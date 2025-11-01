@@ -42,16 +42,15 @@ AI가 번역·요약·의미매핑을 수행하여
 
 ```mermaid
 graph TD
-    A[🌐 Regulation Websites] -->|Crawler| B[📥 Data Collector (Spring Boot)]
-    B --> C[(🗄 Regulation DB)]
-    C --> D[🧠 AI Engine (FastAPI)]
+    A[Regulation Websites] -->|Crawler| B[Data Collector (Spring Boot)]
+    B --> C[(Regulation DB)]
+    C --> D[AI Engine (FastAPI)]
     D -->|Translation / Summary / Mapping| C
-    D --> E[🔍 RAG Search & Citation]
-    E --> F[📊 Report Generator (Spring Boot)]
-    F --> G[💻 Frontend Dashboard (Vue)]
-    G --> H[👥 User (Legal / R&D)]
-    C --> I[📈 Monitoring (Prometheus/Grafana)]
-```
+    D --> E[RAG Search & Citation]
+    E --> F[Report Generator (Spring Boot)]
+    F --> G[Frontend Dashboard (Vue)]
+    G --> H[User (Legal / R&D)]
+    C --> I[Monitoring (Prometheus / Grafana)]
 ---
 
 ## 🚀 Quick Start
