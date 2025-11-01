@@ -51,8 +51,7 @@ graph TD
     F --> G[💻 Frontend Dashboard (Vue)]
     G --> H[👥 User (Legal / R&D)]
     C --> I[📈 Monitoring (Prometheus/Grafana)]
-````
-
+```
 ---
 
 ## 🚀 Quick Start
