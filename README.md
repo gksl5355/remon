@@ -40,8 +40,6 @@ AI가 번역·요약·의미매핑을 수행하여
 
 ## 🏗 System Architecture
 
-## 🏗 System Architecture
-
 ```mermaid
 graph TD
     A[Regulation Websites] -->|Crawler| B[Data Collector - SpringBoot]
