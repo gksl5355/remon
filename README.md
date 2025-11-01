@@ -20,7 +20,7 @@ AI가 번역·요약·의미매핑을 수행하여
 |------|------|
 | **F1. 규제 수집·변경탐지** | 각국 기관 사이트 크롤링 및 조항 단위 버전 비교 |
 | **F2. 문서 처리·번역·요약** | OCR → 언어감지 → Glossary 번역·요약 자동화 |
-| **F3. 규제–제품 매핑·영향평가** | 규제 조항과 제품 속성 자동 매핑 (Rule+Embedding) |
+| **F3. 규제–제품 매핑·영향평가** | 규제 조항과 제품 속성 자동 매핑 (Rule + Embedding) |
 | **F4. RAG 검색·근거 추적** | 근거 기반 LLM 응답 + Faithfulness 검증 |
 | **F5. 리포트·대시보드** | 자동 리포트(PDF/HTML) + 트렌드 시각화 |
 
@@ -51,7 +51,7 @@ graph TD
     F --> G[Frontend Dashboard (Vue)]
     G --> H[User (Legal / R&D)]
     C --> I[Monitoring (Prometheus / Grafana)]
----
+```
 
 ## 🚀 Quick Start
 
@@ -159,7 +159,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 5000 --reload
 
 ## 📬 Contact
 
-**KT&G Global Regulation AI Automation Project**
+**Tobacco Global Regulation AI Automation Project**
 ✉️ `regulation.ai.team@gmail.com`
 
 ---
