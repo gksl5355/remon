@@ -54,7 +54,7 @@ graph TD
     G --> H[User - Legal & R&D]
     C --> I[Monitoring - Prometheus & Grafana]
 
-
+```
 ## 🚀 Quick Start
 
 ### 1️⃣ Clone Repository
