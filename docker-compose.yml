@@ -1,0 +1,29 @@
+version: "3"
+services:
+  backend:
+    build: ./api
+    container_name: remon_api
+    ports:
+      - "8080:8080"
+    networks:
+      - remon-net
+
+  ai-engine:
+    build: ./ai
+    container_name: remon_ai
+    ports:
+      - "5000:5000"
+    networks:
+      - remon-net
+
+  frontend:
+    build: ./web
+    container_name: remon_web
+    ports:
+      - "3000:3000"
+    networks:
+      - remon-net
+
+networks:
+  remon-net:
+    driver: bridge
