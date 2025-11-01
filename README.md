@@ -40,18 +40,20 @@ AI가 번역·요약·의미매핑을 수행하여
 
 ## 🏗 System Architecture
 
+## 🏗 System Architecture
+
 ```mermaid
 graph TD
-    A[Regulation Websites] -->|Crawler| B[Data Collector (Spring Boot)]
+    A[Regulation Websites] -->|Crawler| B[Data Collector - SpringBoot]
     B --> C[(Regulation DB)]
-    C --> D[AI Engine (FastAPI)]
-    D -->|Translation / Summary / Mapping| C
+    C --> D[AI Engine - FastAPI]
+    D -->|Translation · Summary · Mapping| C
     D --> E[RAG Search & Citation]
-    E --> F[Report Generator (Spring Boot)]
-    F --> G[Frontend Dashboard (Vue)]
-    G --> H[User (Legal / R&D)]
-    C --> I[Monitoring (Prometheus / Grafana)]
-```
+    E --> F[Report Generator - SpringBoot]
+    F --> G[Frontend Dashboard - Vue]
+    G --> H[User - Legal & R&D]
+    C --> I[Monitoring - Prometheus & Grafana]
+
 
 ## 🚀 Quick Start
 
