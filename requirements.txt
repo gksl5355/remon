@@ -1,0 +1,1 @@
+fastapi\nsqlalchemy\nuvicorn\npydantic-settings\nchromadb\nredis\nopensearch-py\npython-dotenv\n
