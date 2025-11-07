@@ -25,7 +25,6 @@ yarn-error.log*
 # ============ Common ============
 .DS_Store
 .idea/
-.vscode/
 *.iml
 logs/
 tmp/
