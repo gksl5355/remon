@@ -1,11 +1,14 @@
 """
 module: report_api.py
-description: Report 단계 API 라우터 예시.
+description: 리포트 관련 API 라우터
 """
 from fastapi import APIRouter
-router = APIRouter()
+from app.services.report_service import ReportService
 
-@router.get("/")
-async def sample_report():
-    """Report 단계 샘플 엔드포인트."""
-    return {"stage": "report", "message": "Sample OK"}
+router = APIRouter()
+service = ReportService()
+
+@router.post("/generate")
+async def generate_report(request: dict):
+    """리포트 생성 API"""
+    return await service.generate_report(request)
