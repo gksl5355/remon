@@ -24,7 +24,7 @@
   ```bash
   chmod +x init_env.sh
   ./init_env.sh
-  ```
+  ````
 
 ---
 
@@ -38,9 +38,3 @@
 
 ---
 
-## 📎 참고
-
-* GitHub 저장소: [https://github.com/gksl5355/remon.git](https://github.com/gksl5355/remon.git)
-
-```
-```
