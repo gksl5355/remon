@@ -8,7 +8,7 @@
   ```bash
   git clone https://github.com/gksl5355/remon.git
   cd remon
-````
+
 
 ---
 
@@ -24,7 +24,7 @@
   ```bash
   chmod +x init_env.sh
   ./init_env.sh
-  ````
+
 
 ---
 
@@ -34,7 +34,8 @@
 
   ```bash
   uv run uvicorn app.main:app --reload
-  ```
+
 
 ---
+
 
