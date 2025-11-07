@@ -28,6 +28,7 @@ yarn-error.log*
 *.iml
 logs/
 tmp/
+.vscode/
 .cache/
 *.bak
 *.swp
