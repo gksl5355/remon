@@ -9,10 +9,10 @@ echo "🚀 REMON 개발 환경 초기화 시작..."
 MODE="$1"
 if [[ "$MODE" == "-mac" ]]; then
     OS_MODE="mac"
-    echo "💻 macOS 모드로 실행합니다. (Homebrew 사용)"
+    echo "💻 macOS 모드로 실행합니다. (Homebrew 사용, zsh PATH 적용)"
 else
     OS_MODE="linux"
-    echo "🐧 Linux/WSL 모드로 실행합니다. (curl + install.sh 사용)"
+    echo "🐧 Linux/WSL 모드로 실행합니다. (curl 설치, bash PATH 적용)"
 fi
 
 # ------------------------------
@@ -48,25 +48,42 @@ if ! command -v uv &> /dev/null; then
 
         echo "⬇️ uv 설치 스크립트 실행 중..."
         curl -LsSf https://astral.sh/uv/install.sh | sh
-
-        export PATH="$HOME/.local/bin:$PATH"
-        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc 2>/dev/null || true
-        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc 2>/dev/null || true
-    fi
-
-    # 설치 확인
-    if ! command -v uv &> /dev/null; then
-        echo "⚠️ uv 명령어가 아직 인식되지 않습니다."
-        echo "   새 터미널을 열거나 아래 명령 중 하나를 실행해주세요:"
-        echo "   source ~/.bashrc  또는  source ~/.zshrc"
-        exit 1
     fi
 else
     echo "✅ uv가 이미 설치되어 있습니다: $(uv --version)"
 fi
 
 # ------------------------------
-# 2️⃣ Python 버전 확인
+# 2️⃣ PATH 보정 (즉시 적용 + 영구 등록)
+# ------------------------------
+if [[ "$OS_MODE" == "mac" ]]; then
+    echo "⚙️ zsh PATH 적용 중..."
+    export PATH="$HOME/.local/bin:$PATH"
+    if ! grep -q '.local/bin' ~/.zshrc 2>/dev/null; then
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+    fi
+else
+    echo "⚙️ bash PATH 적용 중..."
+    export PATH="$HOME/.local/bin:$PATH"
+    if ! grep -q '.local/bin' ~/.bashrc 2>/dev/null; then
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+    fi
+fi
+
+# 확인
+if ! command -v uv &> /dev/null; then
+    echo "⚠️ uv 명령이 PATH에 반영되지 않았습니다."
+    echo "   아래 명령으로 셸 설정을 갱신해주세요:"
+    if [[ "$OS_MODE" == "mac" ]]; then
+        echo "   source ~/.zshrc"
+    else
+        echo "   source ~/.bashrc"
+    fi
+    exit 1
+fi
+
+# ------------------------------
+# 3️⃣ Python 버전 확인
 # ------------------------------
 PY_VER=$(python3 -V 2>&1 || true)
 if [[ -z "$PY_VER" ]]; then
@@ -78,7 +95,7 @@ fi
 echo "🐍 Python 버전 확인: $PY_VER"
 
 # ------------------------------
-# 3️⃣ pyproject.toml 확인
+# 4️⃣ pyproject.toml 확인
 # ------------------------------
 if [ ! -f "pyproject.toml" ]; then
     echo "❌ pyproject.toml 파일을 찾을 수 없습니다. remon 루트에서 실행해주세요."
@@ -86,7 +103,7 @@ if [ ! -f "pyproject.toml" ]; then
 fi
 
 # ------------------------------
-# 4️⃣ 환경 선택
+# 5️⃣ uv 환경 동기화
 # ------------------------------
 read -p "⚙️ 설치할 모드 선택 [1: 기본(FastAPI) / 2: AI / 3: Crawler]: " ENV_MODE
 
@@ -110,7 +127,7 @@ case $ENV_MODE in
 esac
 
 # ------------------------------
-# 5️⃣ .env 파일 자동 생성
+# 6️⃣ .env 파일 자동 생성
 # ------------------------------
 if [ ! -f ".env" ]; then
 cat <<EOF > .env
@@ -123,11 +140,11 @@ EOF
 fi
 
 # ------------------------------
-# 6️⃣ 완료 안내
+# 7️⃣ 완료 안내
 # ------------------------------
 echo ""
-echo "✅ 모든 설정이 완료되었습니다!"
-echo "서버 실행 명령:"
+echo "✅ 모든 설정 완료!"
+echo "서버 실행:"
 echo ""
 echo "   uv run uvicorn app.main:app --reload"
 echo ""
