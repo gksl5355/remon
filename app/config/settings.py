@@ -11,10 +11,10 @@ load_dotenv()
 
 class Settings(BaseSettings):
     DATABASE_URL: str
-    REDIS_URL: str
-    SECRET_KEY: str
-    CHROMA_DB_PATH: str
-    CHROMA_COLLECTION: str
+    # REDIS_URL: str
+    # SECRET_KEY: str
+    # CHROMA_DB_PATH: str
+    # CHROMA_COLLECTION: str
 
     class Config:
         env_file = ".env"
