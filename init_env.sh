@@ -41,7 +41,7 @@ if ! command -v uv &> /dev/null; then
             elif command -v yum &> /dev/null; then
                 sudo yum install -y curl
             else
-                echo "❌ curl 설치를 자동으로 처리할 수 없습니다. 수동으로 설치해주세요."
+                echo "❌ curl 설치를 자동으로 처리할 수 없습니다. 수동으로 설치해주세요."un
                 exit 1
             fi
         fi
