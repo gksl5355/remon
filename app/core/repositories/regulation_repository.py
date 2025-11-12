@@ -2,7 +2,7 @@ from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-from app.core.models import Regulation, RegulationVersion, RegulationTranslation
+from core.models import Regulation, RegulationVersion, RegulationTranslation
 from .base_repository import BaseRepository
 
 class RegulationRepository(BaseRepository[Regulation]):

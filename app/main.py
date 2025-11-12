@@ -28,7 +28,7 @@ app.include_router(auth_api.router, prefix="/api")
 app.include_router(admin_regulation_api.router, prefix="/api")
 app.include_router(admin_summary_api.router, prefix="/api")
 app.include_router(admin_websearch_api.router, prefix="/api")
-app.include_router(collect_api.router, prefix="/api")
+# app.include_router(collect_api.router, prefix="/api")
 app.include_router(mapping_api.router, prefix="/api")
 
 @app.get("/")
