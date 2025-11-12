@@ -1,31 +1,39 @@
-"""
-module: main.py
-description: FastAPI 엔트리포인트 (라우터 등록 + 세션 DI)
-author: 조영우
-created: 2025-11-10
-updated: 2025-11-11
-"""
 from fastapi import FastAPI
-from app.api import sample_api, report_api, admin_api, mapping_api, collect_api, auth_api, health_api
-from app.config.logger import logger
+from fastapi.middleware.cors import CORSMiddleware
+
+from api import regulation_api, report_api, auth_api
+
+from api.admin import admin_regulation_api, admin_summary_api, admin_websearch_api
 
 app = FastAPI(
-    title="REMON API",
-    description="규제 모니터링 및 매핑 시스템",
-    version="0.1.0"
+    title="REMON Regulatory Monitoring API",
+    description="Demo backend for Regulation Summary Reports (Admin + User)",
+    version="1.3.0"
 )
 
-# 라우터 등록
-app.include_router(sample_api.router)
-# app.include_router(auth_api.router)
-# app.include_router(collect_api.router)
-# app.include_router(report_api.router)
-# app.include_router(admin_api.router)
-# app.include_router(mapping_api.router) # 미구현 목록 주석처리 함
-app.include_router(health_api.router, prefix="/health", tags=["Health"])
+# CORS 설정 (프론트 연동)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 메인 페이지 엔드포인트
+app.include_router(regulation_api.router, prefix="/api")
+app.include_router(report_api.router, prefix="/api")
+app.include_router(auth_api.router, prefix="/api")
+
+#관리자 페이지 엔드포인트
+app.include_router(admin_regulation_api.router, prefix="/api")
+app.include_router(admin_summary_api.router, prefix="/api")
+app.include_router(admin_websearch_api.router, prefix="/api")
 
 @app.get("/")
-async def root():
-    """기본 헬스체크"""
-    logger.info("Health check 호출됨")
-    return {"status": "ok"}
+def root():
+    return {"message": "✅ REMON FastAPI backend running with Admin APIs!"}
+
+@app.get("/api/health")
+def health_check():
+    return {"status": "ok", "message": "FastAPI server running"}
