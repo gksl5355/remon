@@ -1,0 +1,21 @@
+[
+  {
+    "id": "PROD_001",
+    "name": "X1 배터리 팟",
+    "category": "battery",
+    "battery_capacity": 2800,
+    "label_size": 32.0,
+    "warning_area": 35.0,
+    "nicotine": 1.8,
+    "certified": true
+  },
+  {
+    "id": "PROD_002",
+    "name": "Y2 맨솔 디바이스",
+    "category": "nicotine",
+    "battery_capacity": 2900,
+    "label_size": 25.0,
+    "nicotine": 2.5,
+    "certified": false
+  }
+]
