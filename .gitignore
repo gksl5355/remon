@@ -32,3 +32,6 @@ tmp/
 .cache/
 *.bak
 *.swp
+
+# =========== uv ===========
+uv.lock

@@ -12,7 +12,7 @@ dependencies:
 import logging
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from app.config.settings import settings
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
