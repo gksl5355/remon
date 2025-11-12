@@ -6,19 +6,19 @@ created: 2025-11-10
 updated: 2025-11-10
 dependencies:
     - fastapi
-    - app.services.mapping_service
-    - app.core.database
+    - services.mapping_service
+    - core.database
 """
 
 import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.database import get_db
-from app.services.mapping_service import MappingService
+from core.database import get_db
+from services.mapping_service import MappingService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/mapping", tags=["Mapping"])
+router = APIRouter(prefix="/mapping", tags=["Mapping"])
 service = MappingService()
 
 

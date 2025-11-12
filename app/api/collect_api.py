@@ -6,19 +6,19 @@ created: 2025-11-10
 updated: 2025-11-11
 dependencies:
     - fastapi
-    - app.services.collect_service
-    - app.core.database
+    - services.collect_service
+    - core.database
 """
 
 import logging
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.database import get_db
-from app.services.collect_service import CollectService
+from core.database import get_db
+from services.collect_service import CollectService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/regulations", tags=["Regulations"])
+router = APIRouter(prefix="/regulations", tags=["Regulations"])
 service = CollectService()
 
 

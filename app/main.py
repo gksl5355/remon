@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api import regulation_api, report_api, auth_api, collect_api
+from api import regulation_api, report_api, auth_api, collect_api, mapping_api
 from api.admin import admin_regulation_api, admin_summary_api, admin_websearch_api
 
 app = FastAPI(
@@ -29,6 +29,7 @@ app.include_router(admin_regulation_api.router, prefix="/api")
 app.include_router(admin_summary_api.router, prefix="/api")
 app.include_router(admin_websearch_api.router, prefix="/api")
 app.include_router(collect_api.router, prefix="/api")
+app.include_router(mapping_api.router, prefix="/api")
 
 @app.get("/")
 def root():
