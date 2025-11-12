@@ -1,37 +1,49 @@
-"""
-module: database.py
-description: 비동기 SQLAlchemy 엔진 및 세션 주입(Dependency Injection) 설정
-author: 조영우
-created: 2025-11-10
-updated: 2025-11-11
-dependencies:
-    - sqlalchemy.ext.asyncio
-    - app.config.settings
-"""
+# """
+# module: database.py
+# description: SQLAlchemy 비동기 세션 관리
+# """
+# from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+# from sqlalchemy.orm import sessionmaker
+# from app.config.settings import settings
+
+# engine = create_async_engine(settings.DATABASE_URL, echo=False, future=True)
+# AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+# async def get_db():
+#     async with AsyncSessionLocal() as session:
+#         yield session
 
 import logging
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
-from config.settings import settings
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.pool import NullPool
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 logger = logging.getLogger(__name__)
 
-# ✅ AsyncEngine 생성
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# Async Engine
 engine = create_async_engine(
-    settings.DATABASE_URL,
-    pool_pre_ping=True,   #데이터베이스 서버에 의해 연결이 예기치 않게 종료되었을 경우, 새로운 연결로 재시도하여 애플리케이션 오류를 방지
-    echo=False,
+    DATABASE_URL,
+    echo=True,  # 개발 시 SQL 로그 출력
+    poolclass=NullPool,
+    future=True
 )
 
-# ✅ 세션 팩토리
+# Async Session Factory
 AsyncSessionLocal = sessionmaker(
-    bind=engine,
+    engine,
     class_=AsyncSession,
     expire_on_commit=False,
-    autoflush=False,
+    autocommit=False,
+    autoflush=False
 )
 
-async def get_db() -> AsyncSession:
+# Dependency for FastAPI
+async def get_db():
     """
     비동기 DB 세션을 생성하여 FastAPI 의존성으로 제공한다.
 

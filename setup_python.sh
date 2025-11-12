@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 set -e
 
 echo "🐍 Python 3.11.13 환경 자동 세팅 시작..."

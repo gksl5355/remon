@@ -1,32 +1,67 @@
 """
 module: base_repository.py
 description: 공통 Repository 베이스 클래스 (commit 금지, 세션 주입 전용)
-author: 조영우
-created: 2025-11-10
-updated: 2025-11-11
+author: 조영우 - 남지수 BE2브랜치와 merge
+merge_ated: 2025-11-12
 dependencies:
     - sqlalchemy.ext.asyncio
 """
-
+from typing import TypeVar, Generic, Type, Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
-import logging
+from sqlalchemy import select, update, delete
+from sqlalchemy.orm import DeclarativeBase
 
-logger = logging.getLogger(__name__)
+ModelType = TypeVar("ModelType", bound=DeclarativeBase)
 
-class BaseRepository:
-    """Repository 계층의 공통 메서드 제공 (트랜잭션은 서비스 계층에서 관리)."""
-
-    async def execute(self, db: AsyncSession, stmt):
-        """
-        쿼리를 실행하고 결과를 반환한다.
-
-        Args:
-            db (AsyncSession): SQLAlchemy 비동기 세션.
-            stmt: 실행할 SQLAlchemy 문(statement).
-
-        Returns:
-            Result: SQLAlchemy 실행 결과 객체.
-        """
-        logger.debug(f"Executing SQL: {stmt}")
-        result = await db.execute(stmt)
-        return result
+class BaseRepository(Generic[ModelType]):
+    def __init__(self, model: Type[ModelType]):
+        self.model = model
+    
+    async def create(self, db: AsyncSession, obj_in: dict) -> ModelType:
+        """Create new record"""
+        db_obj = self.model(**obj_in)
+        db.add(db_obj)
+        await db.flush()
+        await db.refresh(db_obj)
+        return db_obj
+    
+    async def get(self, db: AsyncSession, id: int) -> Optional[ModelType]:
+        """Get record by ID"""
+        result = await db.execute(
+            select(self.model).where(self.model.id == id)
+        )
+        return result.scalar_one_or_none()
+    
+    async def get_multi(
+        self, db: AsyncSession, skip: int = 0, limit: int = 100
+    ) -> List[ModelType]:
+        """Get multiple records"""
+        result = await db.execute(
+            select(self.model).offset(skip).limit(limit)
+        )
+        return result.scalars().all()
+    
+    async def update(
+        self, db: AsyncSession, id: int, obj_in: dict
+    ) -> Optional[ModelType]:
+        """Update record"""
+        await db.execute(
+            update(self.model).where(self.model.id == id).values(**obj_in)
+        )
+        await db.flush()
+        return await self.get(db, id)
+    
+    async def delete(self, db: AsyncSession, id: int) -> bool:
+        """Delete record"""
+        result = await db.execute(
+            delete(self.model).where(self.model.id == id)
+        )
+        await db.flush()
+        return result.rowcount > 0
+    
+    async def exists(self, db: AsyncSession, id: int) -> bool:
+        """Check if record exists"""
+        result = await db.execute(
+            select(self.model.id).where(self.model.id == id)
+        )
+        return result.scalar_one_or_none() is not None
