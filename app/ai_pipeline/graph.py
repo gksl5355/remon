@@ -49,7 +49,7 @@ def build_graph():
     graph.add_conditional_edges(
         "validator",
         _route_validation,
-        {"ok": "report", "fail": "generate_strategy"},
+        {"ok": "score_impact", "fail": "generate_strategy"},
     )
 
     # 영향도 → 리포트 → 종료
