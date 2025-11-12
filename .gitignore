@@ -32,3 +32,4 @@ tmp/
 .cache/
 *.bak
 *.swp
+docs/
