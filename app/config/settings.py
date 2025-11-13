@@ -13,12 +13,17 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     REDIS_URL: str
     SECRET_KEY: str
-    CHROMA_DB_PATH: str
-    CHROMA_COLLECTION: str
+    QDRANT_HOST: str
+    QDRANT_PORT: int
+    QDRANT_COLLECTION: str
+    # CHROMA_DB_PATH: str  # 사용 안함
+    # CHROMA_COLLECTION: str  # 사용 안함
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "extra": "ignore",  # .env의 추가 필드 허용
+    }
 
 
 settings = Settings()

@@ -192,7 +192,7 @@ class PreprocessOrchestrator:
             
             # Step 11: Qdrant 저장용 데이터 구성 (명제 단위)
             qdrant_ready_data = self._prepare_for_qdrant_with_propositions(
-                chunks, all_propositions, embeddings_array, proposition_metadata, metadata, tables_result
+                chunks, all_propositions, embeddings_array, proposition_metadata, metadata, tables_result, sparse_embeddings
             )
             
             # 최종 결과
@@ -211,7 +211,7 @@ class PreprocessOrchestrator:
                     "embeddings_stats": {
                         "num_embeddings": len(embeddings_array),
                         "num_propositions": len(all_proposition_texts),
-                        "embedding_dim": embeddings_array.shape[1] if embeddings_array.ndim > 1 else 1024,
+                        "embedding_dim": len(embeddings_array[0]) if embeddings_array and len(embeddings_array) > 0 else 1024,
                     },
                     "search_index": bm25_result,
                 },
@@ -225,10 +225,44 @@ class PreprocessOrchestrator:
                 }
             }
             
+            # Qdrant에 저장
+            try:
+                from app.vectorstore.vector_client import VectorClient
+                logger.info(f"  💾 Qdrant VectorDB에 저장 중...")
+                
+                vc = VectorClient()
+                
+                # 데이터 추출
+                texts = [d["text"] for d in qdrant_ready_data]
+                embeddings = [d["embedding"] for d in qdrant_ready_data]
+                metadatas = [d["metadata"] for d in qdrant_ready_data]
+                
+                # Sparse embedding 추출 (있으면)
+                sparse_embeddings = None
+                if qdrant_ready_data and "sparse_embedding" in qdrant_ready_data[0]["metadata"]:
+                    sparse_embeddings = [d["metadata"].pop("sparse_embedding") for d in qdrant_ready_data]
+                
+                # Qdrant 저장
+                vc.insert(
+                    texts=texts,
+                    dense_embeddings=embeddings,
+                    metadatas=metadatas,
+                    sparse_embeddings=sparse_embeddings
+                )
+                
+                logger.info(f"  ✅ Qdrant 저장 완료: {len(texts)}개 명제")
+                result["qdrant_status"] = "saved"
+                result["qdrant_count"] = len(texts)
+                
+            except Exception as e:
+                logger.error(f"  ❌ Qdrant 저장 실패: {e}")
+                result["qdrant_status"] = "failed"
+                result["qdrant_error"] = str(e)
+            
             # 중복 방지
             self.processed_hashes.add(metadata.get("document_hash"))
             
-            logger.info(f"✅ PDF 처리 완료: {len(chunks)}개 청크 생성, {len(embeddings_array)}개 임베딩")
+            logger.info(f"✅ PDF 처리 완료: {len(chunks)}개 청크 생성, {len(all_proposition_texts)}개 명제 임베딩")
             return result
         
         except Exception as e:
@@ -246,6 +280,7 @@ class PreprocessOrchestrator:
         proposition_metadata: List[Dict[str, Any]],
         doc_metadata: Dict[str, Any],
         tables_result: Dict[str, Any],
+        sparse_embeddings=None,
     ) -> List[Dict[str, Any]]:
         """Qdrant VectorDB에 저장할 형식으로 데이터를 준비 (명제 단위)."""
         chroma_data = []
