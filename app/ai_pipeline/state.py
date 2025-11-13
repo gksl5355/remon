@@ -35,8 +35,24 @@ class AppState(BaseModel):
     )
 
     # 6️⃣ 리포트 결과
+    # report_summary: Optional[str] = Field(None, description="최종 요약 리포트 텍스트")
+    # report_data: Optional[Dict[str, Any]] = Field(None, description="리포트 상세 데이터 구조")
+
     report_summary: Optional[str] = Field(None, description="최종 요약 리포트 텍스트")
-    report_data: Optional[Dict[str, Any]] = Field(None, description="리포트 상세 데이터 구조")
+    report_data: Optional[Dict[str, Any]] = Field(
+        None, 
+        description="""리포트 상세 데이터 구조
+        예시: {
+            'regulation_id': int,
+            'product_ids': List[str],
+            'generated_at': str,
+            'generation_method': 'LLM' or 'Template',
+            'high_risk_count': int,
+            'medium_risk_count': int,
+            'low_risk_count': int
+        }"""
+    )
+
 
     # 7️⃣ 내부 관리용
     error_log: Optional[List[str]] = Field(default_factory=list, description="에러/경고 로그")

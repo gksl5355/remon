@@ -22,6 +22,11 @@ from app.ai_pipeline.nodes.score_impact import score_impact_node      # def scor
 from app.ai_pipeline.nodes.report import report_node                  # def report_node(state: AppState) -> dict
 
 
+# 새로 구현한 report 노드 임포트
+from app.ai_pipeline.nodes.report import report_node
+
+
+
 # 유효성(validation) 분기 라우팅
 def _route_validation(state: AppState) -> str:
     """유효성 결과에 따라 분기: ok → score_impact / fail → generate_strategy"""
