@@ -55,15 +55,15 @@
 ## 5. 팀 역할 분담
 ```
 구분  인원  주요 폴더 / 파일  책임 범위
-FE1 – 프론트엔드/UI 담당 박선영 프론트엔드 마스터🥇 /frontend/→ pages/, components/, composables/, services/api.js  사용자 인터페이스 / API 연동 / 리포트 시각화
-BE1 – 백엔드 리드 (트랜잭션·API 게이트웨이) 조영우 백엔드리드 /app/api/
+FE1 – 프론트엔드/UI 담당 박선영  /frontend/→ pages/, components/, composables/, services/api.js  사용자 인터페이스 / API 연동 / 리포트 시각화
+BE1 – 백엔드 리드 (트랜잭션·API 게이트웨이) 조영우/app/api/
 /app/services/
 /app/config/
 /app/main.py  전체 API 라우팅 / 트랜잭션 관리 / 서비스 orchestration
-BE2 – 데이터베이스 엔지니어 (Repository & Schema) 남지수 백엔드엔지니어 /app/core/→ database.py, models/, schemas/, repositories/ DB 구조 설계 / Repository 표준화 / ORM
-AI1 – LangGraph 파이프라인 엔지니어  고서아 LLM 마스터 /app/ai_pipeline/pipeline_orchestrator.py/app/ai_pipeline/chains//app/ai_pipeline/agents/ LLM 파이프라인 (LangGraph) 설계 / 대응전략·리포트 생성
-AI2 – RAG 엔지니어 (임베딩·검색 시스템) 조태환 RAG 마스터 /app/ai_pipeline/memory//app/vectorstore//app/ai_pipeline/utils/  RAG 검색·임베딩·VectorDB 구축
-DE1 – AI/DATA엔지니어 (수집·전처리 파이프라인)  김민제 데이터 엔지니어링 팀장  /app/crawler//app/pipelines/collect//app/pipelines/refine//app/services/collect_service.py  규제 데이터 크롤링 / 전처리 / RAG 입력 데이터 생성
+BE2 – 데이터베이스 엔지니어 (Repository & Schema) 남지수  /app/core/→ database.py, models/, schemas/, repositories/ DB 구조 설계 / Repository 표준화 / ORM
+AI1 – LangGraph 파이프라인 엔지니어  고서아 /app/ai_pipeline/pipeline_orchestrator.py/app/ai_pipeline/chains//app/ai_pipeline/agents/ LLM 파이프라인 (LangGraph) 설계 / 대응전략·리포트 생성
+AI2 – RAG 엔지니어 (임베딩·검색 시스템) 조태환 /app/ai_pipeline/memory//app/vectorstore//app/ai_pipeline/utils/  RAG 검색·임베딩·VectorDB 구축
+DE1 – AI/DATA엔지니어 (수집·전처리 파이프라인)  김민제  /app/crawler//app/pipelines/collect//app/pipelines/refine//app/services/collect_service.py  규제 데이터 크롤링 / 전처리 / RAG 입력 데이터 생성
 ```
 ---
 ## 6. RAG Schema 개요 (초안)
@@ -155,6 +155,7 @@ DE1 – AI/DATA엔지니어 (수집·전처리 파이프라인)  김민제 데�
 
 
 ---
+
 
 
 
