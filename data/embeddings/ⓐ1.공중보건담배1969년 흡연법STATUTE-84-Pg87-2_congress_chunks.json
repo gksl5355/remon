@@ -1,0 +1,101 @@
+{
+  "num_chunks": 13,
+  "statistics": {
+    "avg_chunk_size": 704.9,
+    "total_tokens_estimate": 2286,
+    "num_sections": 3
+  },
+  "chunks": [
+    {
+      "chunk_id": "ⓐ1.공중보건담배1969년 흡연법STATUTE-84-Pg87-2_congress_0",
+      "section": "2.",
+      "section_title": "92 (15 U.S.C. 1331-",
+      "hierarchy_path": "2.",
+      "tokens_estimate": 230
+    },
+    {
+      "chunk_id": "ⓐ1.공중보건담배1969년 흡연법STATUTE-84-Pg87-2_congress_1",
+      "section": "2.",
+      "section_title": "92 (15 U.S.C. 1331-",
+      "hierarchy_path": "2.",
+      "tokens_estimate": 105
+    },
+    {
+      "chunk_id": "ⓐ1.공중보건담배1969년 흡연법STATUTE-84-Pg87-2_congress_2",
+      "section": "2.",
+      "section_title": "92 (15 U.S.C. 1331-",
+      "hierarchy_path": "2.",
+      "tokens_estimate": 247
+    },
+    {
+      "chunk_id": "ⓐ1.공중보건담배1969년 흡연법STATUTE-84-Pg87-2_congress_3",
+      "section": "2.",
+      "section_title": "92 (15 U.S.C. 1331-",
+      "hierarchy_path": "2.",
+      "tokens_estimate": 229
+    },
+    {
+      "chunk_id": "ⓐ1.공중보건담배1969년 흡연법STATUTE-84-Pg87-2_congress_4",
+      "section": "2.",
+      "section_title": "92 (15 U.S.C. 1331-",
+      "hierarchy_path": "2.",
+      "tokens_estimate": 220
+    },
+    {
+      "chunk_id": "ⓐ1.공중보건담배1969년 흡연법STATUTE-84-Pg87-2_congress_5",
+      "section": "2.",
+      "section_title": "92 (15 U.S.C. 1331-",
+      "hierarchy_path": "2.",
+      "tokens_estimate": 222
+    },
+    {
+      "chunk_id": "ⓐ1.공중보건담배1969년 흡연법STATUTE-84-Pg87-2_congress_6",
+      "section": "2.",
+      "section_title": "92 (15 U.S.C. 1331-",
+      "hierarchy_path": "2.",
+      "tokens_estimate": 237
+    },
+    {
+      "chunk_id": "ⓐ1.공중보건담배1969년 흡연법STATUTE-84-Pg87-2_congress_7",
+      "section": "2.",
+      "section_title": "92 (15 U.S.C. 1331-",
+      "hierarchy_path": "2.",
+      "tokens_estimate": 174
+    },
+    {
+      "chunk_id": "ⓐ1.공중보건담배1969년 흡연법STATUTE-84-Pg87-2_congress_8",
+      "section": "2.",
+      "section_title": "92 (15 U.S.C. 1331-",
+      "hierarchy_path": "2.",
+      "tokens_estimate": 234
+    },
+    {
+      "chunk_id": "ⓐ1.공중보건담배1969년 흡연법STATUTE-84-Pg87-2_congress_9",
+      "section": "2.",
+      "section_title": "92 (15 U.S.C. 1331-",
+      "hierarchy_path": "2.",
+      "tokens_estimate": 163
+    },
+    {
+      "chunk_id": "ⓐ1.공중보건담배1969년 흡연법STATUTE-84-Pg87-2_congress_10",
+      "section": "2.",
+      "section_title": "92 (15 U.S.C. 1331-",
+      "hierarchy_path": "2.",
+      "tokens_estimate": 114
+    },
+    {
+      "chunk_id": "ⓐ1.공중보건담배1969년 흡연법STATUTE-84-Pg87-2_congress_11",
+      "section": "2.",
+      "section_title": "No Title",
+      "hierarchy_path": "2.",
+      "tokens_estimate": 36
+    },
+    {
+      "chunk_id": "ⓐ1.공중보건담배1969년 흡연법STATUTE-84-Pg87-2_congress_12",
+      "section": "4,",
+      "section_title": "No Title",
+      "hierarchy_path": "4,",
+      "tokens_estimate": 75
+    }
+  ]
+}
