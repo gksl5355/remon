@@ -42,6 +42,12 @@ class VectorMetadata(BaseModel):
     embedding_model: str = "bge-m3"
 
 
+    sparse_terms: Optional[Dict[str, float]] = None
+    embedding_model: str = "bge-m3"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+
 class ProductSnapshot(BaseModel):
     """제품 RDB 스냅샷 → 매핑 노드 입력."""
 
