@@ -424,6 +424,7 @@ def _build_product_query_text(product: ProductSnapshot) -> str:
     for key in ("name", "category", "export_country"):
         value = attrs.get(key)
         if value:
+            # TODO(remon-ai): 기술용어사전 적용해서 이름/카테고리 등을 정규화한 토큰으로 확장.
             tokens.append(str(value))
 
     detail_tokens = [f"{k}:{v}" for k, v in attrs.items() if k not in ("id", "name")]
