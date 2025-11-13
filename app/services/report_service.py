@@ -22,39 +22,7 @@ class ReportService:
     def __init__(self):
         self.repo = ReportRepository()
 
-    async def get_reports(
-        self,
-        db: AsyncSession,
-        country: str | None = None,
-        risk_level: str | None = None,
-        page: int = 1,
-        page_size: int = 20
-    ) -> dict:
-        """
-        리포트 목록을 조회한다.
-
-        Args:
-            db (AsyncSession): 데이터베이스 세션.
-            country (str | None): 국가 필터.
-            risk_level (str | None): 영향도 필터 (low/medium/high).
-            page (int): 페이지 번호 (1부터 시작).
-            page_size (int): 페이지당 항목 수.
-
-        Returns:
-            dict: 리포트 목록 및 페이지네이션 정보.
-        """
-        logger.info(f"Fetching reports: country={country}, risk_level={risk_level}, page={page}")
-        
-        # TODO: BE2(남지수) - ReportRepository.get_list() 구현 후 연동
-        # TODO: SQL 쿼리: SELECT * FROM reports WHERE country_code=? AND risk_level=?
-        
-        return {
-            "items": [],
-            "total": 0,
-            "page": page,
-            "page_size": page_size
-        }
-
+    
     async def get_report_detail(self, db: AsyncSession, regulation_id: int) -> dict | None:
         """
         리포트 상세 정보를 조회한다 (프론트 형식).
@@ -86,7 +54,7 @@ class ReportService:
                     "summary": {
                         "title": "1. 규제 변경 요약",
                         "type": "paragraph",
-                        "content": []
+                        "content": [report.created_reason]
                     },
                     "products": {
                         "title": "2. 영향받는 제품 목록",

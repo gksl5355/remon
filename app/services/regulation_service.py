@@ -33,7 +33,7 @@ class RegulationService:
         Returns:
             dict: 규제 문서 목록 (프론트 형식).
         """
-        logger.info(f"Fetching regulations - country={country}")
+        # logger.info(f"Fetching regulations - country={country}")
         
         try:
             # Repository 호출

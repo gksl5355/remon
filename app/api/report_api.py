@@ -150,7 +150,7 @@ async def create_report(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    리포트 생성을 요청한다 (AI 파이프라인 트리거).
+    (종합?)리포트 생성을 요청한다 (AI 파이프라인 트리거).
 
     Args:
         regulation_id (int): 규제 문서 ID.
