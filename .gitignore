@@ -35,3 +35,5 @@ tmp/
 
 # =========== uv ===========
 uv.lock
+docs/
+tests/
