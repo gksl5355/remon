@@ -190,8 +190,8 @@ class PreprocessOrchestrator:
             # Step 10: BM25 인덱싱
             bm25_result = self.bm25_indexer.build_index(raw_text, metadata)
             
-            # Step 11: Chroma 저장용 데이터 구성 (명제 단위)
-            chroma_ready_data = self._prepare_for_chroma_with_propositions(
+            # Step 11: Qdrant 저장용 데이터 구성 (명제 단위)
+            qdrant_ready_data = self._prepare_for_qdrant_with_propositions(
                 chunks, all_propositions, embeddings_array, proposition_metadata, metadata, tables_result
             )
             
@@ -215,7 +215,7 @@ class PreprocessOrchestrator:
                     },
                     "search_index": bm25_result,
                 },
-                "chroma_ready_data": chroma_ready_data,
+                "qdrant_ready_data": qdrant_ready_data,
                 "summary": {
                     "num_chunks": len(chunks),
                     "num_propositions": len(all_proposition_texts),
@@ -238,7 +238,7 @@ class PreprocessOrchestrator:
                 "error": str(e),
             }
     
-    def _prepare_for_chroma_with_propositions(
+    def _prepare_for_qdrant_with_propositions(
         self,
         chunks: List[Dict[str, Any]],
         all_propositions: List[List[str]],
@@ -247,7 +247,7 @@ class PreprocessOrchestrator:
         doc_metadata: Dict[str, Any],
         tables_result: Dict[str, Any],
     ) -> List[Dict[str, Any]]:
-        """Chroma VectorDB에 저장할 형식으로 데이터를 준비 (명제 단위)."""
+        """Qdrant VectorDB에 저장할 형식으로 데이터를 준비 (명제 단위)."""
         chroma_data = []
         legal_hierarchy = doc_metadata.get("legal_hierarchy", {})
         
@@ -293,7 +293,7 @@ class PreprocessOrchestrator:
                 chroma_data.append(chroma_doc)
                 embedding_idx += 1
         
-        logger.debug(f"Chroma 저장용 데이터 준비: {len(chroma_data)}개 명제")
+        logger.debug(f"Qdrant 저장용 데이터 준비: {len(chroma_data)}개 명제")
         return chroma_data
     
     def _generate_doc_id(self, pdf_path: str) -> str:
