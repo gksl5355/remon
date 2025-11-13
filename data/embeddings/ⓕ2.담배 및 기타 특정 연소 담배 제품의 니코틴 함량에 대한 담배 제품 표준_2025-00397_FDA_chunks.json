@@ -1,0 +1,3986 @@
+{
+  "num_chunks": 568,
+  "statistics": {
+    "avg_chunk_size": 1363.2,
+    "total_tokens_estimate": 193365,
+    "num_sections": 21
+  },
+  "chunks": [
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_0",
+      "section": "VIII",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII",
+      "tokens_estimate": 217
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_1",
+      "section": "VIII",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII",
+      "tokens_estimate": 252
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_2",
+      "section": "VIII",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII",
+      "tokens_estimate": 238
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_3",
+      "section": "VIII",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII",
+      "tokens_estimate": 248
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_4",
+      "section": "VIII",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII",
+      "tokens_estimate": 227
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_5",
+      "section": "VIII",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII",
+      "tokens_estimate": 176
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_6",
+      "section": "901",
+      "section_title": "No Title",
+      "hierarchy_path": "901",
+      "tokens_estimate": 246
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_7",
+      "section": "901",
+      "section_title": "No Title",
+      "hierarchy_path": "901",
+      "tokens_estimate": 198
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_8",
+      "section": "901",
+      "section_title": "No Title",
+      "hierarchy_path": "901",
+      "tokens_estimate": 205
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_9",
+      "section": "901",
+      "section_title": "No Title",
+      "hierarchy_path": "901",
+      "tokens_estimate": 110
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_10",
+      "section": "907(a)(3)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(3)(A)",
+      "tokens_estimate": 186
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_11",
+      "section": "906(d)",
+      "section_title": "No Title",
+      "hierarchy_path": "906(d)",
+      "tokens_estimate": 250
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_12",
+      "section": "906(d)",
+      "section_title": "No Title",
+      "hierarchy_path": "906(d)",
+      "tokens_estimate": 236
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_13",
+      "section": "906(d)",
+      "section_title": "No Title",
+      "hierarchy_path": "906(d)",
+      "tokens_estimate": 250
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_14",
+      "section": "906(d)",
+      "section_title": "No Title",
+      "hierarchy_path": "906(d)",
+      "tokens_estimate": 179
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_15",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 330
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_16",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 357
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_17",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 365
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_18",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_19",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 329
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_20",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_21",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 371
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_22",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 353
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_23",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 352
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_24",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 342
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_25",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 338
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_26",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 380
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_27",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 380
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_28",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_29",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 360
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_30",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 376
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_31",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 339
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_32",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 371
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_33",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 380
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_34",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 368
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_35",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 375
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_36",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 373
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_37",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 351
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_38",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 370
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_39",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 372
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_40",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 358
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_41",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 378
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_42",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_43",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 381
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_44",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 372
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_45",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 340
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_46",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 349
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_47",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 315
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_48",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 331
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_49",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 329
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_50",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 377
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_51",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 357
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_52",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 378
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_53",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 366
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_54",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 346
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_55",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 380
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_56",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 373
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_57",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 381
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_58",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 316
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_59",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 318
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_60",
+      "section": "907(a)(4)(A)(iii)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(4)(A)(iii)",
+      "tokens_estimate": 218
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_61",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_62",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 381
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_63",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_64",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 359
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_65",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 328
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_66",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 369
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_67",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 309
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_68",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 371
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_69",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 380
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_70",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 320
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_71",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 375
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_72",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 353
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_73",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 330
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_74",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 353
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_75",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 289
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_76",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 364
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_77",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 374
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_78",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 277
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_79",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 332
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_80",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 335
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_81",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 368
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_82",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 328
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_83",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 379
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_84",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 363
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_85",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 349
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_86",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 384
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_87",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 301
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_88",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 377
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_89",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 376
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_90",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 366
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_91",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 368
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_92",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 360
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_93",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 378
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_94",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 360
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_95",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 290
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_96",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 381
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_97",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 374
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_98",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 289
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_99",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 315
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_100",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 348
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_101",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 368
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_102",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_103",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_104",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 324
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_105",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 326
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_106",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 368
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_107",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 279
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_108",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 333
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_109",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 317
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_110",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 346
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_111",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 366
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_112",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 384
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_113",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 358
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_114",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 373
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_115",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 370
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_116",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 368
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_117",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_118",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 304
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_119",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 358
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_120",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 350
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_121",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 358
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_122",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 358
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_123",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 368
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_124",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 375
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_125",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 302
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_126",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 379
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_127",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 354
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_128",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 354
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_129",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 371
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_130",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 298
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_131",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 375
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_132",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 372
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_133",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 339
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_134",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 351
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_135",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 340
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_136",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_137",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 293
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_138",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 345
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_139",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 304
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_140",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 349
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_141",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 357
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_142",
+      "section": "VII.E",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.E",
+      "tokens_estimate": 251
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_143",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 301
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_144",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 352
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_145",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 377
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_146",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 366
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_147",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 339
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_148",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 378
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_149",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 374
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_150",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 363
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_151",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 291
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_152",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 280
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_153",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 368
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_154",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 331
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_155",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 354
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_156",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 316
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_157",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_158",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 307
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_159",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 321
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_160",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 361
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_161",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 366
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_162",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 374
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_163",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 378
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_164",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_165",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 367
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_166",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 374
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_167",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 357
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_168",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 352
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_169",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 384
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_170",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 362
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_171",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 347
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_172",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 307
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_173",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 377
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_174",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 370
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_175",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 361
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_176",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 366
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_177",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 375
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_178",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 361
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_179",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 361
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_180",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 352
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_181",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 374
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_182",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 379
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_183",
+      "section": "VI.B",
+      "section_title": "No Title",
+      "hierarchy_path": "VI.B",
+      "tokens_estimate": 42
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_184",
+      "section": "907(d)(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(3)",
+      "tokens_estimate": 176
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_185",
+      "section": "907(d)(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(3)",
+      "tokens_estimate": 255
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_186",
+      "section": "907(d)(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(3)",
+      "tokens_estimate": 239
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_187",
+      "section": "907(d)(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(3)",
+      "tokens_estimate": 250
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_188",
+      "section": "907(d)(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(3)",
+      "tokens_estimate": 245
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_189",
+      "section": "907(d)(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(3)",
+      "tokens_estimate": 230
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_190",
+      "section": "907(d)(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(3)",
+      "tokens_estimate": 136
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_191",
+      "section": "907(d)(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(3)",
+      "tokens_estimate": 248
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_192",
+      "section": "907(d)(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(3)",
+      "tokens_estimate": 145
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_193",
+      "section": "907(a)(3)(B)(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(3)(B)(i)",
+      "tokens_estimate": 326
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_194",
+      "section": "907(a)(3)(B)(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(3)(B)(i)",
+      "tokens_estimate": 342
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_195",
+      "section": "907(a)(3)(B)(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(3)(B)(i)",
+      "tokens_estimate": 242
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_196",
+      "section": "907(a)(3)(B)(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(3)(B)(i)",
+      "tokens_estimate": 359
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_197",
+      "section": "907(a)(3)(B)(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(3)(B)(i)",
+      "tokens_estimate": 355
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_198",
+      "section": "907(a)(3)(B)(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(3)(B)(i)",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_199",
+      "section": "907(a)(3)(B)(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(3)(B)(i)",
+      "tokens_estimate": 359
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_200",
+      "section": "907(a)(3)(B)(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(3)(B)(i)",
+      "tokens_estimate": 259
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_201",
+      "section": "907(a)(3)(B)(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(3)(B)(i)",
+      "tokens_estimate": 362
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_202",
+      "section": "907(a)(3)(B)(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(3)(B)(i)",
+      "tokens_estimate": 373
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_203",
+      "section": "907(a)(3)(B)(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(3)(B)(i)",
+      "tokens_estimate": 372
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_204",
+      "section": "907(a)(3)(B)(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(3)(B)(i)",
+      "tokens_estimate": 333
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_205",
+      "section": "907(a)(3)(B)(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(3)(B)(i)",
+      "tokens_estimate": 358
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_206",
+      "section": "907(a)(3)(B)(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(3)(B)(i)",
+      "tokens_estimate": 374
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_207",
+      "section": "907(a)(3)(B)(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(3)(B)(i)",
+      "tokens_estimate": 306
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_208",
+      "section": "907(a)(3)(B)(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(3)(B)(i)",
+      "tokens_estimate": 329
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_209",
+      "section": "907(a)(3)(B)(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(3)(B)(i)",
+      "tokens_estimate": 351
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_210",
+      "section": "907(a)(3)(B)(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(3)(B)(i)",
+      "tokens_estimate": 329
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_211",
+      "section": "907(a)(3)(B)(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(3)(B)(i)",
+      "tokens_estimate": 246
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_212",
+      "section": "907(a)(3)(B)(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(a)(3)(B)(i)",
+      "tokens_estimate": 270
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_213",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 363
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_214",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 377
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_215",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 376
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_216",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 365
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_217",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 344
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_218",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 328
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_219",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 321
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_220",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 295
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_221",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 379
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_222",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 346
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_223",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 364
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_224",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_225",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 355
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_226",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 293
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_227",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_228",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 379
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_229",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 377
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_230",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 356
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_231",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 344
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_232",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 360
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_233",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 367
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_234",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 303
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_235",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 357
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_236",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 358
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_237",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 345
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_238",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 308
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_239",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 340
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_240",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 378
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_241",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 345
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_242",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 355
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_243",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 376
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_244",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 380
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_245",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 297
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_246",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 380
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_247",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 345
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_248",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 331
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_249",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 378
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_250",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 335
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_251",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 301
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_252",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 317
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_253",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 372
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_254",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 353
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_255",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 216
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_256",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 379
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_257",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 314
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_258",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 299
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_259",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 362
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_260",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 381
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_261",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 284
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_262",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 320
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_263",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 333
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_264",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 369
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_265",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 373
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_266",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 348
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_267",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 324
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_268",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 355
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_269",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 271
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_270",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 313
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_271",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 302
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_272",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 355
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_273",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 359
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_274",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 355
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_275",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 377
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_276",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 369
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_277",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 326
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_278",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 305
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_279",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 288
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_280",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 379
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_281",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 378
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_282",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 335
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_283",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 341
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_284",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 341
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_285",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 361
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_286",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 320
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_287",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 330
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_288",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 361
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_289",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 380
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_290",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 380
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_291",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 284
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_292",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 349
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_293",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 311
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_294",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 379
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_295",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 295
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_296",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 303
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_297",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_298",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 337
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_299",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 337
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_300",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 339
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_301",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 379
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_302",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 322
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_303",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 354
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_304",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 363
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_305",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 290
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_306",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 375
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_307",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 350
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_308",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 350
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_309",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 286
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_310",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 343
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_311",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 280
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_312",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 370
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_313",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 313
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_314",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 351
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_315",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 373
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_316",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 262
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_317",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 199
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_318",
+      "section": "VIII.A",
+      "section_title": "No Title",
+      "hierarchy_path": "VIII.A",
+      "tokens_estimate": 249
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_319",
+      "section": "910(a)(2)(A)(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "910(a)(2)(A)(i)",
+      "tokens_estimate": 208
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_320",
+      "section": "910(a)(2)(A)(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "910(a)(2)(A)(i)",
+      "tokens_estimate": 191
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_321",
+      "section": "910(a)(2)(A)(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "910(a)(2)(A)(i)",
+      "tokens_estimate": 244
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_322",
+      "section": "910(a)(2)(A)(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "910(a)(2)(A)(i)",
+      "tokens_estimate": 141
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_323",
+      "section": "907(d)(5)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(5)",
+      "tokens_estimate": 252
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_324",
+      "section": "907(d)(5)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(5)",
+      "tokens_estimate": 252
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_325",
+      "section": "907(d)(5)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(5)",
+      "tokens_estimate": 229
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_326",
+      "section": "900(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "900(3)",
+      "tokens_estimate": 347
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_327",
+      "section": "900(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "900(3)",
+      "tokens_estimate": 372
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_328",
+      "section": "900(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "900(3)",
+      "tokens_estimate": 313
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_329",
+      "section": "900(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "900(3)",
+      "tokens_estimate": 336
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_330",
+      "section": "900(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "900(3)",
+      "tokens_estimate": 356
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_331",
+      "section": "900(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "900(3)",
+      "tokens_estimate": 369
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_332",
+      "section": "900(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "900(3)",
+      "tokens_estimate": 381
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_333",
+      "section": "900(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "900(3)",
+      "tokens_estimate": 363
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_334",
+      "section": "900(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "900(3)",
+      "tokens_estimate": 374
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_335",
+      "section": "900(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "900(3)",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_336",
+      "section": "900(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "900(3)",
+      "tokens_estimate": 375
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_337",
+      "section": "900(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "900(3)",
+      "tokens_estimate": 348
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_338",
+      "section": "900(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "900(3)",
+      "tokens_estimate": 368
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_339",
+      "section": "900(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "900(3)",
+      "tokens_estimate": 321
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_340",
+      "section": "900(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "900(3)",
+      "tokens_estimate": 380
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_341",
+      "section": "900(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "900(3)",
+      "tokens_estimate": 296
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_342",
+      "section": "900(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "900(3)",
+      "tokens_estimate": 367
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_343",
+      "section": "900(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "900(3)",
+      "tokens_estimate": 337
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_344",
+      "section": "900(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "900(3)",
+      "tokens_estimate": 314
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_345",
+      "section": "3(1)",
+      "section_title": "No Title",
+      "hierarchy_path": "3(1)",
+      "tokens_estimate": 271
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_346",
+      "section": "3(1)",
+      "section_title": "No Title",
+      "hierarchy_path": "3(1)",
+      "tokens_estimate": 297
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_347",
+      "section": "3(1)",
+      "section_title": "No Title",
+      "hierarchy_path": "3(1)",
+      "tokens_estimate": 376
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_348",
+      "section": "3(1)",
+      "section_title": "No Title",
+      "hierarchy_path": "3(1)",
+      "tokens_estimate": 278
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_349",
+      "section": "3(1)",
+      "section_title": "No Title",
+      "hierarchy_path": "3(1)",
+      "tokens_estimate": 314
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_350",
+      "section": "3(1)",
+      "section_title": "No Title",
+      "hierarchy_path": "3(1)",
+      "tokens_estimate": 332
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_351",
+      "section": "3(1)",
+      "section_title": "No Title",
+      "hierarchy_path": "3(1)",
+      "tokens_estimate": 345
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_352",
+      "section": "3(1)",
+      "section_title": "No Title",
+      "hierarchy_path": "3(1)",
+      "tokens_estimate": 378
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_353",
+      "section": "3(1)",
+      "section_title": "No Title",
+      "hierarchy_path": "3(1)",
+      "tokens_estimate": 328
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_354",
+      "section": "3(1)",
+      "section_title": "No Title",
+      "hierarchy_path": "3(1)",
+      "tokens_estimate": 200
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_355",
+      "section": "3(1)",
+      "section_title": "No Title",
+      "hierarchy_path": "3(1)",
+      "tokens_estimate": 299
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_356",
+      "section": "3(1)",
+      "section_title": "No Title",
+      "hierarchy_path": "3(1)",
+      "tokens_estimate": 298
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_357",
+      "section": "3(1)",
+      "section_title": "No Title",
+      "hierarchy_path": "3(1)",
+      "tokens_estimate": 335
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_358",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 371
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_359",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 364
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_360",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_361",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 363
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_362",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 372
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_363",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 309
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_364",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 359
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_365",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_366",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 328
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_367",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 250
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_368",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 296
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_369",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 295
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_370",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 349
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_371",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 317
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_372",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 306
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_373",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 362
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_374",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 317
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_375",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 370
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_376",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 378
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_377",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 309
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_378",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 371
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_379",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 378
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_380",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 322
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_381",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 372
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_382",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 322
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_383",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 367
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_384",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 276
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_385",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 297
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_386",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 378
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_387",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 338
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_388",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 347
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_389",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 356
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_390",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 303
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_391",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 259
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_392",
+      "section": "VII.D",
+      "section_title": "No Title",
+      "hierarchy_path": "VII.D",
+      "tokens_estimate": 334
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_393",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 303
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_394",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 343
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_395",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 310
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_396",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 380
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_397",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_398",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 239
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_399",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 366
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_400",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 306
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_401",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 375
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_402",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 362
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_403",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 336
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_404",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 344
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_405",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 325
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_406",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 319
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_407",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_408",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 280
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_409",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 300
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_410",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 331
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_411",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 334
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_412",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 310
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_413",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 348
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_414",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 375
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_415",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 335
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_416",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 347
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_417",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 373
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_418",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_419",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 369
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_420",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 374
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_421",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 361
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_422",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 374
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_423",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 353
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_424",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 351
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_425",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_426",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 375
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_427",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 384
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_428",
+      "section": "907(d)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "907(d)(2)",
+      "tokens_estimate": 356
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_429",
+      "section": "907",
+      "section_title": "No Title",
+      "hierarchy_path": "907",
+      "tokens_estimate": 141
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_430",
+      "section": "906(d)",
+      "section_title": "No Title",
+      "hierarchy_path": "906(d)",
+      "tokens_estimate": 205
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_431",
+      "section": "906(d)",
+      "section_title": "No Title",
+      "hierarchy_path": "906(d)",
+      "tokens_estimate": 52
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_432",
+      "section": "916",
+      "section_title": "No Title",
+      "hierarchy_path": "916",
+      "tokens_estimate": 108
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_433",
+      "section": "916(a)(1)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(1)",
+      "tokens_estimate": 200
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_434",
+      "section": "916(a)(1)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(1)",
+      "tokens_estimate": 86
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_435",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 381
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_436",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_437",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 381
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_438",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 379
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_439",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 374
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_440",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 369
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_441",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 376
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_442",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_443",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 356
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_444",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 375
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_445",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 375
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_446",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 374
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_447",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 369
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_448",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 375
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_449",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_450",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 375
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_451",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_452",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_453",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 349
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_454",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 380
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_455",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 374
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_456",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 367
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_457",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 380
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_458",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 368
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_459",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_460",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_461",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_462",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 374
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_463",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_464",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 345
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_465",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_466",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 381
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_467",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 379
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_468",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 377
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_469",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 364
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_470",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 380
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_471",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 357
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_472",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 367
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_473",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_474",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 378
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_475",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_476",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_477",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 376
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_478",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 377
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_479",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 373
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_480",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 369
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_481",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 370
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_482",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 379
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_483",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 362
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_484",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 377
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_485",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 379
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_486",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 380
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_487",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_488",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_489",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 346
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_490",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_491",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 380
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_492",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_493",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 377
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_494",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 377
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_495",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 379
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_496",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 353
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_497",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 370
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_498",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 374
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_499",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 376
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_500",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_501",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_502",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 381
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_503",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 348
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_504",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_505",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 381
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_506",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 378
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_507",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 369
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_508",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 371
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_509",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 363
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_510",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_511",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_512",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 376
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_513",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 372
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_514",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 323
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_515",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 384
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_516",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 378
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_517",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 379
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_518",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_519",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 384
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_520",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 367
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_521",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 380
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_522",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_523",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 373
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_524",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 371
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_525",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 339
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_526",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 384
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_527",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 363
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_528",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 375
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_529",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_530",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 384
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_531",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 379
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_532",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_533",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 372
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_534",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 374
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_535",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 374
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_536",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 379
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_537",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 377
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_538",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 357
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_539",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 367
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_540",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 381
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_541",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 332
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_542",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 373
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_543",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 381
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_544",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_545",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 380
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_546",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 352
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_547",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 298
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_548",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_549",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 366
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_550",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 354
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_551",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 353
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_552",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 375
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_553",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 382
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_554",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 384
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_555",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 378
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_556",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 375
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_557",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 344
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_558",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 285
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_559",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 337
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_560",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 348
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_561",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 328
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_562",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 320
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_563",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 335
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_564",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 347
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_565",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 354
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_566",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 362
+    },
+    {
+      "chunk_id": "ⓕ2.담배 및 기타 특정 연소 담배 제품의 니코틴 함량에 대한 담배 제품 표준_2025-00397_FDA_567",
+      "section": "916(a)(2)(A)",
+      "section_title": "No Title",
+      "hierarchy_path": "916(a)(2)(A)",
+      "tokens_estimate": 74
+    }
+  ]
+}

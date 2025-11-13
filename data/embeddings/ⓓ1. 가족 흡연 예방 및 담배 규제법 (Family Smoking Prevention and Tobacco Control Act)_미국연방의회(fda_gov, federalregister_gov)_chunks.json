@@ -1,0 +1,2334 @@
+{
+  "num_chunks": 332,
+  "statistics": {
+    "avg_chunk_size": 774.3,
+    "total_tokens_estimate": 64153,
+    "num_sections": 115
+  },
+  "chunks": [
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_0",
+      "section": "1.",
+      "section_title": "No Title",
+      "hierarchy_path": "1.",
+      "tokens_estimate": 60
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_1",
+      "section": "1.",
+      "section_title": "No Title",
+      "hierarchy_path": "1.",
+      "tokens_estimate": 9
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_2",
+      "section": "2.",
+      "section_title": "No Title",
+      "hierarchy_path": "2.",
+      "tokens_estimate": 4
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_3",
+      "section": "3.",
+      "section_title": "No Title",
+      "hierarchy_path": "3.",
+      "tokens_estimate": 4
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_4",
+      "section": "4.",
+      "section_title": "No Title",
+      "hierarchy_path": "4.",
+      "tokens_estimate": 6
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_5",
+      "section": "5.",
+      "section_title": "No Title",
+      "hierarchy_path": "5.",
+      "tokens_estimate": 5
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_6",
+      "section": "6.",
+      "section_title": "No Title",
+      "hierarchy_path": "6.",
+      "tokens_estimate": 14
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_7",
+      "section": "I—AUTHORITY",
+      "section_title": "AUTHORITY OF THE FOOD AND DRUG ADMINISTRATION",
+      "hierarchy_path": "I—AUTHORITY",
+      "tokens_estimate": 13
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_8",
+      "section": "101.",
+      "section_title": "No Title",
+      "hierarchy_path": "101.",
+      "tokens_estimate": 15
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_9",
+      "section": "102.",
+      "section_title": "No Title",
+      "hierarchy_path": "102.",
+      "tokens_estimate": 5
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_10",
+      "section": "103.",
+      "section_title": "No Title",
+      "hierarchy_path": "103.",
+      "tokens_estimate": 16
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_11",
+      "section": "104.",
+      "section_title": "No Title",
+      "hierarchy_path": "104.",
+      "tokens_estimate": 18
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_12",
+      "section": "105.",
+      "section_title": "No Title",
+      "hierarchy_path": "105.",
+      "tokens_estimate": 19
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_13",
+      "section": "106.",
+      "section_title": "No Title",
+      "hierarchy_path": "106.",
+      "tokens_estimate": 12
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_14",
+      "section": "II—TOBACCO",
+      "section_title": "TOBACCO PRODUCT WARNINGS; CONSTITUENT AND SMOKE",
+      "hierarchy_path": "II—TOBACCO",
+      "tokens_estimate": 19
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_15",
+      "section": "201.",
+      "section_title": "No Title",
+      "hierarchy_path": "201.",
+      "tokens_estimate": 12
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_16",
+      "section": "202.",
+      "section_title": "No Title",
+      "hierarchy_path": "202.",
+      "tokens_estimate": 16
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_17",
+      "section": "203.",
+      "section_title": "No Title",
+      "hierarchy_path": "203.",
+      "tokens_estimate": 16
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_18",
+      "section": "204.",
+      "section_title": "No Title",
+      "hierarchy_path": "204.",
+      "tokens_estimate": 15
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_19",
+      "section": "205.",
+      "section_title": "No Title",
+      "hierarchy_path": "205.",
+      "tokens_estimate": 20
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_20",
+      "section": "206.",
+      "section_title": "No Title",
+      "hierarchy_path": "206.",
+      "tokens_estimate": 19
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_21",
+      "section": "III—PREVENTION",
+      "section_title": "PREVENTION OF ILLICIT TRADE IN TOBACCO PRODUCTS",
+      "hierarchy_path": "III—PREVENTION",
+      "tokens_estimate": 14
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_22",
+      "section": "301.",
+      "section_title": "No Title",
+      "hierarchy_path": "301.",
+      "tokens_estimate": 13
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_23",
+      "section": "302.",
+      "section_title": "No Title",
+      "hierarchy_path": "302.",
+      "tokens_estimate": 352
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_24",
+      "section": "302.",
+      "section_title": "No Title",
+      "hierarchy_path": "302.",
+      "tokens_estimate": 355
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_25",
+      "section": "302.",
+      "section_title": "No Title",
+      "hierarchy_path": "302.",
+      "tokens_estimate": 363
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_26",
+      "section": "302.",
+      "section_title": "No Title",
+      "hierarchy_path": "302.",
+      "tokens_estimate": 359
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_27",
+      "section": "302.",
+      "section_title": "No Title",
+      "hierarchy_path": "302.",
+      "tokens_estimate": 281
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_28",
+      "section": "302.",
+      "section_title": "No Title",
+      "hierarchy_path": "302.",
+      "tokens_estimate": 380
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_29",
+      "section": "302.",
+      "section_title": "No Title",
+      "hierarchy_path": "302.",
+      "tokens_estimate": 352
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_30",
+      "section": "302.",
+      "section_title": "No Title",
+      "hierarchy_path": "302.",
+      "tokens_estimate": 349
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_31",
+      "section": "302.",
+      "section_title": "No Title",
+      "hierarchy_path": "302.",
+      "tokens_estimate": 353
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_32",
+      "section": "302.",
+      "section_title": "No Title",
+      "hierarchy_path": "302.",
+      "tokens_estimate": 363
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_33",
+      "section": "302.",
+      "section_title": "No Title",
+      "hierarchy_path": "302.",
+      "tokens_estimate": 338
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_34",
+      "section": "302.",
+      "section_title": "No Title",
+      "hierarchy_path": "302.",
+      "tokens_estimate": 200
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_35",
+      "section": "3.",
+      "section_title": "No Title",
+      "hierarchy_path": "3.",
+      "tokens_estimate": 199
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_36",
+      "section": "3.",
+      "section_title": "No Title",
+      "hierarchy_path": "3.",
+      "tokens_estimate": 329
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_37",
+      "section": "3.",
+      "section_title": "No Title",
+      "hierarchy_path": "3.",
+      "tokens_estimate": 186
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_38",
+      "section": "3.",
+      "section_title": "No Title",
+      "hierarchy_path": "3.",
+      "tokens_estimate": 211
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_39",
+      "section": "3.",
+      "section_title": "No Title",
+      "hierarchy_path": "3.",
+      "tokens_estimate": 53
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_40",
+      "section": "6.",
+      "section_title": "No Title",
+      "hierarchy_path": "6.",
+      "tokens_estimate": 245
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_41",
+      "section": "6.",
+      "section_title": "No Title",
+      "hierarchy_path": "6.",
+      "tokens_estimate": 63
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_42",
+      "section": "919",
+      "section_title": "No Title",
+      "hierarchy_path": "919",
+      "tokens_estimate": 162
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_43",
+      "section": "I—AUTHORITY",
+      "section_title": "AUTHORITY OF THE FOOD",
+      "hierarchy_path": "I—AUTHORITY",
+      "tokens_estimate": 13
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_44",
+      "section": "101.",
+      "section_title": "No Title",
+      "hierarchy_path": "101.",
+      "tokens_estimate": 243
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_45",
+      "section": "101.",
+      "section_title": "No Title",
+      "hierarchy_path": "101.",
+      "tokens_estimate": 169
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_46",
+      "section": "101.",
+      "section_title": "No Title",
+      "hierarchy_path": "101.",
+      "tokens_estimate": 215
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_47",
+      "section": "101.",
+      "section_title": "No Title",
+      "hierarchy_path": "101.",
+      "tokens_estimate": 230
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_48",
+      "section": "101.",
+      "section_title": "No Title",
+      "hierarchy_path": "101.",
+      "tokens_estimate": 239
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_49",
+      "section": "101.",
+      "section_title": "No Title",
+      "hierarchy_path": "101.",
+      "tokens_estimate": 180
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_50",
+      "section": "3(7)",
+      "section_title": "",
+      "hierarchy_path": "3(7)",
+      "tokens_estimate": 355
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_51",
+      "section": "3(7)",
+      "section_title": "",
+      "hierarchy_path": "3(7)",
+      "tokens_estimate": 291
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_52",
+      "section": "3(7)",
+      "section_title": "",
+      "hierarchy_path": "3(7)",
+      "tokens_estimate": 316
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_53",
+      "section": "3(7)",
+      "section_title": "",
+      "hierarchy_path": "3(7)",
+      "tokens_estimate": 315
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_54",
+      "section": "3(7)",
+      "section_title": "",
+      "hierarchy_path": "3(7)",
+      "tokens_estimate": 335
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_55",
+      "section": "3(7)",
+      "section_title": "",
+      "hierarchy_path": "3(7)",
+      "tokens_estimate": 355
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_56",
+      "section": "3(7)",
+      "section_title": "",
+      "hierarchy_path": "3(7)",
+      "tokens_estimate": 146
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_57",
+      "section": "3(7)",
+      "section_title": "",
+      "hierarchy_path": "3(7)",
+      "tokens_estimate": 383
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_58",
+      "section": "3(7)",
+      "section_title": "",
+      "hierarchy_path": "3(7)",
+      "tokens_estimate": 149
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_59",
+      "section": "3(7)",
+      "section_title": "",
+      "hierarchy_path": "3(7)",
+      "tokens_estimate": 262
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_60",
+      "section": "3(7)",
+      "section_title": "",
+      "hierarchy_path": "3(7)",
+      "tokens_estimate": 424
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_61",
+      "section": "3(7)",
+      "section_title": "",
+      "hierarchy_path": "3(7)",
+      "tokens_estimate": 173
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_62",
+      "section": "904",
+      "section_title": "No Title",
+      "hierarchy_path": "904",
+      "tokens_estimate": 186
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_63",
+      "section": "may",
+      "section_title": "No Title",
+      "hierarchy_path": "may",
+      "tokens_estimate": 221
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_64",
+      "section": "may",
+      "section_title": "No Title",
+      "hierarchy_path": "may",
+      "tokens_estimate": 167
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_65",
+      "section": "may",
+      "section_title": "No Title",
+      "hierarchy_path": "may",
+      "tokens_estimate": 248
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_66",
+      "section": "may",
+      "section_title": "No Title",
+      "hierarchy_path": "may",
+      "tokens_estimate": 192
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_67",
+      "section": "may",
+      "section_title": "No Title",
+      "hierarchy_path": "may",
+      "tokens_estimate": 202
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_68",
+      "section": "may",
+      "section_title": "No Title",
+      "hierarchy_path": "may",
+      "tokens_estimate": 166
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_69",
+      "section": "may",
+      "section_title": "No Title",
+      "hierarchy_path": "may",
+      "tokens_estimate": 210
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_70",
+      "section": "(e).",
+      "section_title": "No Title",
+      "hierarchy_path": "(e).",
+      "tokens_estimate": 225
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_71",
+      "section": "(e).",
+      "section_title": "No Title",
+      "hierarchy_path": "(e).",
+      "tokens_estimate": 245
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_72",
+      "section": "(e).",
+      "section_title": "No Title",
+      "hierarchy_path": "(e).",
+      "tokens_estimate": 215
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_73",
+      "section": "(e).",
+      "section_title": "No Title",
+      "hierarchy_path": "(e).",
+      "tokens_estimate": 179
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_74",
+      "section": "(e).",
+      "section_title": "No Title",
+      "hierarchy_path": "(e).",
+      "tokens_estimate": 121
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_75",
+      "section": "(e).",
+      "section_title": "No Title",
+      "hierarchy_path": "(e).",
+      "tokens_estimate": 216
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_76",
+      "section": "(e).",
+      "section_title": "No Title",
+      "hierarchy_path": "(e).",
+      "tokens_estimate": 82
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_77",
+      "section": "(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "(i)",
+      "tokens_estimate": 127
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_78",
+      "section": "(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "(i)",
+      "tokens_estimate": 135
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_79",
+      "section": "(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "(i)",
+      "tokens_estimate": 284
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_80",
+      "section": "(i)",
+      "section_title": "No Title",
+      "hierarchy_path": "(i)",
+      "tokens_estimate": 42
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_81",
+      "section": "to",
+      "section_title": "No Title",
+      "hierarchy_path": "to",
+      "tokens_estimate": 255
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_82",
+      "section": "to",
+      "section_title": "No Title",
+      "hierarchy_path": "to",
+      "tokens_estimate": 239
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_83",
+      "section": "to",
+      "section_title": "No Title",
+      "hierarchy_path": "to",
+      "tokens_estimate": 26
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_84",
+      "section": "to",
+      "section_title": "No Title",
+      "hierarchy_path": "to",
+      "tokens_estimate": 402
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_85",
+      "section": "to",
+      "section_title": "No Title",
+      "hierarchy_path": "to",
+      "tokens_estimate": 155
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_86",
+      "section": "to",
+      "section_title": "No Title",
+      "hierarchy_path": "to",
+      "tokens_estimate": 240
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_87",
+      "section": "to",
+      "section_title": "No Title",
+      "hierarchy_path": "to",
+      "tokens_estimate": 36
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_88",
+      "section": "902,",
+      "section_title": "No Title",
+      "hierarchy_path": "902,",
+      "tokens_estimate": 114
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_89",
+      "section": "911,",
+      "section_title": "No Title",
+      "hierarchy_path": "911,",
+      "tokens_estimate": 321
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_90",
+      "section": "911,",
+      "section_title": "No Title",
+      "hierarchy_path": "911,",
+      "tokens_estimate": 296
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_91",
+      "section": "911,",
+      "section_title": "No Title",
+      "hierarchy_path": "911,",
+      "tokens_estimate": 304
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_92",
+      "section": "911,",
+      "section_title": "No Title",
+      "hierarchy_path": "911,",
+      "tokens_estimate": 237
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_93",
+      "section": "911,",
+      "section_title": "No Title",
+      "hierarchy_path": "911,",
+      "tokens_estimate": 301
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_94",
+      "section": "911,",
+      "section_title": "No Title",
+      "hierarchy_path": "911,",
+      "tokens_estimate": 334
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_95",
+      "section": "911,",
+      "section_title": "No Title",
+      "hierarchy_path": "911,",
+      "tokens_estimate": 299
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_96",
+      "section": "911,",
+      "section_title": "No Title",
+      "hierarchy_path": "911,",
+      "tokens_estimate": 372
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_97",
+      "section": "911,",
+      "section_title": "No Title",
+      "hierarchy_path": "911,",
+      "tokens_estimate": 367
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_98",
+      "section": "911,",
+      "section_title": "No Title",
+      "hierarchy_path": "911,",
+      "tokens_estimate": 350
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_99",
+      "section": "911,",
+      "section_title": "No Title",
+      "hierarchy_path": "911,",
+      "tokens_estimate": 251
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_100",
+      "section": "911,",
+      "section_title": "No Title",
+      "hierarchy_path": "911,",
+      "tokens_estimate": 329
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_101",
+      "section": "911,",
+      "section_title": "No Title",
+      "hierarchy_path": "911,",
+      "tokens_estimate": 268
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_102",
+      "section": "911,",
+      "section_title": "No Title",
+      "hierarchy_path": "911,",
+      "tokens_estimate": 147
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_103",
+      "section": "906(d);",
+      "section_title": "No Title",
+      "hierarchy_path": "906(d);",
+      "tokens_estimate": 346
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_104",
+      "section": "906(d);",
+      "section_title": "No Title",
+      "hierarchy_path": "906(d);",
+      "tokens_estimate": 284
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_105",
+      "section": "906(d);",
+      "section_title": "No Title",
+      "hierarchy_path": "906(d);",
+      "tokens_estimate": 381
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_106",
+      "section": "906(d);",
+      "section_title": "No Title",
+      "hierarchy_path": "906(d);",
+      "tokens_estimate": 357
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_107",
+      "section": "906(d);",
+      "section_title": "No Title",
+      "hierarchy_path": "906(d);",
+      "tokens_estimate": 349
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_108",
+      "section": "906(d);",
+      "section_title": "No Title",
+      "hierarchy_path": "906(d);",
+      "tokens_estimate": 344
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_109",
+      "section": "906(d);",
+      "section_title": "No Title",
+      "hierarchy_path": "906(d);",
+      "tokens_estimate": 350
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_110",
+      "section": "906(d);",
+      "section_title": "No Title",
+      "hierarchy_path": "906(d);",
+      "tokens_estimate": 354
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_111",
+      "section": "906(d);",
+      "section_title": "No Title",
+      "hierarchy_path": "906(d);",
+      "tokens_estimate": 353
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_112",
+      "section": "906(d);",
+      "section_title": "No Title",
+      "hierarchy_path": "906(d);",
+      "tokens_estimate": 311
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_113",
+      "section": "906(d);",
+      "section_title": "No Title",
+      "hierarchy_path": "906(d);",
+      "tokens_estimate": 307
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_114",
+      "section": "(a).",
+      "section_title": "No Title",
+      "hierarchy_path": "(a).",
+      "tokens_estimate": 166
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_115",
+      "section": "(a).",
+      "section_title": "No Title",
+      "hierarchy_path": "(a).",
+      "tokens_estimate": 453
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_116",
+      "section": "(a).",
+      "section_title": "No Title",
+      "hierarchy_path": "(a).",
+      "tokens_estimate": 240
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_117",
+      "section": "(a).",
+      "section_title": "No Title",
+      "hierarchy_path": "(a).",
+      "tokens_estimate": 211
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_118",
+      "section": "the",
+      "section_title": "",
+      "hierarchy_path": "the",
+      "tokens_estimate": 181
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_119",
+      "section": "905(j);",
+      "section_title": "No Title",
+      "hierarchy_path": "905(j);",
+      "tokens_estimate": 108
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_120",
+      "section": "905(j);",
+      "section_title": "No Title",
+      "hierarchy_path": "905(j);",
+      "tokens_estimate": 163
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_121",
+      "section": "905(j);",
+      "section_title": "No Title",
+      "hierarchy_path": "905(j);",
+      "tokens_estimate": 229
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_122",
+      "section": "905(j);",
+      "section_title": "No Title",
+      "hierarchy_path": "905(j);",
+      "tokens_estimate": 237
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_123",
+      "section": "905(j);",
+      "section_title": "No Title",
+      "hierarchy_path": "905(j);",
+      "tokens_estimate": 66
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_124",
+      "section": "905(j);",
+      "section_title": "No Title",
+      "hierarchy_path": "905(j);",
+      "tokens_estimate": 346
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_125",
+      "section": "905(j);",
+      "section_title": "No Title",
+      "hierarchy_path": "905(j);",
+      "tokens_estimate": 190
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_126",
+      "section": "905(j);",
+      "section_title": "No Title",
+      "hierarchy_path": "905(j);",
+      "tokens_estimate": 205
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_127",
+      "section": "905(j);",
+      "section_title": "No Title",
+      "hierarchy_path": "905(j);",
+      "tokens_estimate": 229
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_128",
+      "section": "906(e);",
+      "section_title": "No Title",
+      "hierarchy_path": "906(e);",
+      "tokens_estimate": 116
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_129",
+      "section": "907,",
+      "section_title": "No Title",
+      "hierarchy_path": "907,",
+      "tokens_estimate": 121
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_130",
+      "section": "907,",
+      "section_title": "No Title",
+      "hierarchy_path": "907,",
+      "tokens_estimate": 154
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_131",
+      "section": "907,",
+      "section_title": "No Title",
+      "hierarchy_path": "907,",
+      "tokens_estimate": 220
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_132",
+      "section": "907,",
+      "section_title": "No Title",
+      "hierarchy_path": "907,",
+      "tokens_estimate": 241
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_133",
+      "section": "907,",
+      "section_title": "No Title",
+      "hierarchy_path": "907,",
+      "tokens_estimate": 42
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_134",
+      "section": "905;",
+      "section_title": "No Title",
+      "hierarchy_path": "905;",
+      "tokens_estimate": 359
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_135",
+      "section": "905;",
+      "section_title": "No Title",
+      "hierarchy_path": "905;",
+      "tokens_estimate": 232
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_136",
+      "section": "905;",
+      "section_title": "No Title",
+      "hierarchy_path": "905;",
+      "tokens_estimate": 165
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_137",
+      "section": "905;",
+      "section_title": "No Title",
+      "hierarchy_path": "905;",
+      "tokens_estimate": 148
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_138",
+      "section": "to",
+      "section_title": "",
+      "hierarchy_path": "to",
+      "tokens_estimate": 269
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_139",
+      "section": "to",
+      "section_title": "",
+      "hierarchy_path": "to",
+      "tokens_estimate": 342
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_140",
+      "section": "to",
+      "section_title": "",
+      "hierarchy_path": "to",
+      "tokens_estimate": 348
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_141",
+      "section": "to",
+      "section_title": "",
+      "hierarchy_path": "to",
+      "tokens_estimate": 193
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_142",
+      "section": "to",
+      "section_title": "",
+      "hierarchy_path": "to",
+      "tokens_estimate": 354
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_143",
+      "section": "to",
+      "section_title": "",
+      "hierarchy_path": "to",
+      "tokens_estimate": 273
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_144",
+      "section": "to",
+      "section_title": "",
+      "hierarchy_path": "to",
+      "tokens_estimate": 360
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_145",
+      "section": "to",
+      "section_title": "",
+      "hierarchy_path": "to",
+      "tokens_estimate": 51
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_146",
+      "section": "to",
+      "section_title": "",
+      "hierarchy_path": "to",
+      "tokens_estimate": 365
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_147",
+      "section": "to",
+      "section_title": "",
+      "hierarchy_path": "to",
+      "tokens_estimate": 344
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_148",
+      "section": "to",
+      "section_title": "",
+      "hierarchy_path": "to",
+      "tokens_estimate": 362
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_149",
+      "section": "to",
+      "section_title": "",
+      "hierarchy_path": "to",
+      "tokens_estimate": 344
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_150",
+      "section": "to",
+      "section_title": "",
+      "hierarchy_path": "to",
+      "tokens_estimate": 355
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_151",
+      "section": "to",
+      "section_title": "",
+      "hierarchy_path": "to",
+      "tokens_estimate": 160
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_152",
+      "section": "to",
+      "section_title": "",
+      "hierarchy_path": "to",
+      "tokens_estimate": 381
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_153",
+      "section": "to",
+      "section_title": "",
+      "hierarchy_path": "to",
+      "tokens_estimate": 92
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_154",
+      "section": "to",
+      "section_title": "",
+      "hierarchy_path": "to",
+      "tokens_estimate": 381
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_155",
+      "section": "to",
+      "section_title": "",
+      "hierarchy_path": "to",
+      "tokens_estimate": 350
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_156",
+      "section": "to",
+      "section_title": "",
+      "hierarchy_path": "to",
+      "tokens_estimate": 240
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_157",
+      "section": "to",
+      "section_title": "",
+      "hierarchy_path": "to",
+      "tokens_estimate": 354
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_158",
+      "section": "to",
+      "section_title": "",
+      "hierarchy_path": "to",
+      "tokens_estimate": 362
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_159",
+      "section": "to",
+      "section_title": "",
+      "hierarchy_path": "to",
+      "tokens_estimate": 123
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_160",
+      "section": "3",
+      "section_title": "",
+      "hierarchy_path": "3",
+      "tokens_estimate": 199
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_161",
+      "section": "3",
+      "section_title": "",
+      "hierarchy_path": "3",
+      "tokens_estimate": 147
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_162",
+      "section": "3",
+      "section_title": "",
+      "hierarchy_path": "3",
+      "tokens_estimate": 248
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_163",
+      "section": "3",
+      "section_title": "",
+      "hierarchy_path": "3",
+      "tokens_estimate": 184
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_164",
+      "section": "3",
+      "section_title": "",
+      "hierarchy_path": "3",
+      "tokens_estimate": 193
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_165",
+      "section": "3",
+      "section_title": "",
+      "hierarchy_path": "3",
+      "tokens_estimate": 227
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_166",
+      "section": "3",
+      "section_title": "",
+      "hierarchy_path": "3",
+      "tokens_estimate": 210
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_167",
+      "section": "3",
+      "section_title": "",
+      "hierarchy_path": "3",
+      "tokens_estimate": 106
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_168",
+      "section": "(a)",
+      "section_title": "",
+      "hierarchy_path": "(a)",
+      "tokens_estimate": 109
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_169",
+      "section": "(a)",
+      "section_title": "",
+      "hierarchy_path": "(a)",
+      "tokens_estimate": 206
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_170",
+      "section": "(a)",
+      "section_title": "",
+      "hierarchy_path": "(a)",
+      "tokens_estimate": 216
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_171",
+      "section": "(a)",
+      "section_title": "",
+      "hierarchy_path": "(a)",
+      "tokens_estimate": 216
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_172",
+      "section": "(a)",
+      "section_title": "",
+      "hierarchy_path": "(a)",
+      "tokens_estimate": 85
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_173",
+      "section": "(a)",
+      "section_title": "",
+      "hierarchy_path": "(a)",
+      "tokens_estimate": 245
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_174",
+      "section": "(a)",
+      "section_title": "",
+      "hierarchy_path": "(a)",
+      "tokens_estimate": 254
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_175",
+      "section": "(a)",
+      "section_title": "",
+      "hierarchy_path": "(a)",
+      "tokens_estimate": 219
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_176",
+      "section": "(a)",
+      "section_title": "",
+      "hierarchy_path": "(a)",
+      "tokens_estimate": 99
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_177",
+      "section": "(a)",
+      "section_title": "",
+      "hierarchy_path": "(a)",
+      "tokens_estimate": 239
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_178",
+      "section": "(a)",
+      "section_title": "",
+      "hierarchy_path": "(a)",
+      "tokens_estimate": 223
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_179",
+      "section": "(a)",
+      "section_title": "",
+      "hierarchy_path": "(a)",
+      "tokens_estimate": 242
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_180",
+      "section": "(a)",
+      "section_title": "",
+      "hierarchy_path": "(a)",
+      "tokens_estimate": 114
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_181",
+      "section": "5,",
+      "section_title": "No Title",
+      "hierarchy_path": "5,",
+      "tokens_estimate": 244
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_182",
+      "section": "5,",
+      "section_title": "No Title",
+      "hierarchy_path": "5,",
+      "tokens_estimate": 215
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_183",
+      "section": "5,",
+      "section_title": "No Title",
+      "hierarchy_path": "5,",
+      "tokens_estimate": 226
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_184",
+      "section": "5,",
+      "section_title": "No Title",
+      "hierarchy_path": "5,",
+      "tokens_estimate": 198
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_185",
+      "section": "5,",
+      "section_title": "No Title",
+      "hierarchy_path": "5,",
+      "tokens_estimate": 132
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_186",
+      "section": "(e)).",
+      "section_title": "No Title",
+      "hierarchy_path": "(e)).",
+      "tokens_estimate": 169
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_187",
+      "section": "(e)).",
+      "section_title": "No Title",
+      "hierarchy_path": "(e)).",
+      "tokens_estimate": 197
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_188",
+      "section": "(e)).",
+      "section_title": "No Title",
+      "hierarchy_path": "(e)).",
+      "tokens_estimate": 136
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_189",
+      "section": "(e)).",
+      "section_title": "No Title",
+      "hierarchy_path": "(e)).",
+      "tokens_estimate": 244
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_190",
+      "section": "(e)).",
+      "section_title": "No Title",
+      "hierarchy_path": "(e)).",
+      "tokens_estimate": 203
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_191",
+      "section": "(e)).",
+      "section_title": "No Title",
+      "hierarchy_path": "(e)).",
+      "tokens_estimate": 195
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_192",
+      "section": "(e)).",
+      "section_title": "No Title",
+      "hierarchy_path": "(e)).",
+      "tokens_estimate": 231
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_193",
+      "section": "(e)).",
+      "section_title": "No Title",
+      "hierarchy_path": "(e)).",
+      "tokens_estimate": 247
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_194",
+      "section": "(e)).",
+      "section_title": "No Title",
+      "hierarchy_path": "(e)).",
+      "tokens_estimate": 237
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_195",
+      "section": "(e)).",
+      "section_title": "No Title",
+      "hierarchy_path": "(e)).",
+      "tokens_estimate": 247
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_196",
+      "section": "(e)).",
+      "section_title": "No Title",
+      "hierarchy_path": "(e)).",
+      "tokens_estimate": 206
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_197",
+      "section": "(e)).",
+      "section_title": "No Title",
+      "hierarchy_path": "(e)).",
+      "tokens_estimate": 145
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_198",
+      "section": "(a)",
+      "section_title": "No Title",
+      "hierarchy_path": "(a)",
+      "tokens_estimate": 159
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_199",
+      "section": "as",
+      "section_title": "No Title",
+      "hierarchy_path": "as",
+      "tokens_estimate": 255
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_200",
+      "section": "as",
+      "section_title": "No Title",
+      "hierarchy_path": "as",
+      "tokens_estimate": 236
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_201",
+      "section": "as",
+      "section_title": "No Title",
+      "hierarchy_path": "as",
+      "tokens_estimate": 113
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_202",
+      "section": "as",
+      "section_title": "No Title",
+      "hierarchy_path": "as",
+      "tokens_estimate": 173
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_203",
+      "section": "as",
+      "section_title": "No Title",
+      "hierarchy_path": "as",
+      "tokens_estimate": 194
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_204",
+      "section": "as",
+      "section_title": "No Title",
+      "hierarchy_path": "as",
+      "tokens_estimate": 421
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_205",
+      "section": "as",
+      "section_title": "No Title",
+      "hierarchy_path": "as",
+      "tokens_estimate": 215
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_206",
+      "section": "as",
+      "section_title": "No Title",
+      "hierarchy_path": "as",
+      "tokens_estimate": 224
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_207",
+      "section": "as",
+      "section_title": "No Title",
+      "hierarchy_path": "as",
+      "tokens_estimate": 110
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_208",
+      "section": "5,",
+      "section_title": "No Title",
+      "hierarchy_path": "5,",
+      "tokens_estimate": 196
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_209",
+      "section": "5,",
+      "section_title": "No Title",
+      "hierarchy_path": "5,",
+      "tokens_estimate": 158
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_210",
+      "section": "5,",
+      "section_title": "No Title",
+      "hierarchy_path": "5,",
+      "tokens_estimate": 248
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_211",
+      "section": "5,",
+      "section_title": "No Title",
+      "hierarchy_path": "5,",
+      "tokens_estimate": 122
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_212",
+      "section": "103.",
+      "section_title": "No Title",
+      "hierarchy_path": "103.",
+      "tokens_estimate": 44
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_213",
+      "section": "an",
+      "section_title": "No Title",
+      "hierarchy_path": "an",
+      "tokens_estimate": 277
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_214",
+      "section": "an",
+      "section_title": "No Title",
+      "hierarchy_path": "an",
+      "tokens_estimate": 353
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_215",
+      "section": "an",
+      "section_title": "No Title",
+      "hierarchy_path": "an",
+      "tokens_estimate": 296
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_216",
+      "section": "an",
+      "section_title": "No Title",
+      "hierarchy_path": "an",
+      "tokens_estimate": 273
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_217",
+      "section": "an",
+      "section_title": "No Title",
+      "hierarchy_path": "an",
+      "tokens_estimate": 422
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_218",
+      "section": "an",
+      "section_title": "No Title",
+      "hierarchy_path": "an",
+      "tokens_estimate": 303
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_219",
+      "section": "an",
+      "section_title": "No Title",
+      "hierarchy_path": "an",
+      "tokens_estimate": 377
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_220",
+      "section": "an",
+      "section_title": "No Title",
+      "hierarchy_path": "an",
+      "tokens_estimate": 344
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_221",
+      "section": "an",
+      "section_title": "No Title",
+      "hierarchy_path": "an",
+      "tokens_estimate": 235
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_222",
+      "section": "an",
+      "section_title": "No Title",
+      "hierarchy_path": "an",
+      "tokens_estimate": 276
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_223",
+      "section": "an",
+      "section_title": "No Title",
+      "hierarchy_path": "an",
+      "tokens_estimate": 223
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_224",
+      "section": "an",
+      "section_title": "No Title",
+      "hierarchy_path": "an",
+      "tokens_estimate": 323
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_225",
+      "section": "409(a)",
+      "section_title": "No Title",
+      "hierarchy_path": "409(a)",
+      "tokens_estimate": 163
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_226",
+      "section": "409(a)",
+      "section_title": "No Title",
+      "hierarchy_path": "409(a)",
+      "tokens_estimate": 270
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_227",
+      "section": "409(a)",
+      "section_title": "No Title",
+      "hierarchy_path": "409(a)",
+      "tokens_estimate": 410
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_228",
+      "section": "409(a)",
+      "section_title": "No Title",
+      "hierarchy_path": "409(a)",
+      "tokens_estimate": 39
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_229",
+      "section": "906(d),",
+      "section_title": "No Title",
+      "hierarchy_path": "906(d),",
+      "tokens_estimate": 226
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_230",
+      "section": "906(d),",
+      "section_title": "No Title",
+      "hierarchy_path": "906(d),",
+      "tokens_estimate": 216
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_231",
+      "section": "906(d),",
+      "section_title": "No Title",
+      "hierarchy_path": "906(d),",
+      "tokens_estimate": 252
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_232",
+      "section": "906(d),",
+      "section_title": "No Title",
+      "hierarchy_path": "906(d),",
+      "tokens_estimate": 231
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_233",
+      "section": "906(d),",
+      "section_title": "No Title",
+      "hierarchy_path": "906(d),",
+      "tokens_estimate": 114
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_234",
+      "section": "104.",
+      "section_title": "No Title",
+      "hierarchy_path": "104.",
+      "tokens_estimate": 103
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_235",
+      "section": "105.",
+      "section_title": "21 USC 387f–1.",
+      "hierarchy_path": "105.",
+      "tokens_estimate": 211
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_236",
+      "section": "105.",
+      "section_title": "21 USC 387f–1.",
+      "hierarchy_path": "105.",
+      "tokens_estimate": 249
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_237",
+      "section": "106.",
+      "section_title": "No Title",
+      "hierarchy_path": "106.",
+      "tokens_estimate": 203
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_238",
+      "section": "106.",
+      "section_title": "No Title",
+      "hierarchy_path": "106.",
+      "tokens_estimate": 135
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_239",
+      "section": "106.",
+      "section_title": "No Title",
+      "hierarchy_path": "106.",
+      "tokens_estimate": 240
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_240",
+      "section": "II—TOBACCO",
+      "section_title": "TOBACCO PRODUCT WARN-",
+      "hierarchy_path": "II—TOBACCO",
+      "tokens_estimate": 20
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_241",
+      "section": "201.",
+      "section_title": "No Title",
+      "hierarchy_path": "201.",
+      "tokens_estimate": 227
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_242",
+      "section": "201.",
+      "section_title": "No Title",
+      "hierarchy_path": "201.",
+      "tokens_estimate": 247
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_243",
+      "section": "201.",
+      "section_title": "No Title",
+      "hierarchy_path": "201.",
+      "tokens_estimate": 228
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_244",
+      "section": "201.",
+      "section_title": "No Title",
+      "hierarchy_path": "201.",
+      "tokens_estimate": 256
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_245",
+      "section": "201.",
+      "section_title": "No Title",
+      "hierarchy_path": "201.",
+      "tokens_estimate": 181
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_246",
+      "section": "201.",
+      "section_title": "No Title",
+      "hierarchy_path": "201.",
+      "tokens_estimate": 253
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_247",
+      "section": "201.",
+      "section_title": "No Title",
+      "hierarchy_path": "201.",
+      "tokens_estimate": 228
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_248",
+      "section": "201.",
+      "section_title": "No Title",
+      "hierarchy_path": "201.",
+      "tokens_estimate": 193
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_249",
+      "section": "(a)(1)",
+      "section_title": "No Title",
+      "hierarchy_path": "(a)(1)",
+      "tokens_estimate": 194
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_250",
+      "section": "will",
+      "section_title": "",
+      "hierarchy_path": "will",
+      "tokens_estimate": 43
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_251",
+      "section": "(b)",
+      "section_title": "No Title",
+      "hierarchy_path": "(b)",
+      "tokens_estimate": 193
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_252",
+      "section": "(a)(1).",
+      "section_title": "No Title",
+      "hierarchy_path": "(a)(1).",
+      "tokens_estimate": 227
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_253",
+      "section": "202.",
+      "section_title": "",
+      "hierarchy_path": "202.",
+      "tokens_estimate": 143
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_254",
+      "section": "903(a)(2)",
+      "section_title": "No Title",
+      "hierarchy_path": "903(a)(2)",
+      "tokens_estimate": 249
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_255",
+      "section": "203.",
+      "section_title": "",
+      "hierarchy_path": "203.",
+      "tokens_estimate": 17
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_256",
+      "section": "5",
+      "section_title": "No Title",
+      "hierarchy_path": "5",
+      "tokens_estimate": 128
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_257",
+      "section": "204.",
+      "section_title": "No Title",
+      "hierarchy_path": "204.",
+      "tokens_estimate": 194
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_258",
+      "section": "204.",
+      "section_title": "No Title",
+      "hierarchy_path": "204.",
+      "tokens_estimate": 196
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_259",
+      "section": "204.",
+      "section_title": "No Title",
+      "hierarchy_path": "204.",
+      "tokens_estimate": 177
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_260",
+      "section": "204.",
+      "section_title": "No Title",
+      "hierarchy_path": "204.",
+      "tokens_estimate": 230
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_261",
+      "section": "204.",
+      "section_title": "No Title",
+      "hierarchy_path": "204.",
+      "tokens_estimate": 195
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_262",
+      "section": "204.",
+      "section_title": "No Title",
+      "hierarchy_path": "204.",
+      "tokens_estimate": 255
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_263",
+      "section": "204.",
+      "section_title": "No Title",
+      "hierarchy_path": "204.",
+      "tokens_estimate": 237
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_264",
+      "section": "204.",
+      "section_title": "No Title",
+      "hierarchy_path": "204.",
+      "tokens_estimate": 77
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_265",
+      "section": "will",
+      "section_title": "",
+      "hierarchy_path": "will",
+      "tokens_estimate": 223
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_266",
+      "section": "will",
+      "section_title": "",
+      "hierarchy_path": "will",
+      "tokens_estimate": 187
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_267",
+      "section": "will",
+      "section_title": "",
+      "hierarchy_path": "will",
+      "tokens_estimate": 109
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_268",
+      "section": "205.",
+      "section_title": "No Title",
+      "hierarchy_path": "205.",
+      "tokens_estimate": 150
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_269",
+      "section": "205.",
+      "section_title": "No Title",
+      "hierarchy_path": "205.",
+      "tokens_estimate": 208
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_270",
+      "section": "206.",
+      "section_title": "",
+      "hierarchy_path": "206.",
+      "tokens_estimate": 20
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_271",
+      "section": "4",
+      "section_title": "No Title",
+      "hierarchy_path": "4",
+      "tokens_estimate": 251
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_272",
+      "section": "4",
+      "section_title": "No Title",
+      "hierarchy_path": "4",
+      "tokens_estimate": 111
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_273",
+      "section": "553",
+      "section_title": "No Title",
+      "hierarchy_path": "553",
+      "tokens_estimate": 250
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_274",
+      "section": "553",
+      "section_title": "No Title",
+      "hierarchy_path": "553",
+      "tokens_estimate": 39
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_275",
+      "section": "III—PREVENTION",
+      "section_title": "PREVENTION OF ILLICIT",
+      "hierarchy_path": "III—PREVENTION",
+      "tokens_estimate": 14
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_276",
+      "section": "301.",
+      "section_title": "No Title",
+      "hierarchy_path": "301.",
+      "tokens_estimate": 205
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_277",
+      "section": "301.",
+      "section_title": "No Title",
+      "hierarchy_path": "301.",
+      "tokens_estimate": 252
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_278",
+      "section": "301.",
+      "section_title": "No Title",
+      "hierarchy_path": "301.",
+      "tokens_estimate": 225
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_279",
+      "section": "301.",
+      "section_title": "No Title",
+      "hierarchy_path": "301.",
+      "tokens_estimate": 247
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_280",
+      "section": "301.",
+      "section_title": "No Title",
+      "hierarchy_path": "301.",
+      "tokens_estimate": 228
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_281",
+      "section": "301.",
+      "section_title": "No Title",
+      "hierarchy_path": "301.",
+      "tokens_estimate": 132
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_282",
+      "section": "302.",
+      "section_title": "No Title",
+      "hierarchy_path": "302.",
+      "tokens_estimate": 210
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_283",
+      "section": "302.",
+      "section_title": "No Title",
+      "hierarchy_path": "302.",
+      "tokens_estimate": 252
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_284",
+      "section": "302.",
+      "section_title": "No Title",
+      "hierarchy_path": "302.",
+      "tokens_estimate": 59
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_285",
+      "section": "100.",
+      "section_title": "No Title",
+      "hierarchy_path": "100.",
+      "tokens_estimate": 67
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_286",
+      "section": "100.",
+      "section_title": "No Title",
+      "hierarchy_path": "100.",
+      "tokens_estimate": 10
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_287",
+      "section": "I—PROVISIONS",
+      "section_title": "PROVISIONS RELATING TO FEDERAL EMPLOYEES RETIREMENT",
+      "hierarchy_path": "I—PROVISIONS",
+      "tokens_estimate": 14
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_288",
+      "section": "101.",
+      "section_title": "No Title",
+      "hierarchy_path": "101.",
+      "tokens_estimate": 5
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_289",
+      "section": "102.",
+      "section_title": "No Title",
+      "hierarchy_path": "102.",
+      "tokens_estimate": 19
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_290",
+      "section": "103.",
+      "section_title": "No Title",
+      "hierarchy_path": "103.",
+      "tokens_estimate": 11
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_291",
+      "section": "104.",
+      "section_title": "No Title",
+      "hierarchy_path": "104.",
+      "tokens_estimate": 13
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_292",
+      "section": "105.",
+      "section_title": "No Title",
+      "hierarchy_path": "105.",
+      "tokens_estimate": 8
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_293",
+      "section": "106.",
+      "section_title": "No Title",
+      "hierarchy_path": "106.",
+      "tokens_estimate": 8
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_294",
+      "section": "107.",
+      "section_title": "No Title",
+      "hierarchy_path": "107.",
+      "tokens_estimate": 7
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_295",
+      "section": "108.",
+      "section_title": "No Title",
+      "hierarchy_path": "108.",
+      "tokens_estimate": 17
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_296",
+      "section": "109.",
+      "section_title": "No Title",
+      "hierarchy_path": "109.",
+      "tokens_estimate": 10
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_297",
+      "section": "110.",
+      "section_title": "No Title",
+      "hierarchy_path": "110.",
+      "tokens_estimate": 21
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_298",
+      "section": "II—SPECIAL",
+      "section_title": "SPECIAL SURVIVOR INDEMNITY ALLOWANCE FOR SURVIVING",
+      "hierarchy_path": "II—SPECIAL",
+      "tokens_estimate": 22
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_299",
+      "section": "201.",
+      "section_title": "No Title",
+      "hierarchy_path": "201.",
+      "tokens_estimate": 114
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_300",
+      "section": "I—PROVISIONS",
+      "section_title": "PROVISIONS RELATING TO",
+      "hierarchy_path": "I—PROVISIONS",
+      "tokens_estimate": 26
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_301",
+      "section": "101.",
+      "section_title": "No Title",
+      "hierarchy_path": "101.",
+      "tokens_estimate": 30
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_302",
+      "section": "102.",
+      "section_title": "No Title",
+      "hierarchy_path": "102.",
+      "tokens_estimate": 156
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_303",
+      "section": "102.",
+      "section_title": "No Title",
+      "hierarchy_path": "102.",
+      "tokens_estimate": 237
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_304",
+      "section": "102.",
+      "section_title": "No Title",
+      "hierarchy_path": "102.",
+      "tokens_estimate": 63
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_305",
+      "section": "103.",
+      "section_title": "No Title",
+      "hierarchy_path": "103.",
+      "tokens_estimate": 221
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_306",
+      "section": "103.",
+      "section_title": "No Title",
+      "hierarchy_path": "103.",
+      "tokens_estimate": 249
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_307",
+      "section": "103.",
+      "section_title": "No Title",
+      "hierarchy_path": "103.",
+      "tokens_estimate": 53
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_308",
+      "section": "104.",
+      "section_title": "No Title",
+      "hierarchy_path": "104.",
+      "tokens_estimate": 227
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_309",
+      "section": "104.",
+      "section_title": "No Title",
+      "hierarchy_path": "104.",
+      "tokens_estimate": 211
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_310",
+      "section": "105.",
+      "section_title": "No Title",
+      "hierarchy_path": "105.",
+      "tokens_estimate": 253
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_311",
+      "section": "105.",
+      "section_title": "No Title",
+      "hierarchy_path": "105.",
+      "tokens_estimate": 29
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_312",
+      "section": "5,",
+      "section_title": "No Title",
+      "hierarchy_path": "5,",
+      "tokens_estimate": 201
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_313",
+      "section": "5,",
+      "section_title": "No Title",
+      "hierarchy_path": "5,",
+      "tokens_estimate": 80
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_314",
+      "section": "8439",
+      "section_title": "No Title",
+      "hierarchy_path": "8439",
+      "tokens_estimate": 11
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_315",
+      "section": "106.",
+      "section_title": "No Title",
+      "hierarchy_path": "106.",
+      "tokens_estimate": 247
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_316",
+      "section": "106.",
+      "section_title": "No Title",
+      "hierarchy_path": "106.",
+      "tokens_estimate": 110
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_317",
+      "section": "107.",
+      "section_title": "No Title",
+      "hierarchy_path": "107.",
+      "tokens_estimate": 244
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_318",
+      "section": "107.",
+      "section_title": "No Title",
+      "hierarchy_path": "107.",
+      "tokens_estimate": 174
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_319",
+      "section": "108.",
+      "section_title": "No Title",
+      "hierarchy_path": "108.",
+      "tokens_estimate": 17
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_320",
+      "section": "8437(e)(3)",
+      "section_title": "No Title",
+      "hierarchy_path": "8437(e)(3)",
+      "tokens_estimate": 80
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_321",
+      "section": "18,",
+      "section_title": "",
+      "hierarchy_path": "18,",
+      "tokens_estimate": 44
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_322",
+      "section": "109.",
+      "section_title": "No Title",
+      "hierarchy_path": "109.",
+      "tokens_estimate": 10
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_323",
+      "section": "8433(e)",
+      "section_title": "",
+      "hierarchy_path": "8433(e)",
+      "tokens_estimate": 234
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_324",
+      "section": "(b)",
+      "section_title": "No Title",
+      "hierarchy_path": "(b)",
+      "tokens_estimate": 31
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_325",
+      "section": "(g)",
+      "section_title": "No Title",
+      "hierarchy_path": "(g)",
+      "tokens_estimate": 103
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_326",
+      "section": "110.",
+      "section_title": "No Title",
+      "hierarchy_path": "110.",
+      "tokens_estimate": 141
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_327",
+      "section": "110.",
+      "section_title": "No Title",
+      "hierarchy_path": "110.",
+      "tokens_estimate": 123
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_328",
+      "section": "II—SPECIAL",
+      "section_title": "SPECIAL SURVIVOR INDEM-",
+      "hierarchy_path": "II—SPECIAL",
+      "tokens_estimate": 23
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_329",
+      "section": "201.",
+      "section_title": "No Title",
+      "hierarchy_path": "201.",
+      "tokens_estimate": 73
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_330",
+      "section": "1450(m)",
+      "section_title": "",
+      "hierarchy_path": "1450(m)",
+      "tokens_estimate": 247
+    },
+    {
+      "chunk_id": "ⓓ1. 가족 흡연 예방 및 담배 규제법 (Family Smoking Prevention and Tobacco Control Act)_미국연방의회(fda_gov, federalregister_gov)_331",
+      "section": "1450(m)",
+      "section_title": "",
+      "hierarchy_path": "1450(m)",
+      "tokens_estimate": 117
+    }
+  ]
+}

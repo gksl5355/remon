@@ -21,16 +21,12 @@ logger = logging.getLogger(__name__)
 # ==================== 기존 REMON 설정 활용 ====================
 # app/config/settings.py에서 .env를 이미 로드했으므로 그것을 재사용
 # .env가 없으면 기본값 사용 (상대경로만 사용)
+# Qdrant 설정 (환경변수에서 직접 로드)
 try:
     from app.config.settings import settings as remon_settings
-    CHROMA_DB_PATH = remon_settings.CHROMA_DB_PATH
-    CHROMA_COLLECTION = remon_settings.CHROMA_COLLECTION
-    logger.info(f"✅ REMON 기존 설정 로드: CHROMA_DB_PATH={CHROMA_DB_PATH}, COLLECTION={CHROMA_COLLECTION}")
+    logger.info(f"✅ REMON 기존 설정 로드 시도")
 except (ImportError, AttributeError, ValueError) as e:
-    # Fallback: 환경변수에서 직접 로드 (settings.py 로드 실패 시)
     logger.warning(f"⚠️ REMON 설정 로드 실패, 환경변수에서 직접 로드: {e}")
-    CHROMA_DB_PATH = os.getenv("CHROMA_DB_PATH", "./data/embeddings")
-    CHROMA_COLLECTION = os.getenv("CHROMA_COLLECTION", "remon_regulations")
 
 
 class PreprocessConfig:
@@ -109,15 +105,18 @@ class PreprocessConfig:
     DETECT_CATEGORY: bool = True
     """규제 카테고리 감지 여부. 기본값: True"""
     
-    # ==================== VectorDB (Chroma) ====================
-    CHROMA_DB_PATH: str = CHROMA_DB_PATH
-    """Chroma DB 경로 (.env에서 로드된 REMON 설정 재사용, 상대경로)"""
+    # ==================== VectorDB (Qdrant) ====================
+    QDRANT_HOST: str = os.getenv("QDRANT_HOST", "localhost")
+    """Qdrant 서버 호스트. 기본값: localhost"""
     
-    CHROMA_COLLECTION: str = CHROMA_COLLECTION
-    """Chroma 컬렉션명 (.env에서 로드된 REMON 설정 재사용)"""
+    QDRANT_PORT: int = int(os.getenv("QDRANT_PORT", "6333"))
+    """Qdrant 서버 포트. 기본값: 6333"""
     
-    CHROMA_ANONYMIZED_TELEMETRY: bool = False
-    """Chroma 익명 텔레메트리. 기본값: False"""
+    QDRANT_PATH: str = os.getenv("QDRANT_PATH", "./data/qdrant")
+    """Qdrant 로컬 저장소 경로. 기본값: ./data/qdrant"""
+    
+    QDRANT_COLLECTION: str = os.getenv("QDRANT_COLLECTION", "remon_regulations")
+    """Qdrant 컬렉션명. 기본값: remon_regulations"""
     
     # ==================== 로그 & 데이터 디렉토리 (상대경로) ====================
     LOG_DIR: str = "./logs/preprocess"
@@ -193,12 +192,12 @@ class PreprocessConfig:
         if cls.LOG_LEVEL not in valid_levels:
             raise ValueError(f"LOG_LEVEL must be one of {valid_levels}, got {cls.LOG_LEVEL}")
         
-        # Chroma 경로 검증 (상대경로 확인)
-        if not cls.CHROMA_DB_PATH:
-            raise ValueError("CHROMA_DB_PATH is not set. Check .env file or app/config/settings.py")
+        # Qdrant 경로 검증
+        if not cls.QDRANT_PATH:
+            raise ValueError("QDRANT_PATH is not set. Check .env file")
         
-        if not cls.CHROMA_COLLECTION:
-            raise ValueError("CHROMA_COLLECTION is not set. Check .env file or app/config/settings.py")
+        if not cls.QDRANT_COLLECTION:
+            raise ValueError("QDRANT_COLLECTION is not set. Check .env file")
     
     @classmethod
     def get_embedding_config(cls) -> dict:
@@ -244,10 +243,11 @@ class PreprocessConfig:
         }
     
     @classmethod
-    def get_chroma_config(cls) -> dict:
-        """Chroma 설정 딕셔너리 반환."""
+    def get_qdrant_config(cls) -> dict:
+        """Qdrant 설정 딕셔너리 반환."""
         return {
-            "path": cls.CHROMA_DB_PATH,
-            "collection": cls.CHROMA_COLLECTION,
-            "anonymized_telemetry": cls.CHROMA_ANONYMIZED_TELEMETRY,
+            "host": cls.QDRANT_HOST,
+            "port": cls.QDRANT_PORT,
+            "path": cls.QDRANT_PATH,
+            "collection": cls.QDRANT_COLLECTION,
         }
