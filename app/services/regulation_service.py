@@ -9,11 +9,11 @@ dependencies:
     - core.repositories.regulation_repository
 """
 
-import logging
+from app.config.logger import logger
 from sqlalchemy.ext.asyncio import AsyncSession
-from core.repositories.regulation_repository import RegulationRepository
+from app.core.repositories.regulation_repository import RegulationRepository
 
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 
 
 class RegulationService:
@@ -51,7 +51,7 @@ class RegulationService:
                     "title": reg.title or "제목 없음",
                     "status": reg.status or "active",
                     # TODO: impact, category는 ImpactScore 테이블에서 가져와야 함
-                    "impact": "보통",  # 임시값
+                    "impact": "높음",  # 임시값
                     "category": "기타",  # 임시값
                     "summary": reg.title or ""
                 })

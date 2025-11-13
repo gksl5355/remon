@@ -3,19 +3,24 @@ module: report_service.py
 description: 리포트 생성, 조회 및 관련 비즈니스 로직을 처리하는 서비스 계층
 author: 조영우
 created: 2025-11-10
-updated: 2025-11-10
+updated: 2025-11-12
 dependencies:
     - sqlalchemy.ext.asyncio
+    - core.repositories.report_repository
 """
 
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.repositories.report_repository import ReportRepository
 
 logger = logging.getLogger(__name__)
 
 
 class ReportService:
     """리포트 관련 비즈니스 로직을 처리하는 서비스 클래스"""
+    
+    def __init__(self):
+        self.repo = ReportRepository()
 
     async def get_reports(
         self,
@@ -50,23 +55,66 @@ class ReportService:
             "page_size": page_size
         }
 
-    async def get_report_detail(self, db: AsyncSession, report_id: int) -> dict | None:
+    async def get_report_detail(self, db: AsyncSession, regulation_id: int) -> dict | None:
         """
-        리포트 상세 정보를 조회한다.
+        리포트 상세 정보를 조회한다 (프론트 형식).
 
         Args:
             db (AsyncSession): 데이터베이스 세션.
-            report_id (int): 리포트 ID.
+            regulation_id (int): 규제 문서 ID.
 
         Returns:
             dict | None: 리포트 상세 정보 또는 None.
         """
-        logger.info(f"Fetching report detail: report_id={report_id}")
+        logger.info(f"Fetching report detail: regulation_id={regulation_id}")
         
-        # TODO: BE2(남지수) - ReportRepository.get_by_id() 구현 후 연동
-        # TODO: JOIN reports, impact_scores, regulation_translations
-        
-        return None
+        try:
+            # TODO: 실제로는 regulation_id로 report를 찾아야 함
+            # 임시: regulation_id를 report_id로 사용
+            report = await self.repo.get_with_items(db, regulation_id)
+            
+            if not report:
+                logger.warning(f"Report not found: regulation_id={regulation_id}")
+                return None
+            
+            # 프론트 형식으로 변환 (더미 데이터 구조 유지)
+            return {
+                "regulation_id": regulation_id,
+                "title": "리포트 제목",  # TODO: 실제 데이터
+                "last_updated": report.created_at.isoformat() if report.created_at else None,
+                "sections": {
+                    "summary": {
+                        "title": "1. 규제 변경 요약",
+                        "type": "paragraph",
+                        "content": []
+                    },
+                    "products": {
+                        "title": "2. 영향받는 제품 목록",
+                        "type": "table",
+                        "headers": ["제품명", "브랜드", "조치"],
+                        "rows": []
+                    },
+                    "changes": {
+                        "title": "3. 주요 변경 사항 해석",
+                        "type": "list",
+                        "content": []
+                    },
+                    "strategy": {
+                        "title": "4. 대응 전략 제안",
+                        "type": "paragraph",
+                        "content": []
+                    },
+                    "references": {
+                        "title": "5. 참고 및 원문 링크",
+                        "type": "links",
+                        "content": []
+                    }
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error fetching report detail: {e}", exc_info=True)
+            return None
 
     async def create_report(
         self,
@@ -113,11 +161,16 @@ class ReportService:
         """
         logger.info(f"Updating report: report_id={report_id}")
         
-        async with db.begin():
-            # TODO: BE2(남지수) - ReportRepository.update() 구현 후 연동
-            pass
-        
-        return None
+        try:
+            async with db.begin():
+                updated = await self.repo.update(db, report_id, update_data)
+                if updated:
+                    logger.info(f"Report updated: report_id={report_id}")
+                    return {"report_id": updated.report_id, "status": "updated"}
+                return None
+        except Exception as e:
+            logger.error(f"Error updating report: {e}", exc_info=True)
+            return None
 
     async def delete_report(self, db: AsyncSession, report_id: int) -> bool:
         """
@@ -132,11 +185,14 @@ class ReportService:
         """
         logger.info(f"Deleting report: report_id={report_id}")
         
-        async with db.begin():
-            # TODO: BE2(남지수) - ReportRepository.delete() 구현 후 연동
-            pass
-        
-        return False
+        try:
+            async with db.begin():
+                success = await self.repo.delete(db, report_id)
+                logger.info(f"Report deleted: report_id={report_id}, success={success}")
+                return success
+        except Exception as e:
+            logger.error(f"Error deleting report: {e}", exc_info=True)
+            return False
 
     async def download_report(self, db: AsyncSession, report_id: int) -> bytes | None:
         """
