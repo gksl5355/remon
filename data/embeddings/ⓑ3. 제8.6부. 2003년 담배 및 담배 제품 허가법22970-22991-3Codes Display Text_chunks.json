@@ -1,0 +1,115 @@
+{
+  "num_chunks": 15,
+  "statistics": {
+    "avg_chunk_size": 1180.3,
+    "total_tokens_estimate": 4420,
+    "num_sections": 2
+  },
+  "chunks": [
+    {
+      "chunk_id": "ⓑ3. 제8.6부. 2003년 담배 및 담배 제품 허가법22970-22991-3Codes Display Text_0",
+      "section": "22977,",
+      "section_title": "No Title",
+      "hierarchy_path": "22977,",
+      "tokens_estimate": 136
+    },
+    {
+      "chunk_id": "ⓑ3. 제8.6부. 2003년 담배 및 담배 제품 허가법22970-22991-3Codes Display Text_1",
+      "section": "22977,",
+      "section_title": "No Title",
+      "hierarchy_path": "22977,",
+      "tokens_estimate": 234
+    },
+    {
+      "chunk_id": "ⓑ3. 제8.6부. 2003년 담배 및 담배 제품 허가법22970-22991-3Codes Display Text_2",
+      "section": "22977,",
+      "section_title": "No Title",
+      "hierarchy_path": "22977,",
+      "tokens_estimate": 191
+    },
+    {
+      "chunk_id": "ⓑ3. 제8.6부. 2003년 담배 및 담배 제품 허가법22970-22991-3Codes Display Text_3",
+      "section": "30473",
+      "section_title": "No Title",
+      "hierarchy_path": "30473",
+      "tokens_estimate": 359
+    },
+    {
+      "chunk_id": "ⓑ3. 제8.6부. 2003년 담배 및 담배 제품 허가법22970-22991-3Codes Display Text_4",
+      "section": "30473",
+      "section_title": "No Title",
+      "hierarchy_path": "30473",
+      "tokens_estimate": 328
+    },
+    {
+      "chunk_id": "ⓑ3. 제8.6부. 2003년 담배 및 담배 제품 허가법22970-22991-3Codes Display Text_5",
+      "section": "30473",
+      "section_title": "No Title",
+      "hierarchy_path": "30473",
+      "tokens_estimate": 356
+    },
+    {
+      "chunk_id": "ⓑ3. 제8.6부. 2003년 담배 및 담배 제품 허가법22970-22991-3Codes Display Text_6",
+      "section": "30473",
+      "section_title": "No Title",
+      "hierarchy_path": "30473",
+      "tokens_estimate": 329
+    },
+    {
+      "chunk_id": "ⓑ3. 제8.6부. 2003년 담배 및 담배 제품 허가법22970-22991-3Codes Display Text_7",
+      "section": "30473",
+      "section_title": "No Title",
+      "hierarchy_path": "30473",
+      "tokens_estimate": 328
+    },
+    {
+      "chunk_id": "ⓑ3. 제8.6부. 2003년 담배 및 담배 제품 허가법22970-22991-3Codes Display Text_8",
+      "section": "30473",
+      "section_title": "No Title",
+      "hierarchy_path": "30473",
+      "tokens_estimate": 351
+    },
+    {
+      "chunk_id": "ⓑ3. 제8.6부. 2003년 담배 및 담배 제품 허가법22970-22991-3Codes Display Text_9",
+      "section": "30473",
+      "section_title": "No Title",
+      "hierarchy_path": "30473",
+      "tokens_estimate": 354
+    },
+    {
+      "chunk_id": "ⓑ3. 제8.6부. 2003년 담배 및 담배 제품 허가법22970-22991-3Codes Display Text_10",
+      "section": "30473",
+      "section_title": "No Title",
+      "hierarchy_path": "30473",
+      "tokens_estimate": 341
+    },
+    {
+      "chunk_id": "ⓑ3. 제8.6부. 2003년 담배 및 담배 제품 허가법22970-22991-3Codes Display Text_11",
+      "section": "30473",
+      "section_title": "No Title",
+      "hierarchy_path": "30473",
+      "tokens_estimate": 336
+    },
+    {
+      "chunk_id": "ⓑ3. 제8.6부. 2003년 담배 및 담배 제품 허가법22970-22991-3Codes Display Text_12",
+      "section": "30473",
+      "section_title": "No Title",
+      "hierarchy_path": "30473",
+      "tokens_estimate": 374
+    },
+    {
+      "chunk_id": "ⓑ3. 제8.6부. 2003년 담배 및 담배 제품 허가법22970-22991-3Codes Display Text_13",
+      "section": "30473",
+      "section_title": "No Title",
+      "hierarchy_path": "30473",
+      "tokens_estimate": 356
+    },
+    {
+      "chunk_id": "ⓑ3. 제8.6부. 2003년 담배 및 담배 제품 허가법22970-22991-3Codes Display Text_14",
+      "section": "30473",
+      "section_title": "No Title",
+      "hierarchy_path": "30473",
+      "tokens_estimate": 47
+    }
+  ]
+}

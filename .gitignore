@@ -32,3 +32,8 @@ tmp/
 .cache/
 *.bak
 *.swp
+.github/
+
+# ============ AI Generated Files ============
+app/ai_pipeline/preprocess/demo
+.amazonq/
