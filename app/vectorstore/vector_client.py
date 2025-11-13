@@ -32,6 +32,7 @@ QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
 QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
 QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "remon_regulations")
 QDRANT_PATH = os.getenv("QDRANT_PATH", "./data/qdrant")  # 로컬 저장소
+QDRANT_USE_LOCAL = os.getenv("QDRANT_USE_LOCAL", "true").lower() == "true"
 
 
 class VectorClient:
@@ -45,22 +46,26 @@ class VectorClient:
     - 로컬/원격 모드 지원
     """
     
-    def __init__(self, collection_name: str = QDRANT_COLLECTION, use_local: bool = True):
+    def __init__(self, collection_name: str = QDRANT_COLLECTION, use_local: bool = None):
         """
         Qdrant 클라이언트 초기화.
         
         Args:
             collection_name: 컬렉션 이름
-            use_local: True면 로컬 저장소, False면 원격 서버
+            use_local: True면 로컬 저장소, False면 원격 서버, None이면 환경변수 사용
         """
         self.collection_name = collection_name
+        
+        # 환경변수에서 모드 결정
+        if use_local is None:
+            use_local = QDRANT_USE_LOCAL
         
         if use_local:
             self.client = QdrantClient(path=QDRANT_PATH)
             logger.info(f"✅ Qdrant 로컬 모드: {QDRANT_PATH}")
         else:
             self.client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
-            logger.info(f"✅ Qdrant 원격 모드: {QDRANT_HOST}:{QDRANT_PORT}")
+            logger.info(f"✅ Qdrant 서버 모드: {QDRANT_HOST}:{QDRANT_PORT}")
         
         self._ensure_collection()
     
@@ -101,7 +106,8 @@ class VectorClient:
         """
         points = []
         for idx, (text, dense, meta) in enumerate(zip(texts, dense_embeddings, metadatas)):
-            point_id = meta.get("clause_id", idx)
+            # Qdrant는 int 또는 UUID만 허용
+            point_id = idx  # 문자열 ID 대신 인덱스 사용
             
             vectors = {"dense": dense}
             
