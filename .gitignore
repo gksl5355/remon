@@ -33,3 +33,4 @@ tmp/
 *.bak
 *.swp
 docs/
+tests/
