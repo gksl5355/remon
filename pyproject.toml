@@ -31,9 +31,5 @@ dependencies = [
   "aiosqlite>=0.21.0",
 ]
 
-[tool.pytest.ini_options]
-addopts = "-q"
-testpaths = ["tests"]
-pythonpath = ["."]
 
 

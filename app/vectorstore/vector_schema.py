@@ -31,18 +31,25 @@ class VectorMetadata(BaseModel):
     category: Optional[str] = None
     language: Optional[str] = None
     # 제품/규제 공통·확장 가능 슬롯들
+<<<<<<< HEAD
     # TODO(remon-ai): 전처리 스키마 확정 시 최종 필드/단위 세트로 교체.
+=======
+>>>>>>> 2ba476cf608dcb810b77acf37ad95713f203636f
     nicotine: Optional[float] = None
     label_size: Optional[float] = None
     warning_area: Optional[float] = None
     battery_capacity: Optional[float] = None
     certified: Optional[bool] = None
     export_country: Optional[str] = None
+<<<<<<< HEAD
     sparse_terms: Optional[Dict[str, float]] = None
+=======
+>>>>>>> 2ba476cf608dcb810b77acf37ad95713f203636f
     embedding_model: str = "bge-m3"
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+<<<<<<< HEAD
 class ProductSnapshot(BaseModel):
     """제품 RDB 스냅샷 → 매핑 노드 입력."""
 
@@ -74,6 +81,14 @@ class MappingResult(BaseModel):
     sparse_score: float | None = None
     numeric_ratio: float | None = None
     condition_ratio: float | None = None
+=======
+class MappingResult(BaseModel):
+    product_id: str
+    regulation_id: str
+    hybrid_score: float
+    dense_score: float | None = None
+    sparse_score: float | None = None
+>>>>>>> 2ba476cf608dcb810b77acf37ad95713f203636f
     matched_fields: List[str] | None = None  # ex) ["battery_capacity","label_size"]
     impact_level: int | None = None  # 1~3
     reason: str | None = None  # 간단 설명 문자열
