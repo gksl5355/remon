@@ -10,8 +10,8 @@ import logging
 from fastapi import APIRouter, Request, HTTPException, Depends, Query
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.database import get_db
-from app.services.report_service import ReportService
+from core.database import get_db
+from services.report_service import ReportService
 
 
 logger = logging.getLogger(__name__)

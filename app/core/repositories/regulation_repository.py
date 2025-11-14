@@ -2,7 +2,7 @@ from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-from app.core.models import Regulation, RegulationVersion, RegulationTranslation
+from core.models import Regulation, RegulationVersion, RegulationTranslation
 from .base_repository import BaseRepository
 
 class RegulationRepository(BaseRepository[Regulation]):
@@ -16,6 +16,25 @@ class RegulationRepository(BaseRepository[Regulation]):
         result = await db.execute(
             select(Regulation).where(Regulation.country_code == country_code)
         )
+        return result.scalars().all()
+    
+    async def get_with_keynotes_and_impact(
+        self, db: AsyncSession, country_code: str = None
+    ) -> List[Regulation]:
+        """keynote와 impact_score를 포함한 규제 조회"""
+        from app.core.models.regulation_model import RegulationVersion, RegulationChangeKeynote
+        from app.core.models.impact_model import ImpactScore
+        
+        query = select(Regulation).options(
+            selectinload(Regulation.versions)
+            .selectinload(RegulationVersion.keynotes)
+            .selectinload(RegulationChangeKeynote.impact_score)
+        )
+        
+        if country_code:
+            query = query.where(Regulation.country_code == country_code)
+        
+        result = await db.execute(query)
         return result.scalars().all()
     
     async def get_with_versions(

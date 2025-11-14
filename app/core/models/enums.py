@@ -6,9 +6,9 @@ class ProductCategoryEnum(str, enum.Enum):
     E_CIGARETTE = "e_cigarette"
 
 class RiskLevelEnum(str, enum.Enum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
 
 class ChangeTypeEnum(str, enum.Enum):
     NONE = "none"

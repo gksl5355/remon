@@ -3,7 +3,7 @@ module: report_service.py
 description: 리포트 생성, 조회 및 관련 비즈니스 로직을 처리하는 서비스 계층
 author: 조영우
 created: 2025-11-10
-updated: 2025-11-12
+updated: 2025-11-14
 dependencies:
     - sqlalchemy.ext.asyncio
     - core.repositories.report_repository
@@ -11,7 +11,7 @@ dependencies:
 
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.repositories.report_repository import ReportRepository
+from core.repositories.report_repository import ReportRepository
 
 logger = logging.getLogger(__name__)
 

@@ -2,7 +2,7 @@ from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-from app.core.models import Report, ReportItem, ReportSummary
+from core.models import Report, ReportItem, ReportSummary
 from .base_repository import BaseRepository
 
 class ReportRepository(BaseRepository[Report]):

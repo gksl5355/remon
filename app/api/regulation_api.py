@@ -14,8 +14,8 @@ dependencies:
 import logging
 from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.database import get_db
-from app.services.regulation_service import RegulationService
+from core.database import get_db
+from services.regulation_service import RegulationService
 
 logger = logging.getLogger(__name__)
 

@@ -3,15 +3,15 @@ module: regulation_service.py
 description: 규제 문서 조회 비즈니스 로직
 author: 조영우
 created: 2025-11-12
-updated: 2025-11-12
+updated: 2025-11-14
 dependencies:
     - sqlalchemy.ext.asyncio
     - core.repositories.regulation_repository
 """
 
-from app.config.logger import logger
+from config.logger import logger
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.repositories.regulation_repository import RegulationRepository
+from core.repositories.regulation_repository import RegulationRepository
 
 # logger = logging.getLogger(__name__)
 
@@ -33,26 +33,41 @@ class RegulationService:
         Returns:
             dict: 규제 문서 목록 (프론트 형식).
         """
-        # logger.info(f"Fetching regulations - country={country}")
+        
+        # risk_level 한글 변환 맵
+        RISK_LEVEL_MAP = {
+            "LOW": "낮음",
+            "MEDIUM": "보통",
+            "HIGH": "높음"
+        }
         
         try:
-            # Repository 호출
-            if country:
-                regulations = await self.repo.get_by_country(db, country)
-            else:
-                regulations = await self.repo.get_multi(db, skip=0, limit=100)
+            # keynote와 impact_score를 포함하여 조회
+            regulations = await self.repo.get_with_keynotes_and_impact(db, country)
             
             # 프론트 형식으로 변환
             result = []
             for reg in regulations:
+                # 최신 버전의 첫 번째 keynote 가져오기
+                keynote = None
+                if reg.versions:
+                    latest_version = reg.versions[-1]
+                    if latest_version.keynotes:
+                        keynote = latest_version.keynotes[0]
+                
+                # keynote에서 impact와 category 추출
+                if keynote and keynote.impact_score:
+                    impact = RISK_LEVEL_MAP.get(keynote.impact_score.risk_level, "보통")
+                    category = keynote.regulation_type or "기타"
+                else:
+                    impact = "보통"
+                    category = "기타"
+                
                 result.append({
                     "id": reg.regulation_id,
                     "country": reg.country_code,
-                    "title": reg.title or "제목 없음",
-                    "status": reg.status or "active",
-                    # TODO: impact, category는 ImpactScore 테이블에서 가져와야 함
-                    "impact": "높음",  # 임시값
-                    "category": "기타",  # 임시값
+                    "impact": impact,
+                    "category": category,
                     "summary": reg.title or ""
                 })
             
