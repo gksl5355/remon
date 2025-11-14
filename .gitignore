@@ -38,3 +38,6 @@ tmp/
 app/ai_pipeline/preprocess/demo
 .amazonq/
 .github
+docs/
+tests/
+uv.lock
