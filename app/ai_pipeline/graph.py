@@ -19,11 +19,11 @@ from app.ai_pipeline.nodes.generate_strategy import (                 # def gene
     validate_strategy_node,
 )
 from app.ai_pipeline.nodes.score_impact import score_impact_node      # def score_impact_node(state: AppState) -> dict
-from app.ai_pipeline.nodes.report import report_node                  # def report_node(state: AppState) -> dict
+from app.ai_pipeline.nodes.report_dummy import report_node                  # def report_node(state: AppState) -> dict
 
 
 # 새로 구현한 report 노드 임포트
-from app.ai_pipeline.nodes.report import report_node
+from app.ai_pipeline.nodes.report_dummy import report_node
 
 
 

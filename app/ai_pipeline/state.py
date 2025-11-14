@@ -25,7 +25,21 @@ class AppState(BaseModel):
 
     # 4️⃣ 영향도 분석 결과
     impact_scores: Optional[Dict[str, float]] = Field(
-        None, description="제품별 영향도 점수 (product_id → score)"
+        None, description="""제품별 영향도 점수 (product_id → score)
+        'impact_score': {
+            'raw_scores': {
+                'directness': 1, 
+                'legal_severity': 4, 
+                'scope': 5, 
+                'regulatory_urgency': 5, 
+                'operational_urgency': 4, 
+                'response_cost': 4, 
+                'reasoning': 'The regulation directly impacts product formulation by requiring a reduction in nicotine concentration, which necessitates reformulation and redesign of packaging. The legal severity is high due to potential fines and mandatory corrective actions for non-compliance. The scope is significant as it affects products that represent a large share of total sales. Regulatory urgency is immediate as the effective date has passed, and operational urgency is high due to the need for multi-department coordination. The response cost is also substantial due to the need for external vendor adjustments and potential CAPEX investments.'
+                }, 
+            'weighted_score': 3.9, 
+            'impact_level': 'Medium'
+    }"""
+    
     )
 
     # 5️⃣ 대응 전략
