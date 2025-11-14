@@ -94,42 +94,61 @@ class VectorClient:
         dense_embeddings: List[List[float]],
         metadatas: List[Dict[str, Any]],
         sparse_embeddings: Optional[List[Dict[int, float]]] = None,
+        batch_size: int = 100,
     ) -> None:
         """
-        문서 삽입 (dense + sparse).
+        문서 삽입 (dense + sparse) - 배치 처리.
         
         Args:
             texts: 문서 텍스트 리스트
             dense_embeddings: Dense 벡터 (1024차원)
             metadatas: 메타데이터 (clause_id, meta_country, meta_regulation_id 등)
             sparse_embeddings: Sparse 벡터 (선택, BM25 스타일)
+            batch_size: 배치 크기 (기본 100개씩)
         """
-        points = []
-        for idx, (text, dense, meta) in enumerate(zip(texts, dense_embeddings, metadatas)):
-            # Qdrant는 int 또는 UUID만 허용
-            point_id = idx  # 문자열 ID 대신 인덱스 사용
-            
-            vectors = {"dense": dense}
-            
-            if sparse_embeddings and idx < len(sparse_embeddings):
-                sparse = sparse_embeddings[idx]
-                vectors["sparse"] = SparseVector(
-                    indices=list(sparse.keys()),
-                    values=list(sparse.values()),
-                )
-            
-            payload = {"text": text, **meta}
-            
-            points.append(
-                PointStruct(
-                    id=point_id,
-                    vector=vectors,
-                    payload=payload,
-                )
-            )
+        import uuid
+        from datetime import datetime
         
-        self.client.upsert(collection_name=self.collection_name, points=points)
-        logger.info(f"✅ {len(points)}개 문서 삽입 완료")
+        total = len(texts)
+        for batch_start in range(0, total, batch_size):
+            batch_end = min(batch_start + batch_size, total)
+            points = []
+            
+            for idx in range(batch_start, batch_end):
+                text = texts[idx]
+                dense = dense_embeddings[idx]
+                meta = metadatas[idx]
+                
+                # UUID 기반 고유 ID 생성
+                point_id = str(uuid.uuid4())
+                
+                vectors = {"dense": dense}
+                
+                if sparse_embeddings and idx < len(sparse_embeddings):
+                    sparse = sparse_embeddings[idx]
+                    vectors["sparse"] = SparseVector(
+                        indices=list(sparse.keys()),
+                        values=list(sparse.values()),
+                    )
+                
+                payload = {"text": text, **meta}
+                
+                points.append(
+                    PointStruct(
+                        id=point_id,
+                        vector=vectors,
+                        payload=payload,
+                    )
+                )
+            
+            self.client.upsert(
+                collection_name=self.collection_name,
+                points=points,
+                wait=True
+            )
+            logger.info(f"  ✅ 배치 {batch_start//batch_size + 1}/{(total + batch_size - 1)//batch_size}: {len(points)}개 삽입")
+        
+        logger.info(f"✅ 총 {total}개 문서 삽입 완료")
     
     def search(
         self,
