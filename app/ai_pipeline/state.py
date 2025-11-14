@@ -5,7 +5,6 @@ LangGraph 전역 State 스키마 정의 – Production Minimal Version
 
 from typing import Any, Dict, List, Optional, TypedDict, Literal
 
-# app/state/pipeline_state.py
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 
