@@ -121,7 +121,7 @@ class SimpleRAG:
                 messages=[
                     {
                         "role": "system",
-                        "content": "당신은 규제 문서 전문가입니다. 제공된 문서를 기반으로 정확하게 답변하세요.",
+                        "content": "You are a regulatory documents expert. Answer accurately based on the provided documents, and present numerical or tabular content as well-formatted tables.",
                     },
                     {
                         "role": "user",

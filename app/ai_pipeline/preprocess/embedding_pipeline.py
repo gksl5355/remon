@@ -21,15 +21,17 @@ logger = logging.getLogger(__name__)
 try:
     from FlagEmbedding import BGEM3FlagModel
     HAS_FLAG_EMBEDDING = True
-    HAS_SENTENCE_TRANSFORMERS = False
 except ImportError:
     HAS_FLAG_EMBEDDING = False
-    try:
-        from sentence_transformers import SentenceTransformer
-        HAS_SENTENCE_TRANSFORMERS = True
-    except ImportError:
-        HAS_SENTENCE_TRANSFORMERS = False
-        logger.warning("⚠️ FlagEmbedding 또는 sentence-transformers 설치 필요")
+
+try:
+    from sentence_transformers import SentenceTransformer
+    HAS_SENTENCE_TRANSFORMERS = True
+except ImportError:
+    HAS_SENTENCE_TRANSFORMERS = False
+
+if not HAS_FLAG_EMBEDDING and not HAS_SENTENCE_TRANSFORMERS:
+    logger.warning("⚠️ FlagEmbedding 또는 sentence-transformers 설치 필요")
 
 
 class EmbeddingPipeline:
@@ -66,10 +68,7 @@ class EmbeddingPipeline:
         self.model = None
         self.embedding_cache: Dict[str, Dict] = {}  # 캐시 (dense + sparse)
         
-        if HAS_FLAG_EMBEDDING or HAS_SENTENCE_TRANSFORMERS:
-            self._load_model()
-        else:
-            logger.warning("⚠️ 임베딩 라이브러리 미설치. 기능 미지원")
+        self._load_model()
         
         logger.info(
             f"✅ EmbeddingPipeline 초기화: model={model_name}, "
@@ -78,18 +77,18 @@ class EmbeddingPipeline:
     
     def _load_model(self) -> None:
         """BGE-M3 모델 로드 (FlagEmbedding 우선)."""
-        try:
-            if HAS_FLAG_EMBEDDING and self.use_sparse:
-                self.model = BGEM3FlagModel(self.model_name, use_fp16=self.use_fp16)
-                logger.info(f"✅ 모델 로드 완료 (FlagEmbedding): {self.model_name}")
-            elif HAS_SENTENCE_TRANSFORMERS:
-                from sentence_transformers import SentenceTransformer
-                self.model = SentenceTransformer(self.model_name)
-                self.use_sparse = False  # sentence-transformers는 sparse 미지원
-                logger.info(f"✅ 모델 로드 완료 (SentenceTransformer): {self.model_name}")
-        except Exception as e:
-            logger.error(f"모델 로드 실패: {e}")
-            raise RuntimeError(f"BGE-M3 모델 로드 실패: {e}")
+        if HAS_FLAG_EMBEDDING and self.use_sparse:
+            logger.info(f"🔄 FlagEmbedding 모델 로드 시작...")
+            self.model = BGEM3FlagModel(self.model_name, use_fp16=self.use_fp16)
+            logger.info(f"✅ 모델 로드 완료 (FlagEmbedding): {self.model_name}")
+        elif HAS_SENTENCE_TRANSFORMERS:
+            logger.info(f"🔄 SentenceTransformer 모델 로드 시작...")
+            from sentence_transformers import SentenceTransformer
+            self.model = SentenceTransformer(self.model_name)
+            self.use_sparse = False
+            logger.info(f"✅ 모델 로드 완료 (SentenceTransformer): {self.model_name}")
+        else:
+            raise RuntimeError("임베딩 라이브러리 미설치 (FlagEmbedding 또는 sentence-transformers 필요)")
     
     def embed_texts(self, texts: List[str], normalize: bool = True) -> Dict[str, Any]:
         """
