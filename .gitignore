@@ -34,3 +34,4 @@ tmp/
 *.swp
 docs/
 tests/
+data/
