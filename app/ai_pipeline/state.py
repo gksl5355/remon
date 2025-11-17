@@ -63,7 +63,6 @@ class AppState(BaseModel):
 
     report_summary: Optional[str] = Field(None, description="최종 요약 리포트 텍스트")
     report_data: Optional[Dict[str, Any]] = Field(
-<<<<<<< HEAD
         None, 
         description="""리포트 상세 데이터 구조
         예시: {
@@ -77,10 +76,6 @@ class AppState(BaseModel):
         }"""
     )
 
-=======
-        None, description="리포트 상세 데이터 구조"
-    )
->>>>>>> e71e25e6fee253c72e0a897365c317efd23e86d2
 
     # 7️⃣ 내부 관리용
     error_log: Optional[List[str]] = Field(
