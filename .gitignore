@@ -32,8 +32,13 @@ tmp/
 .cache/
 *.bak
 *.swp
+.github/
 
-# =========== uv ===========
-uv.lock
+# ============ AI Generated Files 작업용 ============
+app/ai_pipeline/preprocess/demo
+.amazonq/
+.github
 docs/
 tests/
+uv.lock
+data/
