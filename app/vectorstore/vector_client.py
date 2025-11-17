@@ -225,10 +225,18 @@ class VectorClient:
                 query_filter=qdrant_filter,
             )
 
+            # Dense만 검색하는 경우에도 개별 점수를 metadata에 저장
+            final_metadatas = []
+            for result in results:
+                metadata = result.payload.copy()
+                metadata["_dense_score"] = result.score
+                metadata["_sparse_score"] = None
+                final_metadatas.append(metadata)
+
             return {
                 "ids": [r.id for r in results],
                 "documents": [r.payload.get("text", "") for r in results],
-                "metadatas": [r.payload for r in results],
+                "metadatas": final_metadatas,
                 "scores": [r.score for r in results],
             }
 
@@ -240,28 +248,41 @@ class VectorClient:
 
         scores = {}
         payloads = {}
+        dense_scores = {}
+        sparse_scores = {}
 
         # Dense 점수
         for rank, result in enumerate(dense_results, 1):
-            scores[result.id] = scores.get(result.id, 0) + alpha * (1 / (rank + 60))
+            rrf_score = alpha * (1 / (rank + 60))
+            scores[result.id] = scores.get(result.id, 0) + rrf_score
+            dense_scores[result.id] = result.score
             payloads[result.id] = result.payload
 
         # Sparse 점수
         for rank, result in enumerate(sparse_results, 1):
-            scores[result.id] = scores.get(result.id, 0) + (1 - alpha) * (
-                1 / (rank + 60)
-            )
-            payloads[result.id] = result.payload
+            rrf_score = (1 - alpha) * (1 / (rank + 60))
+            scores[result.id] = scores.get(result.id, 0) + rrf_score
+            sparse_scores[result.id] = result.score
+            if result.id not in payloads:
+                payloads[result.id] = result.payload
 
         # 정렬
         sorted_ids = sorted(scores.keys(), key=lambda x: scores[x], reverse=True)[
             :top_k
         ]
 
+        # 메타데이터에 개별 점수 추가
+        final_metadatas = []
+        for doc_id in sorted_ids:
+            metadata = payloads[doc_id].copy()
+            metadata["_dense_score"] = dense_scores.get(doc_id)
+            metadata["_sparse_score"] = sparse_scores.get(doc_id)
+            final_metadatas.append(metadata)
+
         return {
             "ids": sorted_ids,
             "documents": [payloads[id].get("text", "") for id in sorted_ids],
-            "metadatas": [payloads[id] for id in sorted_ids],
+            "metadatas": final_metadatas,
             "scores": [scores[id] for id in sorted_ids],
         }
 

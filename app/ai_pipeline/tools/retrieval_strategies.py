@@ -151,6 +151,11 @@ class HybridStrategy(RetrievalStrategy):
         # Sparse 벡터 추출 (있으면)
         query_sparse = query_emb.get("sparse")
         
+        # 디버깅: Sparse 벡터 상태 확인
+        logger.debug(f"Sparse vector available: {query_sparse is not None}")
+        if query_sparse:
+            logger.debug(f"Sparse vector size: {len(query_sparse)}")
+        
         # VectorDB 검색
         results = self.vector_client.search(
             query_dense=query_emb["dense"],
@@ -161,7 +166,12 @@ class HybridStrategy(RetrievalStrategy):
         )
         
         # 결과 변환
-        return self._format_results(results, strategy="hybrid", alpha=alpha)
+        formatted_results = self._format_results(results, strategy="hybrid", alpha=alpha)
+        
+        # 디버깅: 검색 결과 요약
+        logger.info(f"Hybrid search completed: {len(formatted_results)} results, sparse_used={query_sparse is not None}")
+        
+        return formatted_results
     
     def _format_results(
         self,
@@ -185,6 +195,9 @@ class HybridStrategy(RetrievalStrategy):
             # Dense/Sparse 점수 분리 (metadata에 있으면)
             dense_score = metadata.pop("_dense_score", score)
             sparse_score = metadata.pop("_sparse_score", None)
+            
+            # 디버깅: 점수 확인
+            logger.debug(f"Doc {doc_id}: final={score:.3f}, dense={dense_score:.3f}, sparse={sparse_score}")
             
             formatted.append(
                 RetrievalResult(
