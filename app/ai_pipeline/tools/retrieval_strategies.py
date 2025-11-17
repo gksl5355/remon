@@ -387,9 +387,6 @@ class StrategyFactory:
         strategies = {
             "dense": DenseStrategy,
             "hybrid": HybridStrategy,
-            "metadata_first": MetadataFirstStrategy,
-            "parent_child": ParentChildStrategy,
-            "hierarchical": HierarchicalStrategy
         }
         
         strategy_class = strategies.get(strategy_name.lower())

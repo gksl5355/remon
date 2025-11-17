@@ -1,14 +1,13 @@
 """
 map_products.py
-검색 TOOL(미정) + LLM 매핑 Node
-search_tool의 인터페이스는 아직 결정되지 않았기 때문에
-호출부는 wrapper로 감싸고 TODO로 마킹해둔다.
+검색 TOOL + LLM 매핑 Node
 """
 
 import json
-from typing import Dict, List, Any
+import logging
+from typing import Any, Dict, List, Protocol, TYPE_CHECKING
 
-from state import (
+from app.ai_pipeline.state import (
     ProductInfo,
     RetrievedChunk,
     RetrievalResult,
@@ -17,7 +16,19 @@ from state import (
     MappingResults,
 )
 
-from prompts.mapping_prompt import MAPPING_PROMPT
+from app.ai_pipeline.prompts.mapping_prompt import MAPPING_PROMPT
+from app.ai_pipeline.tools.retrieval_utils import build_product_filters
+
+
+if TYPE_CHECKING:
+    from app.ai_pipeline.tools.retrieval_tool import RetrievalOutput
+else:
+    class RetrievalOutput(Protocol):
+        results: List[Dict[str, Any]]
+        metadata: Dict[str, Any]
+
+
+logger = logging.getLogger(__name__)
 
 
 class MappingNode:
@@ -35,58 +46,76 @@ class MappingNode:
         alpha: float = 0.7,  # 🔥 hybrid dense/sparse 비율
     ):
         self.llm = llm_client
-        self.search_tool = search_tool
+        if search_tool is None:
+            from app.ai_pipeline.tools.retrieval_tool import get_retrieval_tool
+
+            self.search_tool = get_retrieval_tool()
+        else:
+            self.search_tool = search_tool
         self.top_k = top_k
         self.alpha = alpha  # 🔥 dynamic hybrid weight
+        # TODO(remon-rag): replace any ad-hoc StaticRetrievalTool usage with the real
+        # RegulationRetrievalTool wired to the production VectorDB/RDB once torch
+        # dependencies are restored. This entry point already accepts an injected
+        # search tool, so future wiring should happen in the caller (pipeline graph).
 
     # ----------------------------------------------------------------------
     # 1) 검색 TOOL 호출 wrapper (search_tool 인터페이스 확정되면 이 부분만 수정)
     # ----------------------------------------------------------------------
     async def _run_search(
         self,
-        product_id: str,
+        product: ProductInfo,
         feature_name: str,
         feature_value: Any,
         feature_unit: str | None,
     ) -> RetrievalResult:
         """
         검색 TOOL을 호출하는 wrapper.
-        search_tool의 최종 인터페이스가 확정되면
-        이 함수만 수정하면 전체 시스템이 자동으로 연동됨.
-
-        ✔ hybrid alpha 적용
-        ✔ top_k 적용
-        ✔ feature 정보 전달
+        Hybrid 검색 Tool을 호출하고 state 스키마에 맞춰 변환한다.
         """
 
-        # ------------------------------------------------------------------
-        # 🔥 TODO(remon-ai):
-        #   search_tool.py가 완성되면 아래 호출부를 해당 시그니처에 맞게 수정하세요.
-        #
-        #   예시 예상 형태 (완성되면 이 부분을 수정)
-        #
-        #   result = await self.search_tool(
-        #       product_id=product_id,
-        #       feature_name=feature_name,
-        #       feature_value=feature_value,
-        #       feature_unit=feature_unit,
-        #       top_k=self.top_k,
-        #       alpha=self.alpha,
-        #   )
-        #
-        #   return RetrievalResult(**result)
-        # ------------------------------------------------------------------
+        product_id = product["product_id"]
+        query = self._build_search_query(feature_name, feature_value, feature_unit)
+        filters = build_product_filters(product)
 
-        # 임시 placeholder (dummy 형태)
-        result = {
-            "product_id": product_id,
-            "feature_name": feature_name,
-            "feature_value": feature_value,
-            "feature_unit": feature_unit,
-            "candidates": [],  # 나중에 TOOL 출력으로 채워질 것
-        }
+        try:
+            # TODO(remon-tuning): once live RetrievalTool is connected, benchmark per-feature
+            # top_k/alpha/filter settings instead of relying on demo defaults.
+            tool_result: RetrievalOutput = await self.search_tool.search(
+                query=query,
+                strategy="hybrid",
+                top_k=self.top_k,
+                alpha=self.alpha,
+                filters=filters or None,
+            )
+        except Exception as exc:
+            logger.warning("retrieval tool 호출 실패: %s", exc)
+            return RetrievalResult(
+                product_id=product_id,
+                feature_name=feature_name,
+                feature_value=feature_value,
+                feature_unit=feature_unit,
+                candidates=[],
+            )
 
-        return result
+        candidates: List[RetrievedChunk] = []
+        for item in tool_result.results:
+            candidates.append(
+                RetrievedChunk(
+                    chunk_id=item.get("id", ""),
+                    chunk_text=item.get("text", ""),
+                    semantic_score=item.get("scores", {}).get("final_score", 0.0),
+                    metadata=item.get("metadata", {}),
+                )
+            )
+
+        return RetrievalResult(
+            product_id=product_id,
+            feature_name=feature_name,
+            feature_value=feature_value,
+            feature_unit=feature_unit,
+            candidates=candidates,
+        )
 
     # ----------------------------------------------------------------------
     # 2) 매핑 프롬프트 생성 (local 처리)
@@ -97,10 +126,22 @@ class MappingNode:
             "value": feature_value,
             "unit": feature_unit,
         }
-        return MAPPING_PROMPT.format(
-            feature=json.dumps(feature, ensure_ascii=False),
-            chunk=chunk_text,
+        feature_json = json.dumps(feature, ensure_ascii=False)
+        return (
+            MAPPING_PROMPT.replace("{feature}", feature_json).replace("{chunk}", chunk_text)
         )
+
+    def _build_search_query(self, feature_name, feature_value, feature_unit):
+        """
+        검색 Tool에 전달할 기본 쿼리 문자열 생성.
+        """
+        parts: List[str] = [str(feature_name)]
+        if feature_value is not None:
+            parts.append(str(feature_value))
+        if feature_unit:
+            parts.append(feature_unit)
+
+        return " ".join(parts)
 
     # ----------------------------------------------------------------------
     # 3) LLM 매핑 호출
@@ -145,7 +186,7 @@ class MappingNode:
             # a) 검색 TOOL 호출
             # -----------------------------------------
             retrieval: RetrievalResult = await self._run_search(
-                product_id, feature_name, value, unit
+                product, feature_name, value, unit
             )
 
             # -----------------------------------------
