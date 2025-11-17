@@ -49,7 +49,17 @@ class AppState(BaseModel):
         None, description="리포트 상세 데이터 구조"
     )
 
-    # 7️⃣ 내부 관리용
+    # 7️⃣ RAG Retrieval 결과 (🆕)
+    retrieved_contexts: Optional[List[Dict[str, Any]]] = Field(
+        None,
+        description="RAG 검색 결과 (벡터 제외, 메타데이터 + 텍스트 + 점수)"
+    )
+    retrieval_metadata: Optional[Dict[str, Any]] = Field(
+        None,
+        description="검색 메타정보 (전략, 소요시간, 필터 등)"
+    )
+    
+    # 8️⃣ 내부 관리용
     error_log: Optional[List[str]] = Field(
         default_factory=list, description="에러/경고 로그"
     )
