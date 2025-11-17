@@ -1,453 +1,311 @@
-"""Hybrid vector client utilities backed by Qdrant.
+"""
+module: vector_client.py
+description: Qdrant VectorDB 클라이언트 (하이브리드 서칭: dense + sparse)
+author: AI Agent
+created: 2025-11-12
+updated: 2025-11-12
+dependencies:
+    - qdrant-client>=1.7.0
+    - app.config.settings
+"""
 
-This module centralises the logic for generating dense+sparse BGE-M3 embeddings,
-inserting them into Qdrant, and querying results that map nicely into the
-LangGraph map_products node."""
-
-from __future__ import annotations
-
-import asyncio
-import hashlib
-import re
-from collections import Counter
-from dataclasses import dataclass
-from typing import Any, Dict, List, Sequence
-
-from loguru import logger
+import logging
+from typing import List, Dict, Any, Optional
 from qdrant_client import QdrantClient
-from qdrant_client.http import models as rest
-from sentence_transformers import SentenceTransformer
+from qdrant_client.models import (
+    Distance,
+    VectorParams,
+    PointStruct,
+    SparseVector,
+    SparseVectorParams,
+    NamedVector,
+    NamedSparseVector,
+    SearchRequest,
+    Prefetch,
+)
+import os
 
-try:  # Optional - 고품질 하이브리드 임베딩
-    from FlagEmbedding import BGEM3FlagModel  # type: ignore
-except ImportError:  # pragma: no cover - optional dependency
-    BGEM3FlagModel = None  # type: ignore
+logger = logging.getLogger(__name__)
 
-from app.config.settings import settings
-from app.vectorstore.vector_schema import SparseVectorPayload
+# settings.py 통합 (환경변수 폴백)
+try:
+    from app.config.settings import settings
 
-TOKEN_PATTERN = re.compile(r"[A-Za-z0-9가-힣]+")
-SPARSE_HASH_SPACE = 2**31 - 1
-
-
-@dataclass
-class HybridEmbedding:
-    dense: List[float]
-    sparse: SparseVectorPayload | None = None
-
-
-@dataclass
-class VectorMatch:
-    id: str
-    payload: Dict[str, Any]
-    score: float
-    dense_score: float | None = None
-    sparse_score: float | None = None
-
-
-@dataclass
-class VectorConfig:
-    url: str
-    collection_name: str
-    api_key: str | None = None
-    prefer_grpc: bool = False
-    timeout: float = 10.0
-
-
-class HybridEmbedder:
-    """BGE-M3 하이브리드 임베딩 헬퍼 (dense + sparse)."""
-
-    _flag_model: Any | None = None
-    _sentence_model: SentenceTransformer | None = None
-
-    @classmethod
-    def encode(cls, text: str) -> HybridEmbedding:
-        text = text or ""
-        if BGEM3FlagModel is not None:
-            return cls._encode_with_flag_embedding(text)
-        return cls._encode_with_sentence_transformers(text)
-
-    @classmethod
-    def _encode_with_flag_embedding(cls, text: str) -> HybridEmbedding:
-        if cls._flag_model is None:
-            logger.info("Loading BGEM3FlagModel for hybrid embeddings (dense+sparse).")
-            cls._flag_model = BGEM3FlagModel("BAAI/bge-m3", use_fp16=True)
-
-        outputs = cls._flag_model.encode(
-            [text],
-            return_dense=True,
-            return_sparse=True,
-            normalize_to_unit=True,
-        )
-        dense_vec = outputs["dense_vecs"][0]
-        sparse_vec = outputs["sparse_vecs"][0]
-        return HybridEmbedding(
-            dense=[float(v) for v in dense_vec],
-            sparse=SparseVectorPayload(
-                indices=[int(i) for i in sparse_vec["indices"]],
-                values=[float(v) for v in sparse_vec["values"]],
-            ),
-        )
-
-    @classmethod
-    def _encode_with_sentence_transformers(cls, text: str) -> HybridEmbedding:
-        if cls._sentence_model is None:
-            logger.info(
-                "Loading SentenceTransformer(BAAI/bge-m3) for dense embeddings."
-            )
-            cls._sentence_model = SentenceTransformer("BAAI/bge-m3")
-
-        dense_vec = cls._sentence_model.encode(
-            text, normalize_embeddings=True, convert_to_numpy=True
-        )
-        sparse = cls._build_sparse_payload(text)
-        return HybridEmbedding(
-            dense=dense_vec.tolist(),
-            sparse=sparse,
-        )
-
-    @staticmethod
-    def _build_sparse_payload(text: str) -> SparseVectorPayload | None:
-        tokens = TOKEN_PATTERN.findall(text.lower())
-        if not tokens:
-            return None
-        counts = Counter(tokens)
-        indices: List[int] = []
-        values: List[float] = []
-        for token, count in counts.items():
-            digest = hashlib.blake2b(token.encode("utf-8"), digest_size=8).hexdigest()
-            indices.append(int(digest, 16) % SPARSE_HASH_SPACE)
-            values.append(float(count))
-        return SparseVectorPayload(indices=indices, values=values).sort()
+    QDRANT_HOST = (
+        getattr(settings, "QDRANT_URL", "http://localhost:6333")
+        .replace("http://", "")
+        .replace("https://", "")
+        .split(":")[0]
+    )
+    QDRANT_PORT = 6333
+    QDRANT_COLLECTION = getattr(settings, "QDRANT_COLLECTION", "remon_regulations")
+    QDRANT_PATH = getattr(settings, "QDRANT_PATH", "./data/qdrant")
+    # .env의 QDRANT_USE_LOCAL 값 우선 사용
+    QDRANT_USE_LOCAL = os.getenv("QDRANT_USE_LOCAL", "false").lower() == "true"
+except ImportError:
+    logger.warning("settings.py 로드 실패, 환경변수 사용")
+    QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
+    QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
+    QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "remon_regulations")
+    QDRANT_PATH = os.getenv("QDRANT_PATH", "./data/qdrant")
+    QDRANT_USE_LOCAL = os.getenv("QDRANT_USE_LOCAL", "false").lower() == "true"
 
 
 class VectorClient:
-    """Qdrant vector store wrapper (dense + sparse hybrid)."""
+    """
+    Qdrant VectorDB 클라이언트 (하이브리드 서칭 지원).
 
-    def __init__(self, client: QdrantClient, config: VectorConfig):
-        self.client = client
-        self.config = config
+    특징:
+    - Dense vector (BGE-M3 1024차원) + Sparse vector (BM25 스타일) 동시 저장
+    - 하이브리드 검색: 의미 검색 + 키워드 검색 결합
+    - 메타데이터 필터링 (국가, 규제 타입 등)
+    - 로컬/원격 모드 지원
+    """
 
-    @classmethod
-    def from_settings(cls, cfg: VectorConfig | None = None) -> "VectorClient":
-        cfg = cfg or VectorConfig(
-            url=settings.QDRANT_URL,
-            collection_name=settings.QDRANT_COLLECTION,
-            api_key=settings.QDRANT_API_KEY,
-            prefer_grpc=settings.QDRANT_PREFER_GRPC,
-            timeout=settings.QDRANT_TIMEOUT,
-        )
-        client = QdrantClient(
-            url=cfg.url,
-            api_key=cfg.api_key,
-            prefer_grpc=cfg.prefer_grpc,
-            timeout=cfg.timeout,
-        )
-        return cls(client, cfg)
-
-    async def insert(
-        self,
-        texts: Sequence[str],
-        embeddings: Sequence[Sequence[float]] | None,
-        metadatas: Sequence[Dict[str, Any]],
-        sparse_embeddings: (
-            Sequence[SparseVectorPayload | Dict[str, Any] | None] | None
-        ) = None,
-        ids: Sequence[str | int] | None = None,
-    ) -> None:
-        """Insert dense+sparse vectors into Qdrant.
-
-        If either dense or sparse embeddings are missing, the method generates
-        them using :class:`HybridEmbedder`.
+    def __init__(
+        self, collection_name: str = QDRANT_COLLECTION, use_local: bool = None
+    ):
+        """
+        Qdrant 클라이언트 초기화.
 
         Args:
-            texts: Raw texts corresponding to `metadatas`.
-            embeddings: Optional dense embeddings aligned with `texts`.
-            metadatas: Qdrant payloads (must include `clause_id`).
-            sparse_embeddings: Optional sparse payloads aligned with `texts`.
-            ids: Optional point IDs; defaults to `clause_id`.
+            collection_name: 컬렉션 이름
+            use_local: True면 로컬 저장소, False면 원격 서버, None이면 환경변수 사용
         """
+        self.collection_name = collection_name
 
-        if not texts or not metadatas:
-            raise ValueError("texts and metadatas must be provided for insert().")
-        dense_vectors = list(embeddings) if embeddings is not None else None
-        sparse_vectors_seq = (
-            list(sparse_embeddings) if sparse_embeddings is not None else None
-        )
+        # 환경변수에서 모드 결정
+        if use_local is None:
+            use_local = QDRANT_USE_LOCAL
 
-        if dense_vectors is None or sparse_vectors_seq is None:
-            logger.info("Generating missing embeddings via HybridEmbedder.")
-            hybrid_batch = await asyncio.to_thread(self._encode_hybrid_batch, texts)
-            if dense_vectors is None:
-                dense_vectors = [item.dense for item in hybrid_batch]
-            if sparse_vectors_seq is None:
-                sparse_vectors_seq = [item.sparse for item in hybrid_batch]
+        if use_local:
+            self.client = QdrantClient(path=QDRANT_PATH)
+            logger.info(f"✅ Qdrant 로컬 모드: {QDRANT_PATH}")
+        else:
+            self.client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+            logger.info(f"✅ Qdrant 서버 모드: {QDRANT_HOST}:{QDRANT_PORT}")
 
-        if dense_vectors is None or sparse_vectors_seq is None:
-            raise RuntimeError("Failed to generate hybrid embeddings.")
+        self._ensure_collection()
 
-        if len(dense_vectors) != len(metadatas):
-            raise ValueError("Dense embeddings length must match metadatas length.")
-        if len(sparse_vectors_seq) != len(metadatas):
-            raise ValueError("Sparse embeddings length must match metadatas length.")
+    def _ensure_collection(self) -> None:
+        """컬렉션 생성 (없으면)."""
+        collections = self.client.get_collections().collections
+        exists = any(c.name == self.collection_name for c in collections)
 
-        if ids is None:
-            ids = [meta.get("clause_id") for meta in metadatas]
+        if not exists:
+            self.client.create_collection(
+                collection_name=self.collection_name,
+                vectors_config={
+                    "dense": VectorParams(size=1024, distance=Distance.COSINE),
+                },
+                sparse_vectors_config={
+                    "sparse": SparseVectorParams(),
+                },
+            )
+            logger.info(f"✅ 컬렉션 생성: {self.collection_name}")
+        else:
+            logger.info(f"✅ 컬렉션 존재: {self.collection_name}")
 
-        points: List[rest.PointStruct] = []
-        for idx, dense in enumerate(dense_vectors):
-            if ids[idx] is None:
-                raise ValueError("All metadatas or ids must include clause_id.")
-            vector_payload: Dict[str, Any] = {"dense": list(map(float, dense))}
-            sparse_payload = _convert_sparse_input(sparse_vectors_seq[idx])
-            if sparse_payload is not None:
-                vector_payload["sparse"] = sparse_payload
+    def insert(
+        self,
+        texts: List[str],
+        dense_embeddings: List[List[float]],
+        metadatas: List[Dict[str, Any]],
+        sparse_embeddings: Optional[List[Dict[int, float]]] = None,
+        batch_size: int = 100,
+    ) -> None:
+        """
+        문서 삽입 (dense + sparse) - 배치 처리.
 
-            points.append(
-                rest.PointStruct(
-                    id=str(ids[idx]),
-                    vector=vector_payload,
-                    payload=metadatas[idx],
+        Args:
+            texts: 문서 텍스트 리스트
+            dense_embeddings: Dense 벡터 (1024차원)
+            metadatas: 메타데이터 (clause_id, meta_country, meta_regulation_id 등)
+            sparse_embeddings: Sparse 벡터 (선택, BM25 스타일)
+            batch_size: 배치 크기 (기본 100개씩)
+        """
+        import uuid
+        from datetime import datetime
+
+        total = len(texts)
+        for batch_start in range(0, total, batch_size):
+            batch_end = min(batch_start + batch_size, total)
+            points = []
+
+            for idx in range(batch_start, batch_end):
+                text = texts[idx]
+                dense = dense_embeddings[idx]
+                meta = metadatas[idx]
+
+                # UUID 기반 고유 ID 생성
+                point_id = str(uuid.uuid4())
+
+                vectors = {"dense": dense}
+
+                if sparse_embeddings and idx < len(sparse_embeddings):
+                    sparse = sparse_embeddings[idx]
+                    vectors["sparse"] = SparseVector(
+                        indices=list(sparse.keys()),
+                        values=list(sparse.values()),
+                    )
+
+                payload = {"text": text, **meta}
+
+                points.append(
+                    PointStruct(
+                        id=point_id,
+                        vector=vectors,
+                        payload=payload,
+                    )
                 )
+
+            self.client.upsert(
+                collection_name=self.collection_name, points=points, wait=True
+            )
+            logger.info(
+                f"  ✅ 배치 {batch_start//batch_size + 1}/{(total + batch_size - 1)//batch_size}: {len(points)}개 삽입"
             )
 
-        await asyncio.to_thread(
-            self.client.upsert,
-            collection_name=self.config.collection_name,
-            points=points,
-            wait=True,
-        )
+        logger.info(f"✅ 총 {total}개 문서 삽입 완료")
 
-    async def query(
+    def search(
         self,
-        *,
-        query_dense: Sequence[float] | None = None,
-        query_sparse: (
-            Dict[int, float] | SparseVectorPayload | Sequence[float] | None
-        ) = None,
-        query_text: str | None = None,
-        alpha: float = 0.7,
-        n_results: int = 10,
-        where: Dict[str, Any] | None = None,
-    ) -> List[VectorMatch]:
-        """Query Qdrant with dense+sparse embeddings.
+        query_dense: List[float],
+        query_sparse: Optional[Dict[int, float]] = None,
+        top_k: int = 5,
+        filters: Optional[Dict[str, Any]] = None,
+        hybrid_alpha: float = 0.7,
+    ) -> Dict[str, Any]:
+        """
+        하이브리드 검색 (dense + sparse).
 
         Args:
-            query_dense: Dense embedding list.
-            query_sparse: Sparse embedding payload.
-            query_text: Raw text; auto-encodes dense+sparse when provided.
-            alpha: Dense weight for score fusion.
-            n_results: Number of matches to return.
-            where: Qdrant payload filter.
+            query_dense: Dense 쿼리 벡터 (1024차원)
+            query_sparse: Sparse 쿼리 벡터 (선택)
+            top_k: 반환 개수
+            filters: 메타데이터 필터 (예: {"meta_country": "KR"})
+            hybrid_alpha: Dense 가중치 (0~1, 1=dense만, 0=sparse만)
 
         Returns:
-            List[VectorMatch]: Sorted by fused score.
+            {"ids": [...], "documents": [...], "metadatas": [...], "scores": [...]}
         """
-
-        if query_dense is None and query_text:
-            embedding = await asyncio.to_thread(HybridEmbedder.encode, query_text)
-            query_dense = embedding.dense
-            query_sparse = query_sparse or embedding.sparse
-
-        if query_dense is None and query_sparse is None:
-            raise ValueError(
-                "At least one of query_dense/query_sparse/query_text is required."
+        # Qdrant 필터 생성
+        qdrant_filter = self._build_qdrant_filter(filters)
+        if query_sparse:
+            # 하이브리드 검색
+            results = self.client.search_batch(
+                collection_name=self.collection_name,
+                requests=[
+                    SearchRequest(
+                        vector=NamedVector(name="dense", vector=query_dense),
+                        limit=top_k,
+                        with_payload=True,
+                        filter=qdrant_filter,
+                    ),
+                    SearchRequest(
+                        vector=NamedSparseVector(
+                            name="sparse",
+                            vector=SparseVector(
+                                indices=list(query_sparse.keys()),
+                                values=list(query_sparse.values()),
+                            ),
+                        ),
+                        limit=top_k,
+                        with_payload=True,
+                        filter=qdrant_filter,
+                    ),
+                ],
             )
 
-        qdrant_filter = _build_filter(where)
+            # 점수 결합 (RRF 또는 가중 평균)
+            combined = self._combine_results(results, hybrid_alpha, top_k)
+            return combined
 
-        dense_points = await self._search_dense(query_dense, qdrant_filter, n_results)
-        sparse_points = await self._search_sparse(
-            query_sparse, qdrant_filter, n_results
-        )
+        else:
+            # Dense 검색만
+            results = self.client.search(
+                collection_name=self.collection_name,
+                query_vector=("dense", query_dense),
+                limit=top_k,
+                with_payload=True,
+                query_filter=qdrant_filter,
+            )
 
-        matches = _merge_scores(
-            dense_points=dense_points,
-            sparse_points=sparse_points,
-            alpha=alpha,
-            limit=n_results,
-        )
-        return matches
+            return {
+                "ids": [r.id for r in results],
+                "documents": [r.payload.get("text", "") for r in results],
+                "metadatas": [r.payload for r in results],
+                "scores": [r.score for r in results],
+            }
 
-    async def _search_dense(
-        self,
-        query_dense: Sequence[float] | None,
-        qdrant_filter: rest.Filter | None,
-        limit: int,
-    ) -> List[rest.ScoredPoint]:
-        if query_dense is None:
-            return []
-        named = rest.NamedVector(name="dense", vector=list(map(float, query_dense)))
-        return await asyncio.to_thread(
-            self.client.search,
-            self.config.collection_name,
-            query_vector=named,
-            query_filter=qdrant_filter,
-            limit=limit,
-            with_payload=True,
-        )
+    def _combine_results(
+        self, batch_results: List[List], alpha: float, top_k: int
+    ) -> Dict[str, Any]:
+        """하이브리드 결과 결합 (Reciprocal Rank Fusion)."""
+        dense_results, sparse_results = batch_results
 
-    async def _search_sparse(
-        self,
-        query_sparse: Dict[int, float] | SparseVectorPayload | Sequence[float] | None,
-        qdrant_filter: rest.Filter | None,
-        limit: int,
-    ) -> List[rest.ScoredPoint]:
-        sparse_payload = _convert_sparse_input(query_sparse)
-        if sparse_payload is None:
-            return []
-        named = rest.NamedSparseVector(name="sparse", vector=sparse_payload)
-        return await asyncio.to_thread(
-            self.client.search,
-            self.config.collection_name,
-            query_vector=named,
-            query_filter=qdrant_filter,
-            limit=limit,
-            with_payload=True,
-        )
+        scores = {}
+        payloads = {}
 
-    def _encode_hybrid_batch(self, texts: Sequence[str]) -> List[HybridEmbedding]:
-        return [HybridEmbedder.encode(text) for text in texts]
+        # Dense 점수
+        for rank, result in enumerate(dense_results, 1):
+            scores[result.id] = scores.get(result.id, 0) + alpha * (1 / (rank + 60))
+            payloads[result.id] = result.payload
 
+        # Sparse 점수
+        for rank, result in enumerate(sparse_results, 1):
+            scores[result.id] = scores.get(result.id, 0) + (1 - alpha) * (
+                1 / (rank + 60)
+            )
+            payloads[result.id] = result.payload
 
-def _convert_sparse_input(
-    data: (
-        Dict[int, float] | SparseVectorPayload | Sequence[float] | Dict[str, Any] | None
-    ),
-) -> rest.SparseVector | None:
-    """Normalise sparse inputs into Qdrant `SparseVector`.
+        # 정렬
+        sorted_ids = sorted(scores.keys(), key=lambda x: scores[x], reverse=True)[
+            :top_k
+        ]
 
-    Args:
-        data: Sparse structure (payload dict, `SparseVectorPayload`, list, or None).
+        return {
+            "ids": sorted_ids,
+            "documents": [payloads[id].get("text", "") for id in sorted_ids],
+            "metadatas": [payloads[id] for id in sorted_ids],
+            "scores": [scores[id] for id in sorted_ids],
+        }
 
-    Returns:
-        rest.SparseVector | None: Payload ready for Qdrant upsert/search.
-    """
-    if data is None:
-        return None
-    if isinstance(data, SparseVectorPayload):
-        payload = data.sort()
-        return rest.SparseVector(indices=payload.indices, values=payload.values)
-    if isinstance(data, dict) and "indices" in data and "values" in data:
-        payload = SparseVectorPayload(
-            indices=[int(i) for i in data["indices"]],
-            values=[float(v) for v in data["values"]],
-        ).sort()
-        return rest.SparseVector(indices=payload.indices, values=payload.values)
-    if isinstance(data, dict):
-        indices: List[int] = []
-        values: List[float] = []
-        for key, value in data.items():
-            try:
-                idx = int(key)
-            except ValueError:
-                idx = int(
-                    hashlib.blake2b(key.encode("utf-8"), digest_size=8).hexdigest(), 16
+    def delete_collection(self) -> None:
+        """컬렉션 삭제."""
+        self.client.delete_collection(collection_name=self.collection_name)
+        logger.info(f"✅ 컬렉션 삭제: {self.collection_name}")
+
+    def _build_qdrant_filter(self, filters: Optional[Dict[str, Any]]):
+        """Dict 필터 → Qdrant Filter 객체 변환."""
+        if not filters:
+            return None
+
+        from qdrant_client.models import Filter, FieldCondition, MatchValue, Range
+
+        conditions = []
+
+        for key, value in filters.items():
+            # 날짜 범위 필터
+            if key.endswith("_from"):
+                field = key.replace("_from", "")
+                conditions.append(FieldCondition(key=field, range=Range(gte=value)))
+            elif key.endswith("_to"):
+                field = key.replace("_to", "")
+                conditions.append(FieldCondition(key=field, range=Range(lte=value)))
+            # 일반 매칭 필터
+            else:
+                conditions.append(
+                    FieldCondition(key=key, match=MatchValue(value=value))
                 )
-            indices.append(idx % SPARSE_HASH_SPACE)
-            values.append(float(value))
-        payload = SparseVectorPayload(indices=indices, values=values).sort()
-        return rest.SparseVector(indices=payload.indices, values=payload.values)
-    if isinstance(data, Sequence):
-        # interpreted as dense histogram -> convert to sequential indices
-        indices = list(range(len(data)))
-        values = [float(v) for v in data]
-        payload = SparseVectorPayload(indices=indices, values=values).sort()
-        return rest.SparseVector(indices=payload.indices, values=payload.values)
-    return None
 
+        return Filter(must=conditions) if conditions else None
 
-def _build_filter(where: Dict[str, Any] | None) -> rest.Filter | None:
-    """Convert simple dict filters into Qdrant FieldConditions."""
-    if not where:
-        return None
-    must: List[rest.FieldCondition] = []
-    for key, value in where.items():
-        if value is None:
-            continue
-        if isinstance(value, (list, tuple, set)):
-            must.append(
-                rest.FieldCondition(key=key, match=rest.MatchAny(any=list(value)))
-            )
-        else:
-            must.append(
-                rest.FieldCondition(key=key, match=rest.MatchValue(value=value))
-            )
-    if not must:
-        return None
-    return rest.Filter(must=must)
-
-
-def _merge_scores(
-    *,
-    dense_points: Sequence[rest.ScoredPoint],
-    sparse_points: Sequence[rest.ScoredPoint],
-    alpha: float,
-    limit: int,
-) -> List[VectorMatch]:
-    """Fuse dense/sparse search results into ranked matches.
-
-    Args:
-        dense_points: Qdrant dense search results.
-        sparse_points: Qdrant sparse search results.
-        alpha: Dense contribution (0-1).
-        limit: Max number of matches to return.
-
-    Returns:
-        List[VectorMatch]: Sorted by fused score desc.
-    """
-    dense_raw, dense_scaled, dense_payload = _extract_scores(dense_points)
-    sparse_raw, sparse_scaled, sparse_payload = _extract_scores(sparse_points)
-
-    candidate_ids = set(dense_raw.keys()) | set(sparse_raw.keys())
-    matches: List[VectorMatch] = []
-    for candidate_id in candidate_ids:
-        dense_component = dense_scaled.get(candidate_id)
-        sparse_component = sparse_scaled.get(candidate_id)
-
-        if dense_component is None and sparse_component is None:
-            continue
-        if dense_component is None:
-            final_score = sparse_component
-        elif sparse_component is None:
-            final_score = dense_component
-        else:
-            final_score = alpha * dense_component + (1 - alpha) * sparse_component
-
-        payload = (
-            dense_payload.get(candidate_id) or sparse_payload.get(candidate_id) or {}
-        )
-        matches.append(
-            VectorMatch(
-                id=candidate_id,
-                payload=payload,
-                score=float(final_score),
-                dense_score=dense_raw.get(candidate_id),
-                sparse_score=sparse_raw.get(candidate_id),
-            )
-        )
-
-    matches.sort(key=lambda item: item.score, reverse=True)
-    return matches[:limit]
-
-
-def _extract_scores(points: Sequence[rest.ScoredPoint]):
-    """Extract raw/normalized scores and payloads from Qdrant results."""
-    raw_scores: Dict[str, float] = {}
-    scaled_scores: Dict[str, float] = {}
-    payloads: Dict[str, Dict[str, Any]] = {}
-    if not points:
-        return raw_scores, scaled_scores, payloads
-
-    scores = [float(p.score or 0.0) for p in points]
-    score_min = min(scores)
-    score_max = max(scores)
-    denom = score_max - score_min if score_max != score_min else 1.0
-
-    for point in points:
-        point_id = str(point.id)
-        raw = float(point.score or 0.0)
-        raw_scores[point_id] = raw
-        scaled_scores[point_id] = (raw - score_min) / denom if denom else 1.0
-        payloads[point_id] = dict(point.payload or {})
-    return raw_scores, scaled_scores, payloads
+    def get_collection_info(self) -> Dict[str, Any]:
+        """컬렉션 정보 조회."""
+        info = self.client.get_collection(collection_name=self.collection_name)
+        return {
+            "name": info.config.params.vectors["dense"].size,
+            "points_count": info.points_count,
+            "vectors_config": str(info.config.params.vectors),
+        }
