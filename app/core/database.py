@@ -13,7 +13,7 @@
 #     async with AsyncSessionLocal() as session:
 #         yield session
 
-
+import logging
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.pool import NullPool
@@ -34,6 +34,7 @@ def get_db_session():
 
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
@@ -56,8 +57,18 @@ AsyncSessionLocal = sessionmaker(
 
 # Dependency for FastAPI
 async def get_db():
+    """
+    비동기 DB 세션을 생성하여 FastAPI 의존성으로 제공한다.
+
+    Yields:
+        AsyncSession: 트랜잭션 단위의 DB 세션 객체.
+    """
     async with AsyncSessionLocal() as session:
         try:
             yield session
+        except Exception as e:
+            logger.error(f"DB session rollback due to error: {e}", exc_info=True)
+            await session.rollback()
+            raise
         finally:
             await session.close()

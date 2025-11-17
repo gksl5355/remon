@@ -1,3 +1,11 @@
+"""
+module: base_repository.py
+description: 공통 Repository 베이스 클래스 (commit 금지, 세션 주입 전용)
+author: 조영우 - 남지수 BE2브랜치와 merge
+merge_ated: 2025-11-12
+dependencies:
+    - sqlalchemy.ext.asyncio
+"""
 from typing import TypeVar, Generic, Type, Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete

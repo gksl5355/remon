@@ -29,7 +29,7 @@ class RegulationVersion(Base):
     regulation_version_id = Column(Integer, primary_key=True, autoincrement=True)
     regulation_id = Column(Integer, ForeignKey("regulations.regulation_id"), nullable=False)
     version_number = Column(Integer, nullable=False)
-    original_url = Column(String(500), nullable=True)
+    original_uri = Column(String(500), nullable=True)
     hash_value = Column(String(64), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
