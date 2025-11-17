@@ -15,10 +15,18 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     REDIS_URL: str
     SECRET_KEY: str
-    QDRANT_URL: str = "http://localhost:6333"
+    QDRANT_HOST: str
+    QDRANT_PORT: int
+    QDRANT_COLLECTION: str
+    # CHROMA_DB_PATH: str  # 사용 안함
+    # CHROMA_COLLECTION: str  # 사용 안함
+
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "extra": "ignore",  # .env의 추가 필드 허용
+    }
     QDRANT_API_KEY: str | None = None
-    qdrant_path: str = "./data/qdrant"
-    QDRANT_COLLECTION: str = "remon_regulations"
     QDRANT_PREFER_GRPC: bool = False
     QDRANT_TIMEOUT: float = 10.0
     MAPPING_TOP_K: int = 10
