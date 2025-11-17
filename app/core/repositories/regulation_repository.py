@@ -22,8 +22,8 @@ class RegulationRepository(BaseRepository[Regulation]):
         self, db: AsyncSession, country_code: str = None
     ) -> List[Regulation]:
         """keynote와 impact_score를 포함한 규제 조회"""
-        from app.core.models.regulation_model import RegulationVersion, RegulationChangeKeynote
-        from app.core.models.impact_model import ImpactScore
+        from core.models.regulation_model import RegulationVersion, RegulationChangeKeynote
+        from core.models.impact_model import ImpactScore
         
         query = select(Regulation).options(
             selectinload(Regulation.versions)
