@@ -46,7 +46,6 @@ class MappingService:
 
         # TODO: BE2(남지수) - MappingRepository.get_by_regulation_id() 구현 후 연동
         # TODO: AI2(조태환) - Qdrant 벡터 검색 결과 연동
-        # TODO: SQL: SELECT * FROM impact_scores WHERE translation_id IN (SELECT translation_id FROM regulation_translations WHERE regulation_version_id IN (SELECT regulation_version_id FROM regulation_versions WHERE regulation_id=?))
 
         return None
 
@@ -66,7 +65,6 @@ class MappingService:
         async with db.begin():
             # TODO: AI1(고서아) - ai_service.start_mapping() 호출
             # TODO: AI2(조태환) - Qdrant 하이브리드 벡터 검색 및 유사도 계산
-            # TODO: 매핑 결과를 DB에 저장
             pass
 
         return {"job_id": None, "status": "pending"}

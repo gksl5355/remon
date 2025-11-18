@@ -20,7 +20,6 @@ service = ReportService()
 
 # 더미 데이터 제거됨 (2025-11-12)
 
-# TODO 종합-요약 등 용어 정리해야함(=>조영우)
 # 기간별 종합 리포트 다운로드
 @router.get("/reports/combined/download")
 async def download_combined_report(

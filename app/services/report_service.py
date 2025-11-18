@@ -37,8 +37,7 @@ class ReportService:
         logger.info(f"Fetching report detail: regulation_id={regulation_id}")
         
         try:
-            # TODO: 실제로는 regulation_id로 report를 찾아야 함
-            # 임시: regulation_id를 report_id로 사용
+            
             report = await self.repo.get_with_items(db, regulation_id)
             
             if not report:
@@ -105,7 +104,6 @@ class ReportService:
         
         async with db.begin():
             # TODO: AI1(고서아) - ai_service.generate_report() 호출
-            # TODO: 생성된 리포트를 DB에 저장
             pass
         
         return {"report_id": None, "status": "pending"}
