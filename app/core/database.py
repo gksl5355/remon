@@ -20,6 +20,19 @@ from sqlalchemy.pool import NullPool
 import os
 from dotenv import load_dotenv
 
+
+# app/core/database.py
+# 실제 DB 연동을 위해 추가
+DB_URL = "postgresql+asyncpg://postgres:1234@localhost/remon_db"
+engine = create_async_engine(DB_URL)
+SessionLocal = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+
+def get_db_session():
+    return SessionLocal()
+
+
+
+
 load_dotenv()
 logger = logging.getLogger(__name__)
 
