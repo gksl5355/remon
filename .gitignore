@@ -13,6 +13,8 @@ __pycache__/
 venv/
 .env
 .venv/
+.ipynb_checkpoints/
+.pytest_cache/
 
 # ============ Node ============
 node_modules/
@@ -42,3 +44,5 @@ docs/
 tests/
 uv.lock
 data/
+data/*
+app/data/
