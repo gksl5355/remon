@@ -18,6 +18,9 @@ from app.vectorstore.vector_client import VectorClient, VectorMatch
 from app.vectorstore.vector_schema import MappingResult, ProductSnapshot
 from db.models import MappingResult as MappingResultORM
 from db.models import Product as ProductORM
+# 🆕 Tools import 추가
+from app.ai_pipeline.tools.retrieval_tool import RetrievalTool
+from app.ai_pipeline.tools.filter_builder import FilterBuilder
 
 
 # -----------------------------------------------------------------------------
@@ -157,12 +160,20 @@ class MapProductsDependencies:
     product_repository: ProductRepository
     mapping_sink: MappingSink
     config: MappingConfig
+    # 🆕 Tools 추가
+    retrieval_tool: RetrievalTool
+    filter_builder: FilterBuilder
 
     @classmethod
     def default(cls) -> "MapProductsDependencies":
         vector_client = VectorClient.from_settings()
         session_maker = AsyncSessionLocal
         product_repo = RDBProductRepository(session_maker)
+        
+        # 🆕 Tools 초기화
+        retrieval_tool = RetrievalTool(vector_client=vector_client)
+        filter_builder = FilterBuilder()
+        
         sink: MappingSink
         if settings.MAPPING_SINK_TYPE.lower() == "rdb":
             sink = RDBMappingSink(session_maker)
@@ -174,6 +185,8 @@ class MapProductsDependencies:
             product_repository=product_repo,
             mapping_sink=sink,
             config=MappingConfig.from_settings().normalize(),
+            retrieval_tool=retrieval_tool,
+            filter_builder=filter_builder,
         )
 
 
@@ -200,7 +213,12 @@ class MapProductsNode:
             logger.warning("map_products: no products fetched for filters {}", metadata)
             return {"mapped_products": []}
 
-        where_filters = _build_regulation_where(metadata)
+        # 🆕 FilterBuilder 사용
+        where_filters = self.deps.filter_builder.build_filters(
+            country=country,
+            category=category,
+            metadata=metadata
+        )
         mapped: List[MappingResult] = []
         query_tasks = []
 
@@ -254,11 +272,13 @@ class MapProductsNode:
         query_text: str,
         where_filters: Dict[str, Any] | None,
     ) -> List[MappingResult]:
-        query_response = await self.deps.vector_client.query(
-            query_text=query_text,
+        # 🆕 RetrievalTool 사용 (고급 검색)
+        query_response = await self.deps.retrieval_tool.search(
+            query=query_text,
+            strategy="hybrid",  # 하이브리드 검색 전략
+            top_k=self.deps.config.top_k,
+            filters=where_filters,
             alpha=self.deps.config.alpha,
-            n_results=self.deps.config.top_k,
-            where=where_filters,
         )
 
         return self._score_product(product, query_response)
@@ -410,6 +430,7 @@ def _evaluate_condition(value: Any, expected: Any, comparator: str | None) -> bo
 
 
 def _build_regulation_where(metadata: Dict[str, Any]) -> Dict[str, Any] | None:
+    """레거시 필터 빌더 (FilterBuilder로 대체됨)."""
     filters = {}
     if metadata.get("country"):
         filters["country"] = metadata["country"]

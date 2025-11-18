@@ -19,41 +19,24 @@ logger = logging.getLogger(__name__)
 
 class TableDetector:
     """
-    문서에서 테이블 영역을 감지하고 구조를 분석하는 클래스.
+    청킹 전략에 통합된 테이블 감지 및 Markdown 변환기.
     
     역할:
-    - 테이블 텍스트 패턴 인식 (|, -, 등 구분자)
-    - 테이블 경계 감지
-    - 행(row), 열(column) 구조 파악
-    - 테이블 메타데이터 추출 (크기, 데이터 타입 등)
-    - 테이블과 일반 텍스트 분리
-    
-    특징:
-    - 정규표현식 기반 (외부 라이브러리 불필요)
-    - 다양한 테이블 형식 지원 (Markdown, HTML, 텍스트)
-    - 테이블 위치 정보 제공
+    - 테이블 패턴 감지 (|, -, 공백 구분)
+    - Markdown 형식으로 정규화
+    - 청킹 시 테이블 무결성 보장
     """
     
-    # 테이블 감지 패턴들
-    TABLE_PATTERNS = {
-        "markdown": r"\|.+\|",  # | 로 구분된 행
-        "plain_pipe": r"^\|[\s\S]+?\|$",  # 시작-끝이 | 인 행들
-        "grid": r"^\+[-=]+\+",  # +--+ 형태 (ASCII 테이블)
-        "tab_separated": r"^\t.+\t",  # 탭으로 구분
-        "spaced": r"(?:^|\n)\s{2,}\S+(?:\s{2,}\S+)+(?:\n|$)",  # 2칸 이상 공백으로 구분
-    }
+    # 테이블 감지 패턴 (간소화)
+    TABLE_PATTERNS = [
+        r"\|.+\|",  # Markdown 테이블
+        r"^\+[-=]+\+",  # ASCII 테이블
+        r"\s{3,}\S+(?:\s{3,}\S+){2,}",  # 공백 구분 (3칸 이상, 3열 이상)
+    ]
     
-    def __init__(self, min_rows: int = 2, min_cols: int = 2):
-        """
-        테이블 감지기 초기화.
-        
-        Args:
-            min_rows (int): 테이블 최소 행 수. 기본값: 2
-            min_cols (int): 테이블 최소 열 수. 기본값: 2
-        """
-        self.min_rows = min_rows
-        self.min_cols = min_cols
-        logger.info(f"✅ TableDetector 초기화: min_rows={min_rows}, min_cols={min_cols}")
+    def __init__(self):
+        """테이블 감지기 초기화 (청킹 통합용)."""
+        logger.info("✅ TableDetector 초기화 (청킹 통합)")
     
     def _check_table_reference(self, lines: List[str], table_idx: int, direction: str = "before") -> bool:
         """표 참조 문구 확인."""
@@ -75,132 +58,100 @@ class TableDetector:
         
         return False
     
-    def detect_tables_in_text(self, text: str) -> Dict[str, Any]:
+    def detect_and_convert_tables(self, text: str) -> Dict[str, Any]:
         """
-        텍스트에서 테이블을 감지합니다.
-        
-        Args:
-            text (str): 분석 대상 텍스트
+        텍스트에서 테이블을 감지하고 Markdown으로 변환.
         
         Returns:
             Dict[str, Any]: {
-                "num_tables": 감지된 테이블 수,
-                "tables": [
-                    {
-                        "table_id": "table_0",
-                        "type": "markdown" | "grid" | "tab_separated" | "unknown",
-                        "start_line": 시작 라인 번호,
-                        "end_line": 종료 라인 번호,
-                        "num_rows": 행 수,
-                        "num_cols": 열 수,
-                        "headers": ["헤더1", "헤더2", ...],
-                        "preview": "테이블 프리뷰 (텍스트)",
-                        "bbox": {"line_start": X, "line_end": Y}  # 위치 정보
-                    },
-                    ...
-                ],
-                "non_table_text": "테이블 제거된 텍스트"
+                "converted_text": "테이블이 Markdown으로 변환된 텍스트",
+                "table_regions": [(start, end), ...],  # 테이블 위치
+                "num_tables": 감지된 테이블 수
             }
-        
-        Raises:
-            ValueError: 입력 텍스트가 비어있을 경우
         """
         if not text or not text.strip():
-            raise ValueError("Text cannot be empty")
+            return {"converted_text": text, "table_regions": [], "num_tables": 0}
         
         lines = text.split("\n")
-        tables = []
-        table_regions = []  # 테이블 영역 (라인 범위)
+        converted_lines = lines.copy()
+        table_regions = []
         
-        # 각 테이블 패턴으로 감지
-        for table_type, pattern in self.TABLE_PATTERNS.items():
-            tables_found = self._detect_by_pattern(lines, pattern, table_type)
-            tables.extend(tables_found)
-            table_regions.extend([(t["start_line"], t["end_line"]) for t in tables_found])
+        # 테이블 패턴 감지 및 변환
+        for pattern in self.TABLE_PATTERNS:
+            i = 0
+            while i < len(converted_lines):
+                if re.search(pattern, converted_lines[i]):
+                    # 연속된 테이블 행 찾기
+                    start_line = i
+                    table_lines = []
+                    while i < len(converted_lines) and re.search(pattern, converted_lines[i]):
+                        table_lines.append(converted_lines[i])
+                        i += 1
+                    
+                    # Markdown 테이블로 변환
+                    if len(table_lines) >= 2:  # 최소 2행
+                        markdown_table = self._convert_to_markdown(table_lines)
+                        # 원본 라인들을 Markdown으로 교체
+                        converted_lines[start_line:start_line + len(table_lines)] = markdown_table.split("\n")
+                        table_regions.append((start_line, start_line + len(table_lines) - 1))
+                else:
+                    i += 1
         
-        # 테이블 정보 구성
-        result_tables = []
-        for idx, table in enumerate(tables):
-            result_tables.append({
-                "table_id": f"table_{idx}",
-                "type": table["type"],
-                "start_line": table["start_line"],
-                "end_line": table["end_line"],
-                "num_rows": table["num_rows"],
-                "num_cols": table["num_cols"],
-                "headers": table.get("headers", []),
-                "preview": table.get("preview", "")[:200],
-                "json_structure": self._extract_table_json(table),
-                "has_reference": self._check_table_reference(lines, table["start_line"]),
-                "bbox": {
-                    "line_start": table["start_line"],
-                    "line_end": table["end_line"],
-                },
-            })
+        converted_text = "\n".join(converted_lines)
         
-        # 테이블 제거된 텍스트
-        non_table_lines = self._remove_table_lines(lines, table_regions)
-        non_table_text = "\n".join(non_table_lines)
-        
-        logger.info(f"✅ 테이블 감지 완료: {len(result_tables)}개 테이블 발견")
+        logger.debug(f"✅ 테이블 변환 완료: {len(table_regions)}개 테이블")
         
         return {
-            "num_tables": len(result_tables),
-            "tables": result_tables,
-            "non_table_text": non_table_text,
+            "converted_text": converted_text,
+            "table_regions": table_regions,
+            "num_tables": len(table_regions)
         }
     
-    def extract_table_content(self, text: str, table_id: str) -> Dict[str, Any]:
+    def _convert_to_markdown(self, table_lines: List[str]) -> str:
         """
-        특정 테이블의 내용을 구조적으로 추출합니다.
+        테이블 라인들을 Markdown 형식으로 변환.
         
         Args:
-            text (str): 원본 텍스트
-            table_id (str): 테이블 ID (예: "table_0")
+            table_lines: 테이블 라인 리스트
         
         Returns:
-            Dict[str, Any]: {
-                "table_id": "table_0",
-                "headers": ["헤더1", "헤더2"],
-                "rows": [
-                    {"col1": "값1", "col2": "값2"},
-                    ...
-                ],
-                "num_rows": 행 수,
-                "num_cols": 열 수,
-            }
+            str: Markdown 테이블 문자열
         """
-        # 간단한 구현 (실제로는 더 복잡한 파싱 필요)
-        result = {
-            "table_id": table_id,
-            "headers": [],
-            "rows": [],
-            "num_rows": 0,
-            "num_cols": 0,
-        }
+        if not table_lines:
+            return ""
         
-        logger.debug(f"테이블 내용 추출: {table_id}")
-        return result
+        # 이미 Markdown 형식인지 확인
+        if all("|" in line for line in table_lines[:2]):
+            return "\n".join(table_lines)
+        
+        # 공백 구분 테이블을 Markdown으로 변환
+        markdown_lines = []
+        for i, line in enumerate(table_lines):
+            # 공백으로 구분된 셀들을 | 구분자로 변환
+            cells = re.split(r'\s{2,}', line.strip())
+            if len(cells) >= 2:
+                markdown_line = "| " + " | ".join(cells) + " |"
+                markdown_lines.append(markdown_line)
+                
+                # 첫 번째 행 후에 구분자 추가
+                if i == 0:
+                    separator = "| " + " | ".join(["---"] * len(cells)) + " |"
+                    markdown_lines.append(separator)
+        
+        return "\n".join(markdown_lines)
     
-    def _extract_table_json(self, table: Dict[str, Any]) -> Dict[str, Any]:
-        """테이블을 JSON 구조로 변환."""
-        lines = table.get("preview", "").split("\n")
-        if not lines or len(lines) < 2:
-            return {"headers": [], "rows": [], "row_count": 0, "col_count": 0}
+    def is_table_region(self, line_num: int, table_regions: List[Tuple[int, int]]) -> bool:
+        """
+        특정 라인이 테이블 영역에 속하는지 확인.
         
-        headers = [cell.strip() for cell in lines[0].split("|") if cell.strip()]
-        rows = []
-        for line in lines[2:]:  # Skip header and separator
-            cells = [cell.strip() for cell in line.split("|") if cell.strip()]
-            if cells:
-                rows.append(cells)
+        Args:
+            line_num: 라인 번호
+            table_regions: 테이블 영역 리스트 [(start, end), ...]
         
-        return {
-            "headers": headers,
-            "rows": rows,
-            "row_count": len(rows),
-            "col_count": len(headers)
-        }
+        Returns:
+            bool: 테이블 영역 여부
+        """
+        return any(start <= line_num <= end for start, end in table_regions)
     
     def _detect_by_pattern(self, lines: List[str], pattern: str, pattern_type: str) -> List[Dict[str, Any]]:
         """

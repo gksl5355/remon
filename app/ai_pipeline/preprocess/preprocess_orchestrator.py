@@ -18,15 +18,14 @@ from pathlib import Path
 
 from app.ai_pipeline.preprocess.config import PreprocessConfig
 from app.ai_pipeline.preprocess.metadata_extractor import MetadataExtractor
-from app.ai_pipeline.preprocess.definition_extractor import DefinitionExtractor
-from app.ai_pipeline.preprocess.bm25_indexer import BM25Indexer
 from app.ai_pipeline.preprocess.pdf_processor import PDFProcessor
-from app.ai_pipeline.preprocess.table_detector import TableDetector
 from app.ai_pipeline.preprocess.embedding_pipeline import EmbeddingPipeline
 from app.ai_pipeline.preprocess.semantic_chunker import SemanticChunker
-from app.ai_pipeline.preprocess.hybrid_search import HybridSearch
-from app.ai_pipeline.preprocess.hierarchy_extractor import HierarchyExtractor
 from app.ai_pipeline.preprocess.proposition_extractor import PropositionExtractor
+from app.ai_pipeline.preprocess.table_detector import TableDetector
+from app.ai_pipeline.preprocess.hierarchy_extractor import HierarchyExtractor
+from app.ai_pipeline.preprocess.definition_extractor import DefinitionExtractor
+from app.ai_pipeline.preprocess.embedding_to_vectordb import EmbeddingToVectorDB
 
 logger = logging.getLogger(__name__)
 
@@ -57,33 +56,26 @@ class PreprocessOrchestrator:
         """
         self.config = config or PreprocessConfig()
         
-        # 모든 모듈 초기화
+        # 전체 파이프라인 모듈 초기화
         self.metadata_extractor = MetadataExtractor()
-        self.definition_extractor = DefinitionExtractor()
-        self.bm25_indexer = BM25Indexer()
         self.pdf_processor = PDFProcessor()
         self.table_detector = TableDetector()
-        self.embedding_pipeline = EmbeddingPipeline(
-            model_name=self.config.EMBEDDING_MODEL,
-            use_fp16=self.config.USE_FP16,
-            batch_size=self.config.EMBEDDING_BATCH_SIZE,
-        )
+        self.hierarchy_extractor = HierarchyExtractor()
+        self.definition_extractor = DefinitionExtractor()
         self.semantic_chunker = SemanticChunker(
             chunk_size=self.config.MAX_CHUNK_SIZE,
         )
-        self.hybrid_search = HybridSearch(
-            embedding_pipeline=self.embedding_pipeline,
-            bm25_indexer=self.bm25_indexer,
-            alpha=self.config.HYBRID_ALPHA,
-            table_boost=self.config.TABLE_BOOST,
-            category_boost=self.config.CATEGORY_BOOST,
-        )
-        self.hierarchy_extractor = HierarchyExtractor()
         self.proposition_extractor = PropositionExtractor(
             api_key=self.config.OPENAI_API_KEY,
             model=self.config.OPENAI_MODEL_PROPOSITION,
             max_workers=3
         )
+        self.embedding_pipeline = EmbeddingPipeline(
+            model_name=self.config.EMBEDDING_MODEL,
+            use_fp16=self.config.USE_FP16,
+            batch_size=self.config.EMBEDDING_BATCH_SIZE,
+        )
+        self.embedding_to_vectordb = EmbeddingToVectorDB()
         
         # Parent-Child Hierarchy 저장소
         self.parent_chunks: Dict[str, str] = {}
@@ -138,26 +130,32 @@ class PreprocessOrchestrator:
             metadata = self.metadata_extractor.extract_metadata(raw_text, source_url=pdf_path)
             metadata["doc_id"] = doc_id
             
-            # Step 3: 정의 추출
-            definitions = self.definition_extractor.extract_definitions(raw_text)
+            # Step 3: 테이블 감지
+            logger.info("  📊 테이블 감지 중...")
+            table_results = self.table_detector.detect_tables(raw_text)
             
             # Step 4: 계층 구조 추출
-            hierarchy = self.hierarchy_extractor.extract_hierarchy(raw_text)
+            logger.info("  🏗️ 계층 구조 추출 중...")
+            hierarchy_results = self.hierarchy_extractor.extract_hierarchy(raw_text)
             
-            # Step 5: 테이블 감지 및 컨텍스트 바인딩
-            tables_result = self.table_detector.detect_tables_in_text(raw_text)
-            if tables_result.get("tables"):
-                enriched_tables = self.table_detector.bind_table_context(
-                    raw_text, tables_result["tables"]
-                )
-                tables_result["tables"] = enriched_tables
+            # Step 5: 정의 추출
+            logger.info("  📖 정의 추출 중...")
+            definition_results = self.definition_extractor.extract_definitions(raw_text)
             
-            # Step 6: 의미 기반 청크 분할
-            chunking_result = self.semantic_chunker.chunk_document(raw_text, metadata)
+            # Step 6: 의미 기반 청크 분할 (구조 정보 활용)
+            # 구조 정보를 메타데이터에 추가
+            enhanced_metadata = {
+                **metadata,
+                "tables": table_results,
+                "hierarchy": hierarchy_results,
+                "definitions": definition_results,
+            }
+            
+            chunking_result = self.semantic_chunker.chunk_document(raw_text, enhanced_metadata)
             chunks = chunking_result["chunks"]
             
             # Step 7: 명제 추출 (병렬 처리)
-            logger.info(f"  명제 추출 중 ({len(chunks)}개 청크)...")
+            logger.info(f"  📝 명제 추출 중 ({len(chunks)}개 청크)...")
             all_propositions = self.proposition_extractor.extract_propositions_batch(
                 [{"content": c["text"]} for c in chunks]
             )
@@ -187,12 +185,9 @@ class PreprocessOrchestrator:
             embeddings_array = embeddings_result["dense"]
             sparse_embeddings = embeddings_result.get("sparse")
             
-            # Step 10: BM25 인덱싱
-            bm25_result = self.bm25_indexer.build_index(raw_text, metadata)
-            
-            # Step 11: Qdrant 저장용 데이터 구성 (명제 단위)
+            # Step 10: VectorDB 저장용 데이터 구성 (명제 단위)
             qdrant_ready_data = self._prepare_for_qdrant_with_propositions(
-                chunks, all_propositions, embeddings_array, proposition_metadata, metadata, tables_result, sparse_embeddings
+                chunks, all_propositions, embeddings_array, proposition_metadata, metadata, sparse_embeddings
             )
             
             # 최종 결과
@@ -203,9 +198,9 @@ class PreprocessOrchestrator:
                 "pipeline_output": {
                     "raw_text": raw_text[:1000] + "..." if len(raw_text) > 1000 else raw_text,  # 샘플
                     "metadata": metadata,
-                    "definitions": definitions,
-                    "hierarchy": hierarchy,
-                    "tables": tables_result,
+                    "tables": table_results,
+                    "hierarchy": hierarchy_results,
+                    "definitions": definition_results,
                     "chunks": chunks[:3],
                     "propositions_sample": all_propositions[:3],
                     "embeddings_stats": {
@@ -213,14 +208,11 @@ class PreprocessOrchestrator:
                         "num_propositions": len(all_proposition_texts),
                         "embedding_dim": len(embeddings_array[0]) if embeddings_array and len(embeddings_array) > 0 else 1024,
                     },
-                    "search_index": bm25_result,
                 },
                 "qdrant_ready_data": qdrant_ready_data,
                 "summary": {
                     "num_chunks": len(chunks),
                     "num_propositions": len(all_proposition_texts),
-                    "num_definitions": len(definitions.get("definitions", [])),
-                    "num_tables": tables_result.get("num_tables", 0),
                     "total_text_chars": len(raw_text),
                 }
             }
@@ -295,7 +287,6 @@ class PreprocessOrchestrator:
         embeddings_array,
         proposition_metadata: List[Dict[str, Any]],
         doc_metadata: Dict[str, Any],
-        tables_result: Dict[str, Any],
         sparse_embeddings=None,
     ) -> List[Dict[str, Any]]:
         """Qdrant VectorDB에 저장할 형식으로 데이터를 준비 (명제 단위)."""

@@ -19,8 +19,40 @@ dependencies:
 from typing import List, Dict, Tuple, Optional, Any
 import logging
 import re
+from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
+
+@dataclass
+class ProcessedChunk:
+    """
+    Parent-Child 청킹을 위한 데이터 모델.
+    
+    Attributes:
+        chunk_id: 고유 청크 ID
+        text: 검색용 텍스트 (Child)
+        context_text: LLM용 전체 맥락 (Parent)
+        metadata: 청크 메타데이터
+        chunk_type: "parent" | "child"
+        parent_id: Parent 청크 ID (Child인 경우)
+    """
+    chunk_id: str
+    text: str
+    context_text: str
+    metadata: Dict[str, Any]
+    chunk_type: str = "child"
+    parent_id: Optional[str] = None
+    embedding: Optional[List[float]] = None
+    parent_embedding: Optional[List[float]] = None
+
+# 청킹에 통합된 모듈들
+try:
+    from app.ai_pipeline.preprocess.table_detector import TableDetector
+    from app.ai_pipeline.preprocess.definition_extractor import DefinitionExtractor
+except ImportError:
+    TableDetector = None
+    DefinitionExtractor = None
+    logger.warning("⚠️ TableDetector 또는 DefinitionExtractor 임포트 실패")
 
 
 class SemanticChunker:
@@ -131,10 +163,13 @@ class SemanticChunker:
         self.min_chunk_size = min_chunk_size
         self.max_chunk_size = max_chunk_size
         
+        # 통합 모듈 초기화
+        self.table_detector = TableDetector() if TableDetector else None
+        self.definition_extractor = DefinitionExtractor() if DefinitionExtractor else None
+        
         logger.info(
-            f"✅ SemanticChunker 초기화 (US Regulations): "
-            f"chunk_size={chunk_size}, overlap={overlap_size}, "
-            f"min={min_chunk_size}, max={max_chunk_size}"
+            f"✅ SemanticChunker 초기화 (테이블/정의 통합): "
+            f"chunk_size={chunk_size}, overlap={overlap_size}"
         )
 
     
@@ -190,15 +225,30 @@ class SemanticChunker:
         if not document_metadata:
             document_metadata = {}
         
-        # 1단계: 문서 유형에 따른 섹션 식별
+        # 1단계: 테이블 감지 및 Markdown 변환
+        table_result = {"converted_text": document_text, "table_regions": [], "num_tables": 0}
+        if self.table_detector:
+            table_result = self.table_detector.detect_and_convert_tables(document_text)
+            document_text = table_result["converted_text"]
+            logger.debug(f"✅ 테이블 변환: {table_result['num_tables']}개 → Markdown")
+        
+        # 2단계: 정의 및 약어 추출
+        definitions_result = {"definitions": [], "acronyms": []}
+        if self.definition_extractor:
+            definitions_result = self.definition_extractor.extract_definitions_and_acronyms(document_text)
+            logger.debug(f"✅ 정의/약어: {len(definitions_result['definitions'])}/{len(definitions_result['acronyms'])}개")
+        
+        # 3단계: 문서 유형에 따른 섹션 식별
         jurisdiction = document_metadata.get("jurisdiction", "federal")
         sections = self._identify_sections(document_text, jurisdiction)
         logger.debug(f"✅ 섹션 식별: {len(sections)}개 ({jurisdiction})")
         
-        # 2단계: 각 섹션을 청크로 분할
+        # 4단계: 각 섹션을 청크로 분할 (테이블/정의 보존)
         all_chunks = []
         for section in sections:
-            chunks = self._chunk_section(section, jurisdiction)
+            chunks = self._chunk_section_with_preservation(
+                section, jurisdiction, table_result["table_regions"], definitions_result
+            )
             all_chunks.extend(chunks)
         
         # 3단계: 청크에 메타데이터 추가
@@ -216,7 +266,8 @@ class SemanticChunker:
                 "subsection": chunk.get("subsection", ""),
                 "hierarchy_path": chunk.get("hierarchy_path", ""),
                 "hierarchy_depth": chunk.get("hierarchy_depth", 0),
-                "has_table": self._contains_table(chunk["text"]),
+                "has_table": chunk.get("has_table", self._contains_table(chunk["text"])),
+                "has_definition": chunk.get("has_definition", False),
                 "tokens_estimate": self._estimate_tokens(chunk["text"]),
                 "footnotes": self._extract_footnotes(chunk["text"]),
                 "legal_citations": self._extract_legal_citations(chunk["text"]),
@@ -242,6 +293,9 @@ class SemanticChunker:
                 "avg_chunk_size": round(avg_chunk_size, 1),
                 "total_tokens_estimate": total_tokens,
                 "num_sections": len(sections),
+                "num_tables": table_result["num_tables"],
+                "num_definitions": len(definitions_result["definitions"]),
+                "num_acronyms": len(definitions_result["acronyms"]),
             }
         }
     
@@ -469,6 +523,92 @@ class SemanticChunker:
     
     # ==================== 유틸리티 ====================
     
+    def _chunk_section_with_preservation(
+        self,
+        section: Dict[str, Any],
+        jurisdiction: str,
+        table_regions: List[Tuple[int, int]],
+        definitions_result: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """
+        섹션을 청크로 분할하되 테이블과 정의 영역 보존.
+        
+        Args:
+            section: 섹션 정보
+            jurisdiction: 관할권
+            table_regions: 테이블 영역 리스트
+            definitions_result: 정의/약어 추출 결과
+        
+        Returns:
+            List[Dict]: 청크 리스트
+        """
+        text = section.get("text", "")
+        if not text:
+            return []
+        
+        chunks = []
+        current_pos = 0
+        
+        # 문장 단위로 분할
+        sentences = self._split_into_sentences(text)
+        current_chunk = ""
+        current_start = 0
+        
+        for sentence in sentences:
+            # 청크 크기 확인
+            if len(current_chunk) + len(sentence) > self.chunk_size and current_chunk:
+                # 테이블/정의 영역 확인
+                has_table = self.table_detector and any(
+                    self.table_detector.is_table_region(line_num, table_regions)
+                    for line_num in range(current_start, current_pos)
+                ) if self.table_detector else False
+                
+                has_definition = self.definition_extractor and self.definition_extractor.has_definition_in_range(
+                    text, current_start, current_pos
+                ) if self.definition_extractor else False
+                
+                chunk_info = {
+                    "text": current_chunk.strip(),
+                    "start_char": current_start,
+                    "end_char": current_pos,
+                    "section_num": section.get("number", ""),
+                    "section_title": section.get("title", ""),
+                    "has_table": has_table,
+                    "has_definition": has_definition,
+                }
+                chunks.append(chunk_info)
+                
+                current_chunk = sentence
+                current_start = current_pos
+            else:
+                current_chunk += " " + sentence if current_chunk else sentence
+            
+            current_pos += len(sentence) + 1
+        
+        # 마지막 청크
+        if current_chunk:
+            has_table = self.table_detector and any(
+                self.table_detector.is_table_region(line_num, table_regions)
+                for line_num in range(current_start, len(text))
+            ) if self.table_detector else False
+            
+            has_definition = self.definition_extractor and self.definition_extractor.has_definition_in_range(
+                text, current_start, len(text)
+            ) if self.definition_extractor else False
+            
+            chunk_info = {
+                "text": current_chunk.strip(),
+                "start_char": current_start,
+                "end_char": len(text),
+                "section_num": section.get("number", ""),
+                "section_title": section.get("title", ""),
+                "has_table": has_table,
+                "has_definition": has_definition,
+            }
+            chunks.append(chunk_info)
+        
+        return chunks
+    
     def _contains_table(self, text: str) -> bool:
         """텍스트가 테이블을 포함하는지 확인 (Federal Register 특화)."""
         for pattern in self.TABLE_PATTERNS:
@@ -579,6 +719,157 @@ class SemanticChunker:
         
         logger.info(f"✅ 배치 완료: {total}개 문서")
         return results
+    
+    def _reconstruct_full_text(self, node: Dict[str, Any]) -> str:
+        """
+        트리를 순회하며 전체 텍스트 재조립 (Parent Chunk용).
+        
+        Args:
+            node: LegalNode 딕셔너리
+            
+        Returns:
+            str: 재조립된 전체 텍스트
+        """
+        text = f"{node.get('identifier', '')} {node.get('text', '')}\n"
+        
+        for child in node.get("children", []):
+            text += self._reconstruct_full_text(child)
+            
+        return text
+    
+    def _flatten_nodes(self, node: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        트리를 평탄화하여 개별 검색 단위 추출 (Child Chunk용).
+        
+        Args:
+            node: LegalNode 딕셔너리
+            
+        Returns:
+            List[Dict]: 평탄화된 노드 리스트
+        """
+        flat_list = [node]  # 자기 자신 포함
+        
+        for child in node.get("children", []):
+            flat_list.extend(self._flatten_nodes(child))
+            
+        return flat_list
+    
+    def _normalize_terms(self, text: str) -> str:
+        """
+        기술 용어 정규화 (definition_extractor 통합).
+        
+        Args:
+            text: 원본 텍스트
+            
+        Returns:
+            str: 정규화된 텍스트
+        """
+        if not text:
+            return ""
+            
+        # 기본 담배 규제 용어 정규화
+        replacements = {
+            "HPHC": "Harmful and Potentially Harmful Constituent (HPHC)",
+            "MRTP": "Modified Risk Tobacco Product (MRTP)",
+            "VLNC": "Very Low Nicotine Content (VLNC)",
+            "FDA": "Food and Drug Administration (FDA)",
+            "CFR": "Code of Federal Regulations (CFR)",
+            "USC": "United States Code (USC)"
+        }
+        
+        normalized_text = text
+        for abbr, full_form in replacements.items():
+            # 이미 확장된 형태가 아닌 경우에만 치환
+            if abbr in normalized_text and full_form not in normalized_text:
+                normalized_text = normalized_text.replace(abbr, full_form)
+                
+        # definition_extractor 사용 (있는 경우)
+        if self.definition_extractor:
+            try:
+                definitions = self.definition_extractor.extract_definitions_and_acronyms(normalized_text)
+                # 추출된 정의를 텍스트에 반영
+                for definition in definitions.get("definitions", []):
+                    term = definition.get("term", "")
+                    meaning = definition.get("definition", "")
+                    if term and meaning and len(meaning) < 100:  # 너무 긴 정의는 제외
+                        normalized_text = normalized_text.replace(
+                            term, f"{term} ({meaning})", 1
+                        )
+            except Exception as e:
+                logger.debug(f"정의 추출 중 오류: {e}")
+                
+        return normalized_text
+    
+    def create_parent_child_chunks(
+        self,
+        legal_nodes: List[Dict[str, Any]],
+        global_metadata: Optional[Dict[str, Any]] = None
+    ) -> List[ProcessedChunk]:
+        """
+        DDH 구조의 LegalNode를 Parent-Child 청크로 변환.
+        
+        Args:
+            legal_nodes: hierarchy_extractor.parse_ddh_structure() 결과
+            global_metadata: 전역 메타데이터
+            
+        Returns:
+            List[ProcessedChunk]: Parent-Child 청크 리스트
+        """
+        if not global_metadata:
+            global_metadata = {}
+            
+        final_chunks = []
+        
+        for section in legal_nodes:
+            if section.get("node_type") != "section":
+                continue
+                
+            # Parent Chunk 생성 (섹션 전체)
+            full_section_text = self._reconstruct_full_text(section)
+            full_section_text = self._normalize_terms(full_section_text)
+            
+            parent_chunk = ProcessedChunk(
+                chunk_id=f"parent_{section['identifier']}",
+                text=full_section_text,
+                context_text=full_section_text,
+                metadata={
+                    **global_metadata,
+                    **section.get("metadata", {}),
+                    "section_id": section["identifier"],
+                    "type": "parent",
+                    "law_level": "Section"
+                },
+                chunk_type="parent"
+            )
+            final_chunks.append(parent_chunk)
+            
+            # Child Chunks 생성 (개별 조항)
+            children_chunks = self._flatten_nodes(section)
+            
+            for child in children_chunks:
+                # 표(Table) 처리
+                is_table = "|" in child.get("text", "") and "-|-" in child.get("text", "")
+                
+                child_chunk = ProcessedChunk(
+                    chunk_id=f"child_{section['identifier']}_{child.get('identifier', 'unknown')}",
+                    text=self._normalize_terms(child.get("text", "")),
+                    context_text=full_section_text,
+                    metadata={
+                        **global_metadata,
+                        **section.get("metadata", {}),
+                        "section_id": section["identifier"],
+                        "hierarchy_level": child.get("identifier", ""),
+                        "level": child.get("level", 0),
+                        "is_table": is_table,
+                        "type": "child"
+                    },
+                    chunk_type="child",
+                    parent_id=f"parent_{section['identifier']}"
+                )
+                final_chunks.append(child_chunk)
+                
+        logger.info(f"✅ Parent-Child 청킹 완료: {len(final_chunks)}개 청크")
+        return final_chunks
 
 
 if __name__ == "__main__":
