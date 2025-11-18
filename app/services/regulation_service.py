@@ -55,20 +55,22 @@ class RegulationService:
                     if latest_version.keynotes:
                         keynote = latest_version.keynotes[0]
                 
-                # keynote에서 impact와 category 추출
+                # keynote에서 impact, category, summary 모두 추출
                 if keynote and keynote.impact_score:
                     impact = RISK_LEVEL_MAP.get(keynote.impact_score.risk_level, "보통")
-                    category = keynote.regulation_type or "기타"
+                    category = keynote.regulation_type 
+                    summary = keynote.title 
                 else:
                     impact = "보통"
                     category = "기타"
+                    summary = reg.title or ""
                 
                 result.append({
                     "id": reg.regulation_id,
                     "country": reg.country_code,
                     "impact": impact,
                     "category": category,
-                    "summary": reg.title or ""
+                    "summary": summary
                 })
             
             logger.info(f"Found {len(result)} regulations")
@@ -84,44 +86,3 @@ class RegulationService:
                 "today_count": 0,
                 "regulations": []
             }
-
-    async def get_regulation_detail(
-        self, 
-        db: AsyncSession, 
-        regulation_id: int
-    ) -> dict | None:
-        """
-        규제 문서 상세 정보를 조회한다.
-
-        Args:
-            db (AsyncSession): 데이터베이스 세션.
-            regulation_id (int): 규제 문서 ID.
-
-        Returns:
-            dict | None: 규제 문서 상세 정보 또는 None.
-        """
-        logger.info(f"Fetching regulation detail: regulation_id={regulation_id}")
-        
-        try:
-            # Repository 호출
-            regulation = await self.repo.get_with_versions(db, regulation_id)
-            
-            if not regulation:
-                logger.warning(f"Regulation not found: regulation_id={regulation_id}")
-                return None
-            
-            # 프론트 형식으로 변환
-            return {
-                "id": regulation.regulation_id,
-                "country": regulation.country_code,
-                "title": regulation.title or "제목 없음",
-                "status": regulation.status or "active",
-                "impact": "보통",  # 임시값
-                "category": "기타",  # 임시값
-                "summary": regulation.title or "",
-                "created_at": regulation.created_at.isoformat() if regulation.created_at else None
-            }
-            
-        except Exception as e:
-            logger.error(f"Error fetching regulation detail: {e}", exc_info=True)
-            return None
