@@ -1,20 +1,50 @@
 #======================================================================
 # app/ai_pipeline/nodes/generate_strategy.py
 # 대응 전략
-# RAG 이전 규제 대응 history 반영 
-# input - 
+# - 규제 + 제품 조합 임베딩으로 Qdrant history 검색
+# - 과거 규제/제품/전략 텍스트를 프롬프트에 넣어 LLM으로 최종 전략 생성
+# - 생성된 전략을 다시 Qdrant history에 저장
+# input  - state.regulation_text, state.mapped_products
 # output - strategies: List[str]
 #======================================================================
 
-from typing import List, Dict
+from typing import List, Dict, Optional
+import os
 import re
+from datetime import datetime
+
+from qdrant_client import QdrantClient
+from qdrant_client import models as qm
+
 from app.ai_pipeline.state import AppState                     # AppState.strategies: List[str]
-from app.ai_pipeline.nodes.llm import llm         
+from app.ai_pipeline.nodes.llm import llm
+from app.ai_pipeline.nodes.embedding import embed_text         # str -> List[float]
 
 #------------------
 # 설정
 #------------------
 JACCARD_THRESHOLD = 0.80
+
+QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+HISTORY_COLLECTION = os.getenv("QDRANT_HISTORY_COLLECTION", "regulation_strategy_history")
+HISTORY_TOP_K = int(os.getenv("HISTORY_TOP_K", "5"))
+
+_qdrant_client: Optional[QdrantClient] = None
+
+
+def _get_qdrant_client() -> QdrantClient:
+    """
+    Qdrant 클라이언트 lazy singleton.
+    """
+    global _qdrant_client
+    if _qdrant_client is None:
+        _qdrant_client = QdrantClient(
+            url=QDRANT_URL,
+            api_key=QDRANT_API_KEY or None,
+        )
+    return _qdrant_client
+
 
 #------------------------
 # 유틸: 토큰/유사도/파싱
@@ -76,7 +106,6 @@ def _is_valid_action_text(text: str) -> bool:
     if not text:
         return False
 
-    # 너무 짧은 건 의미 없는 경우가 많음
     if len(text) < 3:
         return False
 
@@ -87,7 +116,7 @@ def _is_valid_action_text(text: str) -> bool:
     # 메타 텍스트로 자주 나오는 프리픽스 제거
     lowered = text.lower()
     meta_prefixes = (
-        "role:", "system:", "assistant:", "user:", 
+        "role:", "system:", "assistant:", "user:",
         "지시사항", "출력 형식", "예시", "참고"
     )
     if any(lowered.startswith(p) for p in meta_prefixes):
@@ -111,10 +140,7 @@ def _parse_llm_actions(text: str) -> List[str]:
             continue
 
         # 불릿/번호 제거
-        term = _clean_action_line(ln)
-
-        # 다시 한 번 공백 제거
-        term = term.strip()
+        term = _clean_action_line(ln).strip()
         if not term:
             continue
 
@@ -145,7 +171,7 @@ def _is_semantically_duplicate(a: str, b: str, threshold: float) -> bool:
     if j >= threshold:
         return True
 
-    # 2) 부분집합 관계 (조금 더 세부화된 같은 전략으로 간주)
+    # 2) 부분집합 관계
     if ta.issubset(tb) or tb.issubset(ta):
         return True
 
@@ -171,40 +197,149 @@ def _dedup_by_jaccard(lines: List[str], threshold: float = JACCARD_THRESHOLD) ->
 
 
 #-----------------------------------------------
+# 규제 + 제품 컨텍스트 블록
+#  - history 검색용 임베딩에도 이 문자열 포맷을 그대로 쓰는 걸 권장
+#-----------------------------------------------
+def _build_regulation_product_block(
+    regulation_text: str,
+    mapped_products: List[str],
+) -> str:
+    """
+    규제 + 제품을 하나의 의미 단위 텍스트로 묶는다.
+    - 이 블록을 그대로 embed() 해서
+      '규제+제품' 조합 임베딩으로 사용할 수 있음.
+    """
+    products_block = ", ".join(mapped_products or []) or "(매핑된 제품 없음)"
+
+    return f"""
+[규제]
+{regulation_text}
+
+[대상 제품]
+{products_block}
+""".strip()
+
+
+#-----------------------------------------------
+# Qdrant history 검색 (규제+제품 임베딩 기반)
+#-----------------------------------------------
+def _format_history_hit(payload: Dict, idx: int) -> str:
+    """
+    Qdrant에서 가져온 한 개의 history payload를
+    generate_strategy 프롬프트에 넣기 좋은 문자열로 변환.
+    """
+    reg_text = payload.get("regulation_text", "")
+    prod_text = payload.get("product_text", "")
+    strategies = payload.get("strategy_list", []) or []
+    strategies_block = "\n".join(f"- {s}" for s in strategies)
+
+    country = payload.get("country")
+    reg_id = payload.get("reg_id")
+
+    header_meta = []
+    if country:
+        header_meta.append(f"국가: {country}")
+    if reg_id:
+        header_meta.append(f"규제 ID: {reg_id}")
+    header_line = " / ".join(header_meta) if header_meta else ""
+
+    return f"""
+=== 과거 유사 사례 {idx} ===
+[과거 규제]
+{reg_text}
+
+[당시 대상 제품]
+{prod_text}
+
+[당시 대응 전략]
+{strategies_block}
+
+{header_line}
+""".strip()
+
+
+def _search_history_blocks(
+    regulation_text: str,
+    mapped_products: List[str],
+) -> List[str]:
+    """
+    현재 규제 + 매핑된 제품을 기반으로
+    Qdrant history 컬렉션에서 유사 사례를 검색하고,
+    프롬프트에 바로 쓸 수 있는 문자열 리스트를 반환.
+    """
+    # 규제 없으면 검색 안 함
+    if not regulation_text:
+        return []
+
+    # 1) 쿼리 텍스트 → 임베딩
+    query_text = _build_regulation_product_block(
+        regulation_text=regulation_text,
+        mapped_products=mapped_products,
+    )
+    query_vec = embed_text(query_text)
+
+    # 2) Qdrant 검색
+    client = _get_qdrant_client()
+
+    hits = client.search(
+        collection_name=HISTORY_COLLECTION,
+        query_vector=query_vec,
+        limit=HISTORY_TOP_K,
+        with_payload=True,
+        score_threshold=None,  # 필요하면 값 지정
+    )
+
+    # 3) payload → 문자열로 변환
+    docs: List[str] = []
+    for i, h in enumerate(hits, start=1):
+        payload = h.payload or {}
+        doc_str = _format_history_hit(payload, idx=i)
+        docs.append(doc_str)
+
+    return docs
+
+
+#-----------------------------------------------
 # 프롬프트 템플릿 (규제 + 제품 + 히스토리 기반 → 최종 전략)
 #-----------------------------------------------
 def _render_strategy_prompt(
     regulation_text: str,
     mapped_products: List[str],
-    rag_context_docs: List[str],
+    history_blocks: List[str],
 ) -> str:
 
-    products_block = ", ".join(mapped_products or [])
-    history_block = "\n".join(f"- {c}" for c in (rag_context_docs or [])[:5]) or "- (검색된 근거 없음)"
+    # 규제+제품 블록 (→ 이 포맷을 임베딩에도 사용)
+    current_case_block = _build_regulation_product_block(
+        regulation_text=regulation_text,
+        mapped_products=mapped_products,
+    )
+
+    if history_blocks:
+        history_block = "\n\n".join(history_blocks)
+    else:
+        history_block = "(검색된 근거 없음)"
 
     return f"""
 [ROLE]
 당신은 담배/니코틴 제품 규제 대응 전문가입니다.
-아래의 정보(규제/제품/검색된 근거)를 종합하여
+아래의 정보(현재 규제/대상 제품/과거 유사 사례)를 종합하여
 실제 실행 가능한 수준의 '최종 대응 전략'을 제시하십시오.
 
-[기준 규제 조항]
-{regulation_text}
+[현재 규제 + 대상 제품]
+{current_case_block}
 
-[대상 제품]
-{products_block}
-
-[검색된 근거 (과거 유사 규제/제품/전략 히스토리)]
+[과거 유사 규제/제품/전략 히스토리]
 {history_block}
 
 [지시사항]
 
 1. 반드시 다음 세 가지 정보만 근거로 사용하십시오.
-   - [기준 규제 조항]
-   - [대상 제품]
-   - [검색된 근거 (과거 유사 규제/제품/전략 히스토리)]
+   - [현재 규제 + 대상 제품]
+   - [과거 유사 규제/제품/전략 히스토리]
+   - 일반적인 상식 수준의 규제 컴플라이언스 지식
+     (단, 구체적인 수치/기한/비율은 반드시 주어진 텍스트에서만 가져오십시오.)
 
-2. 특히, [기준 규제 조항]에 명시된 수치 기준
+2. 특히, [규제]에 명시된 수치 기준
    (예: 니코틴 함량 %, 타르 mg, 경고문 면적 %, 광고 금지 기간 등)이 있을 경우
    해당 수치를 그대로 반영하십시오.
    - 새로운 수치, 비율, 기준을 임의로 만들지 마십시오.
@@ -215,10 +350,11 @@ def _render_strategy_prompt(
    - 단순한 원칙 수준(예: "규제 준수 강화", "내부 프로세스 정비")의 모호한 표현은 피하고,
      실제로 담당자가 바로 실행할 수 있는 구체적인 액션으로 작성하십시오.
 
-4. 과거 [검색된 근거]에 등장하는 대응 전략을 우선 참고하되,
-   이번 규제 상황에 맞지 않는 전략은 포함하지 마십시오.
+4. 과거 [과거 유사 규제/제품/전략 히스토리]에 등장하는 대응 전략을 우선 참고하되,
+   이번 규제 상황과 제품 특성에 맞지 않는 전략은 포함하지 마십시오.
    새로운 전략을 제안하는 경우에도
-   반드시 [기준 규제 조항] 또는 [검색된 근거]에서 근거를 찾을 수 있어야 합니다.
+   반드시 [현재 규제 + 대상 제품] 또는 [과거 유사 규제/제품/전략 히스토리]에서
+   근거를 찾을 수 있어야 합니다.
 
 5. 출력 형식:
    - 최종 대응 전략 리스트를 출력합니다.
@@ -235,46 +371,130 @@ def _render_strategy_prompt(
 """.strip()
 
 
+#-----------------------------------------------
+# history 저장 (이번 규제 + 제품 + 생성된 전략)
+#-----------------------------------------------
+def _persist_history(
+    regulation_text: str,
+    mapped_products: List[str],
+    strategies: List[str],
+    extra_meta: Optional[Dict] = None,
+) -> None:
+    """
+    현재 규제 + 매핑 제품 + 생성된 전략을
+    '규제+제품+전략' 텍스트로 합쳐서 임베딩 → Qdrant에 upsert.
+    """
+    if not regulation_text or not strategies:
+        return
+
+    reg_prod_block = _build_regulation_product_block(
+        regulation_text=regulation_text,
+        mapped_products=mapped_products,
+    )
+    strategy_block = "\n".join(f"- {s}" for s in strategies)
+
+    full_text = f"""
+[규제 + 대상 제품]
+{reg_prod_block}
+
+[최종 대응 전략]
+{strategy_block}
+""".strip()
+
+    vec = embed_text(full_text)
+
+    payload: Dict = {
+        "regulation_text": regulation_text,
+        "product_text": ", ".join(mapped_products or []),
+        "strategy_list": strategies,
+        "source_type": "generated",
+        "created_at": datetime.utcnow().isoformat() + "Z",
+    }
+
+    if extra_meta:
+        payload.update(extra_meta)
+
+    client = _get_qdrant_client()
+    client.upsert(
+        collection_name=HISTORY_COLLECTION,
+        points=[
+            qm.PointStruct(
+                id=None,      # 자동 ID; 필요하면 규칙적으로 부여
+                vector=vec,
+                payload=payload,
+            )
+        ],
+    )
+
+
 #----------------------------------
 # 메인 노드 (generate_strategy_node)
 #----------------------------------
-
 def generate_strategy_node(state: AppState) -> Dict:
     """
-    규제 텍스트 + 매핑 제품 + RAG 히스토리를 기반으로
-    최종 대응 전략을 한 번에 생성한다.
+    [한 노드에서 모두 처리]
+    - 규제 텍스트 + 매핑 제품 → 임베딩
+    - Qdrant history에서 유사 사례 검색 (벡터 기반)
+    - 과거 규제/제품/전략을 LLM 프롬프트에 넣고
+      현재 규제에 대한 최종 대응 전략을 생성
+    - 생성된 전략을 다시 Qdrant history에 저장
     """
 
-    # 0) 입력
     regulation_text = getattr(state, "regulation_text", "") or ""
     mapped_products = getattr(state, "mapped_products", []) or []
-    rag_context_docs = getattr(state, "rag_context_docs", []) or []
 
     if not regulation_text:
         state.strategies = []
+        # history 없더라도 필드만 맞춰둠
+        state.rag_context_docs = []
         return {"strategies": state.strategies}
 
-    # 1) 프롬프트 생성 & LLM 호출
+    # 1) Qdrant history 검색 (규제+제품 임베딩 기반)
+    history_blocks = _search_history_blocks(
+        regulation_text=regulation_text,
+        mapped_products=mapped_products,
+    )
+
+    # 디버깅/추적용으로 state에도 저장해두면 LangGraph에서 보기 좋음
+    state.rag_context_docs = history_blocks
+
+    # 2) 프롬프트 생성 & LLM 호출
     prompt = _render_strategy_prompt(
         regulation_text=regulation_text,
         mapped_products=mapped_products,
-        rag_context_docs=rag_context_docs,
+        history_blocks=history_blocks,
     )
 
     raw = llm.invoke(prompt)
 
-    # 2) LLM 결과 파싱
+    # 3) LLM 결과 파싱
     candidates = _parse_llm_actions(raw)
 
     # 후보가 비었으면 보충 요청
     if not candidates:
-        raw2 = llm.invoke(prompt + "\n반드시 불릿 형식으로 3~7개의 대응 전략을 출력하십시오.")
+        raw2 = llm.invoke(
+            prompt
+            + "\n\n반드시 불릿 형식으로 3~7개의 대응 전략을 출력하십시오."
+        )
         candidates = _parse_llm_actions(raw2)
 
-    # 3) 중복 제거
+    # 4) 중복 제거
     deduped = _dedup_by_jaccard(candidates, threshold=JACCARD_THRESHOLD)
 
     state.strategies = deduped
 
-    # 4) LangGraph 반환 
+    # 5) 이번 규제+제품+전략을 history에 저장
+    try:
+        _persist_history(
+            regulation_text=regulation_text,
+            mapped_products=mapped_products,
+            strategies=deduped,
+            # 필요하면 state에서 country/reg_id 같은 메타데이터를 넘겨도 됨
+            # extra_meta={"country": state.country, "reg_id": state.reg_id}
+        )
+    except Exception:
+        # history 저장 실패는 전체 파이프라인을 깨뜨릴 필요는 없으니
+        # 로그만 남기고 무시할 수도 있음 (여기선 그냥 무시)
+        pass
+
     return {"strategies": state.strategies}
