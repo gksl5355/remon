@@ -5,7 +5,14 @@ map_products.py
 
 import json
 import logging
-from typing import Any, Dict, List, Protocol, TYPE_CHECKING
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Protocol, TYPE_CHECKING
+
+try:  # pragma: no cover - import guard
+    from openai import AsyncOpenAI
+except Exception:  # pragma: no cover
+    AsyncOpenAI = None  # type: ignore[assignment]
 
 from app.ai_pipeline.state import (
     ProductInfo,
@@ -14,10 +21,13 @@ from app.ai_pipeline.state import (
     MappingItem,
     MappingParsed,
     MappingResults,
+    AppState,
+    MappingContext,
 )
 
 from app.ai_pipeline.prompts.mapping_prompt import MAPPING_PROMPT
 from app.ai_pipeline.tools.retrieval_utils import build_product_filters
+from app.config.settings import settings
 
 
 if TYPE_CHECKING:
@@ -58,6 +68,10 @@ class MappingNode:
         # RegulationRetrievalTool wired to the production VectorDB/RDB once torch
         # dependencies are restored. This entry point already accepts an injected
         # search tool, so future wiring should happen in the caller (pipeline graph).
+        # TODO(remon-qdrant): VectorClient / RegulationRetrievalTool rework
+        # 현재 Qdrant SDK 호출과 호환되지 않아 search_tool 호출에서 연속적으로 실패 중.
+        # 새 하이브리드 검색 Tool 도입 시 아래 search_tool 인스턴스만 교체하면 됨.
+        self.debug_enabled = settings.MAPPING_DEBUG_ENABLED
 
     # ----------------------------------------------------------------------
     # 1) 검색 TOOL 호출 wrapper (search_tool 인터페이스 확정되면 이 부분만 수정)
@@ -178,6 +192,16 @@ class MappingNode:
 
         mapping_results: List[MappingItem] = []
 
+        if self.debug_enabled:
+            logger.info(
+                "🧭 Mapping start: product=%s name=%s features=%d top_k=%d alpha=%.2f",
+                product_id,
+                product.get("name", "unknown"),
+                len(features),
+                self.top_k,
+                self.alpha,
+            )
+
         # 🔥 feature별로 검색 TOOL → 매핑
         for feature_name, value in features.items():
             unit = units.get(feature_name)
@@ -185,9 +209,21 @@ class MappingNode:
             # -----------------------------------------
             # a) 검색 TOOL 호출
             # -----------------------------------------
+            if self.debug_enabled:
+                logger.info(
+                    "🔍 Searching feature=%s value=%s unit=%s",
+                    feature_name,
+                    value,
+                    unit or "-",
+                )
             retrieval: RetrievalResult = await self._run_search(
                 product, feature_name, value, unit
             )
+            if self.debug_enabled:
+                logger.info(
+                    "   ↳ candidates=%d",
+                    len(retrieval["candidates"]),
+                )
 
             # -----------------------------------------
             # b) LLM 매핑 수행
@@ -200,20 +236,29 @@ class MappingNode:
 
                 parsed: MappingParsed = llm_out.get("parsed", {})
 
-                mapping_results.append(
-                    MappingItem(
-                        product_id=product_id,
-                        feature_name=feature_name,
-                        applies=llm_out["applies"],
-                        required_value=llm_out["required_value"],
-                        current_value=llm_out["current_value"],
-                        gap=llm_out["gap"],
-                        regulation_chunk_id=cand["chunk_id"],
-                        regulation_summary=cand["chunk_text"][:120],
-                        regulation_meta=cand["metadata"],
-                        parsed=parsed,
-                    )
+                item = MappingItem(
+                    product_id=product_id,
+                    feature_name=feature_name,
+                    applies=llm_out["applies"],
+                    required_value=llm_out["required_value"],
+                    current_value=llm_out["current_value"],
+                    gap=llm_out["gap"],
+                    regulation_chunk_id=cand["chunk_id"],
+                    regulation_summary=cand["chunk_text"][:120],
+                    regulation_meta=cand["metadata"],
+                    parsed=parsed,
                 )
+                mapping_results.append(item)
+
+                if self.debug_enabled:
+                    logger.info(
+                        "🧩 applies=%s required=%s current=%s chunk=%s (%s)",
+                        item["applies"],
+                        item["required_value"],
+                        item["current_value"],
+                        item["regulation_chunk_id"],
+                        item["feature_name"],
+                    )
 
         # -----------------------------------------
         # c) 전역 State 업데이트
@@ -222,5 +267,164 @@ class MappingNode:
             product_id=product_id,
             items=mapping_results,
         )
+        if self.debug_enabled:
+            _log_mapping_preview(product_id, mapping_results)
+            snapshot_path = _persist_mapping_snapshot(
+                product,
+                mapping_results,
+                state,
+                self.top_k,
+                self.alpha,
+            )
+            if snapshot_path:
+                state["mapping_debug"] = {
+                    "snapshot_path": snapshot_path,
+                    "total_items": len(mapping_results),
+                }
 
         return state
+
+
+_DEFAULT_LLM_CLIENT = None
+_DEFAULT_MAPPING_NODE: Optional[MappingNode] = None
+
+
+def _get_default_llm_client():
+    """AsyncOpenAI 싱글톤을 구성한다."""
+    global _DEFAULT_LLM_CLIENT
+    if _DEFAULT_LLM_CLIENT is not None:
+        return _DEFAULT_LLM_CLIENT
+
+    if AsyncOpenAI is None:
+        raise RuntimeError(
+            "openai 패키지를 찾을 수 없습니다. `pip install openai` 후 다시 시도하세요."
+        )
+
+    _DEFAULT_LLM_CLIENT = AsyncOpenAI()
+    return _DEFAULT_LLM_CLIENT
+
+
+def _build_mapping_node(
+    *,
+    llm_client=None,
+    search_tool=None,
+    top_k: Optional[int] = None,
+    alpha: Optional[float] = None,
+) -> MappingNode:
+    """MappingNode 인스턴스를 생성한다."""
+    resolved_llm = llm_client or _get_default_llm_client()
+    resolved_top_k = top_k if top_k is not None else settings.MAPPING_TOP_K
+    resolved_alpha = alpha if alpha is not None else settings.MAPPING_ALPHA
+    return MappingNode(
+        llm_client=resolved_llm,
+        search_tool=search_tool,
+        top_k=resolved_top_k,
+        alpha=resolved_alpha,
+    )
+
+
+def _get_default_mapping_node() -> MappingNode:
+    """파이프라인 전용 기본 MappingNode."""
+    global _DEFAULT_MAPPING_NODE
+    if _DEFAULT_MAPPING_NODE is None:
+        _DEFAULT_MAPPING_NODE = _build_mapping_node()
+    return _DEFAULT_MAPPING_NODE
+
+
+async def map_products_node(state: AppState) -> AppState:
+    """
+    LangGraph entrypoint wrapping MappingNode.
+
+    state["mapping_context"]를 통해 테스트/특수 실행 시 LLM 또는 Tool을 주입할 수 있다.
+    """
+
+    product = state.get("product_info")
+    if not product:
+        raise ValueError("map_products_node requires state['product_info']")
+
+    context: MappingContext = state.get("mapping_context", {}) or {}
+    has_override = any(
+        key in context for key in ("llm_client", "search_tool", "top_k", "alpha")
+    )
+    if has_override:
+        node = _build_mapping_node(
+            llm_client=context.get("llm_client"),
+            search_tool=context.get("search_tool"),
+            top_k=context.get("top_k"),
+            alpha=context.get("alpha"),
+        )
+    else:
+        node = _get_default_mapping_node()
+
+    return await node.run(state)
+
+
+__all__ = ["MappingNode", "map_products_node"]
+
+
+def _log_mapping_preview(product_id: str, items: List[MappingItem]) -> None:
+    max_items = max(1, settings.MAPPING_DEBUG_MAX_ITEMS)
+    preview = items[:max_items]
+    if not preview:
+        logger.info("📭 Mapping produced no items for product=%s", product_id)
+        return
+
+    logger.info(
+        "📒 Mapping preview (showing %d/%d items):", len(preview), len(items)
+    )
+    for idx, item in enumerate(preview, 1):
+        logger.info(
+            "  %d) feature=%s applies=%s required=%s current=%s chunk=%s",
+            idx,
+            item["feature_name"],
+            item["applies"],
+            item["required_value"],
+            item["current_value"],
+            item["regulation_chunk_id"],
+        )
+
+
+def _persist_mapping_snapshot(
+    product: ProductInfo,
+    items: List[MappingItem],
+    state: AppState,
+    top_k: int,
+    alpha: float,
+) -> Optional[str]:
+    if not settings.MAPPING_DEBUG_DIR:
+        return None
+
+    target_dir = Path(settings.MAPPING_DEBUG_DIR)
+    try:
+        target_dir.mkdir(parents=True, exist_ok=True)
+    except Exception as exc:  # pragma: no cover - disk trouble
+        logger.warning("Failed to create mapping debug dir: %s", exc)
+        return None
+
+    product_id = product["product_id"]
+    timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    doc_id = None
+    preprocess_results = state.get("preprocess_results") or []
+    if preprocess_results:
+        doc_id = preprocess_results[0].get("doc_id")
+    doc_suffix = doc_id or "unknown-doc"
+    filename = f"{timestamp}_{product_id}_{doc_suffix}.json"
+    snapshot_path = target_dir / filename
+
+    payload = {
+        "generated_at": datetime.utcnow().isoformat(),
+        "product": product,
+        "preprocess_summary": state.get("preprocess_summary"),
+        "mapping_config": {
+            "top_k": top_k,
+            "alpha": alpha,
+        },
+        "total_items": len(items),
+        "items": items,
+    }
+
+    snapshot_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    logger.info("📝 Mapping snapshot saved: %s", snapshot_path)
+    return str(snapshot_path)

@@ -191,52 +191,43 @@ class VectorClient:
         """
         # Qdrant 필터 생성
         qdrant_filter = self._build_qdrant_filter(filters)
-        if query_sparse:
-            # 하이브리드 검색
-            results = self.client.search_batch(
+        dense_results = list(
+            self.client.query_points(
                 collection_name=self.collection_name,
-                requests=[
-                    SearchRequest(
-                        vector=NamedVector(name="dense", vector=query_dense),
-                        limit=top_k,
-                        with_payload=True,
-                        filter=qdrant_filter,
-                    ),
-                    SearchRequest(
-                        vector=NamedSparseVector(
-                            name="sparse",
-                            vector=SparseVector(
-                                indices=list(query_sparse.keys()),
-                                values=list(query_sparse.values()),
-                            ),
-                        ),
-                        limit=top_k,
-                        with_payload=True,
-                        filter=qdrant_filter,
-                    ),
-                ],
-            )
-
-            # 점수 결합 (RRF 또는 가중 평균)
-            combined = self._combine_results(results, hybrid_alpha, top_k)
-            return combined
-
-        else:
-            # Dense 검색만
-            results = self.client.search(
-                collection_name=self.collection_name,
-                query_vector=("dense", query_dense),
+                query=query_dense,
+                using="dense",
                 limit=top_k,
                 with_payload=True,
                 query_filter=qdrant_filter,
             )
+        )
 
+        if not query_sparse:
             return {
-                "ids": [r.id for r in results],
-                "documents": [r.payload.get("text", "") for r in results],
-                "metadatas": [r.payload for r in results],
-                "scores": [r.score for r in results],
+                "ids": [r.id for r in dense_results],
+                "documents": [r.payload.get("text", "") for r in dense_results],
+                "metadatas": [r.payload for r in dense_results],
+                "scores": [r.score for r in dense_results],
             }
+
+        sparse_vector = SparseVector(
+            indices=list(query_sparse.keys()),
+            values=list(query_sparse.values()),
+        )
+        sparse_results = list(
+            self.client.query_points(
+                collection_name=self.collection_name,
+                query=sparse_vector,
+                using="sparse",
+                limit=top_k,
+                with_payload=True,
+                query_filter=qdrant_filter,
+            )
+        )
+
+        return self._combine_results(
+            [dense_results, sparse_results], hybrid_alpha, top_k
+        )
 
     def _combine_results(
         self, batch_results: List[List], alpha: float, top_k: int
