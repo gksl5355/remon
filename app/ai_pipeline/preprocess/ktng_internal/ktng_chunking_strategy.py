@@ -28,49 +28,83 @@ class RegulationProductChunking:
         from app.ai_pipeline.preprocess.semantic_chunker import SemanticChunker
         self.semantic_chunker = SemanticChunker(chunk_size=max_chunk_size)
         
-    def create_combined_chunks(self, parsed_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def create_combined_chunks(self, case_data_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        규제내용 + 제품정보 결합 청크 생성.
+        JSON 케이스 데이터를 청크로 변환.
         
         Args:
-            parsed_data: KTNGPDFParser에서 추출한 규제-제품 쌍 데이터
+            case_data_list: JSON 케이스 데이터 리스트
             
         Returns:
-            List[Dict]: [
-                {
-                    "text": "결합된 텍스트",
-                    "metadata": {...},
-                    "chunk_type": "regulation_product_combined"
-                }
-            ]
+            List[Dict]: 각 케이스별 청크
         """
-        logger.info(f"규제-제품 결합 청킹 시작: {len(parsed_data)}개 쌍")
+        logger.info(f"케이스 청킹 시작: {len(case_data_list)}개 케이스")
         
         combined_chunks = []
         
-        for idx, data in enumerate(parsed_data):
-            # 결합 텍스트 생성
-            combined_text = self._create_combined_text(data)
-            
-            # 긴 텍스트는 의미 단위로 분할
-            if len(combined_text) > self.max_chunk_size * 4:  # 대략 토큰 추정
-                sub_chunks = self._split_long_combined_text(combined_text, data)
-                combined_chunks.extend(sub_chunks)
-            else:
-                # 단일 청크로 처리
-                chunk = {
-                    "text": combined_text,
-                    "metadata": self._create_chunk_metadata(data, idx, 0),
-                    "chunk_type": "regulation_product_combined",
-                    "chunk_index": idx,
-                    "sub_chunk_index": 0
-                }
-                combined_chunks.append(chunk)
+        for case_idx, case_data in enumerate(case_data_list):
+            # 각 케이스를 청크로 변환
+            case_chunk = self._create_case_chunk(case_data, case_idx)
+            combined_chunks.append(case_chunk)
         
-        logger.info(f"규제-제품 결합 청킹 완료: {len(combined_chunks)}개 청크")
+        logger.info(f"케이스 청킹 완료: {len(combined_chunks)}개 청크")
         return combined_chunks
     
-    def _create_combined_text(self, data: Dict[str, Any]) -> str:
+    def _create_case_chunk(self, case_data: Dict[str, Any], case_idx: int) -> Dict[str, Any]:
+        """단일 케이스를 청크로 변환 (regulation_text + products만 임베딩)."""
+        case_id = case_data.get("case_id", f"CASE_{case_idx}")
+        regulation_text = case_data.get("regulation_text", "")
+        products = case_data.get("products", [])
+        
+        # 임베딩용 텍스트: regulation_text + products만
+        embedding_parts = []
+        
+        if regulation_text:
+            embedding_parts.append(f"Regulation: {regulation_text}")
+        
+        if products:
+            products_str = ", ".join(products)
+            embedding_parts.append(f"Products: {products_str}")
+        
+        # 임베딩용 텍스트 (간결하게)
+        embedding_text = "\n".join(embedding_parts)
+        
+        return {
+            "text": embedding_text,
+            "metadata": self._create_case_metadata(case_data, case_idx),
+            "chunk_type": "regulation_product_pair",
+            "case_id": case_id,
+            "chunk_index": case_idx
+        }
+    
+
+    
+    def _create_case_metadata(self, case_data: Dict[str, Any], case_idx: int) -> Dict[str, Any]:
+        """케이스별 메타데이터 생성."""
+        return {
+            # 표준 REMON 메타데이터
+            "meta_document_type": "internal_ktng_data",
+            "meta_source_type": "json_cases",
+            "meta_country": case_data.get("country", "US"),
+            "meta_lang": "en" if case_data.get("country") == "US" else "ko",
+            "meta_jurisdiction": case_data.get("country", "US"),
+            
+            # 케이스 정보
+            "meta_case_id": case_data.get("case_id", f"CASE_{case_idx}"),
+            "meta_products": case_data.get("products", []),
+            "meta_product_count": len(case_data.get("products", [])),
+            
+            # 전체 데이터 (메타데이터로 저장)
+            "meta_regulation_text": case_data.get("regulation_text", ""),
+            "meta_strategy": case_data.get("strategy", ""),
+            "meta_has_strategy": bool(case_data.get("strategy")),
+            
+            # 청크 정보
+            "meta_chunk_type": "regulation_product_pair",
+            "meta_case_index": case_idx
+        }
+    
+    def _create_combined_text_old(self, data: Dict[str, Any]) -> str:
         """규제내용 + 제품정보를 결합한 텍스트 생성."""
         regulation_text = data.get("regulation_text", "")
         products = data.get("products", [])
