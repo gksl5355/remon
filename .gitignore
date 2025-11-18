@@ -42,5 +42,5 @@ docs/
 tests/
 uv.lock
 
-# Qdrant DB
+# ============  Qdrant DB ============ 
 data/

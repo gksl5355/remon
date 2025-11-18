@@ -36,7 +36,7 @@ class HierarchyExtractor:
     - 시각화 정보 (들여쓰기 레벨)
     """
     
-    # 계층 레벨 정의
+    # 계층 레벨 정의 (기존 + DDH 패턴)
     HIERARCHY_LEVELS = {
         1: {"name": "chapter", "kr": "장", "pattern": r"^(제\s*\d+\s*장|Chapter\s+[IVX]+)"},
         2: {"name": "section", "kr": "절", "pattern": r"^(제\s*\d+\s*절|Section\s+\d+)"},
@@ -45,15 +45,29 @@ class HierarchyExtractor:
         5: {"name": "clause", "kr": "호", "pattern": r"^\s*(제?\s*\d+\s*호|\d+\.)"},
     }
     
-    def __init__(self, max_depth: int = 5):
+    # DDH 규제 패턴 (미국 연방 규정)
+    DDH_PATTERNS = {
+        "HEADER": r"^(AGENCY|ACTION|SUMMARY|DATES|ADDRESSES):",
+        "ISSUANCE": r"(amends|adds|revises).*?part.*?to read as follows:",
+        "SECTION": r"^(§|SEC\.)\s*(\d+\.\d+)\s*(.*)",
+        "LEVEL_1": r"^\((a|[a-z])\)",
+        "LEVEL_2": r"^\(([1-9]|[0-9]+)\)",
+        "LEVEL_3": r"^\((i|ii|iii|iv|v)\)",
+    }
+    
+    def __init__(self, max_depth: int = 5, use_ddh: bool = False):
         """
         계층 추출기 초기화.
         
         Args:
             max_depth (int): 최대 계층 깊이. 기본값: 5
+            use_ddh (bool): DDH 패턴 사용 여부. 기본값: False
         """
         self.max_depth = max_depth
-        logger.info(f"✅ HierarchyExtractor 초기화: max_depth={max_depth}")
+        self.use_ddh = use_ddh
+        self.current_zone = "preamble" if use_ddh else "content"
+        self.preamble_metadata = {}
+        logger.info(f"✅ HierarchyExtractor 초기화: max_depth={max_depth}, use_ddh={use_ddh}")
     
     def extract_hierarchy(self, document_text: str) -> Dict[str, Any]:
         """
@@ -269,3 +283,128 @@ class HierarchyExtractor:
     def export_as_json(self, hierarchy_result: Dict[str, Any]) -> str:
         """계층을 JSON 형식으로 내보냅니다."""
         return json.dumps(hierarchy_result, ensure_ascii=False, indent=2)
+    
+    def parse_ddh_structure(self, raw_text: str) -> List[Dict[str, Any]]:
+        """
+        DDH 표준에 따른 규제 문서 파싱.
+        
+        Args:
+            raw_text (str): 원본 규제 문서 텍스트
+            
+        Returns:
+            List[Dict]: LegalNode 형태의 구조화된 데이터
+        """
+        if not self.use_ddh:
+            logger.warning("DDH 모드가 비활성화됨. use_ddh=True로 초기화 필요")
+            return []
+            
+        lines = raw_text.split('\n')
+        nodes = []
+        current_section = None
+        stack = []
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+                
+            # 1. 구역 전환 감지 (Words of Issuance)
+            if re.search(self.DDH_PATTERNS["ISSUANCE"], line, re.IGNORECASE):
+                self.current_zone = "regulatory_text"
+                logger.debug("구역 전환: preamble → regulatory_text")
+                continue
+                
+            # 2. 서문(Preamble) 파싱: 메타데이터 추출
+            if self.current_zone == "preamble":
+                match = re.match(self.DDH_PATTERNS["HEADER"], line)
+                if match:
+                    key = match.group(1)
+                    value = line[len(key)+1:].strip()
+                    self.preamble_metadata[key] = value
+                    logger.debug(f"서문 메타데이터: {key} = {value[:50]}...")
+                continue
+                
+            # 3. 규제 본문(Regulatory Text) 파싱
+            if self.current_zone == "regulatory_text":
+                # 섹션 감지 (§ 1160.10)
+                sec_match = re.match(self.DDH_PATTERNS["SECTION"], line)
+                if sec_match:
+                    # 이전 섹션 저장
+                    if current_section:
+                        nodes.append(current_section)
+                    
+                    # 새 섹션 생성
+                    current_section = {
+                        "node_type": "section",
+                        "identifier": f"§ {sec_match.group(2)}",
+                        "text": sec_match.group(3).strip(),
+                        "metadata": self.preamble_metadata.copy(),
+                        "children": []
+                    }
+                    stack = [current_section]
+                    logger.debug(f"새 섹션: {current_section['identifier']}")
+                    continue
+                    
+                # 하위 파라그래프 감지
+                if current_section:
+                    level_1_match = re.match(self.DDH_PATTERNS["LEVEL_1"], line)
+                    level_2_match = re.match(self.DDH_PATTERNS["LEVEL_2"], line)
+                    level_3_match = re.match(self.DDH_PATTERNS["LEVEL_3"], line)
+                    
+                    if level_1_match:  # (a)
+                        new_node = {
+                            "node_type": "paragraph",
+                            "identifier": level_1_match.group(0),
+                            "text": line[len(level_1_match.group(0)):].strip(),
+                            "metadata": self.preamble_metadata.copy(),
+                            "children": [],
+                            "level": 1
+                        }
+                        current_section["children"].append(new_node)
+                        stack = [current_section, new_node]
+                        
+                    elif level_2_match and len(stack) >= 2:  # (1)
+                        new_node = {
+                            "node_type": "subparagraph",
+                            "identifier": level_2_match.group(0),
+                            "text": line[len(level_2_match.group(0)):].strip(),
+                            "metadata": self.preamble_metadata.copy(),
+                            "children": [],
+                            "level": 2
+                        }
+                        stack[1]["children"].append(new_node)
+                        
+                    elif level_3_match and len(stack) >= 2:  # (i)
+                        new_node = {
+                            "node_type": "clause",
+                            "identifier": level_3_match.group(0),
+                            "text": line[len(level_3_match.group(0)):].strip(),
+                            "metadata": self.preamble_metadata.copy(),
+                            "children": [],
+                            "level": 3
+                        }
+                        # 가장 가까운 부모에 추가
+                        if len(stack) >= 3:
+                            stack[2]["children"].append(new_node)
+                        else:
+                            stack[1]["children"].append(new_node)
+                            
+                    else:
+                        # 패턴이 없으면 직전 노드에 텍스트 추가
+                        if stack:
+                            # 표(Table) 감지
+                            if "|" in line and "-|-" in line:
+                                stack[-1]["text"] += "\n" + line
+                            else:
+                                stack[-1]["text"] += " " + line
+        
+        # 마지막 섹션 추가
+        if current_section:
+            nodes.append(current_section)
+            
+        logger.info(f"✅ DDH 파싱 완료: {len(nodes)}개 섹션, 서문 메타데이터 {len(self.preamble_metadata)}개")
+        return nodes
+    
+    def get_preamble_metadata(self) -> Dict[str, str]:
+        """서문에서 추출된 메타데이터 반환."""
+        return self.preamble_metadata.copy()

@@ -104,12 +104,13 @@ def calculate_retrieval_metadata(
     Returns:
         메타데이터 딕셔너리
     """
+    # 🔧 None 값 안전 처리
     return {
-        "strategy": strategy,
+        "strategy": strategy or "unknown",
         "filters_applied": filters or {},
-        "num_results": num_results,
-        "search_time_ms": round(search_time_ms, 2),
-        "query_text": query_text[:100],  # 쿼리 프리뷰
+        "num_results": num_results or 0,
+        "search_time_ms": round(search_time_ms or 0.0, 2),
+        "query_text": (query_text or "")[:100],  # 쿼리 프리뷰
     }
 
 
@@ -159,19 +160,23 @@ def format_retrieval_result_for_state(
     Returns:
         State 저장용 딕셔너리 (벡터 제외)
     """
+    # 🔧 None 값 안전 처리
     formatted = {
-        "id": result.id,
-        "rank": result.rank,
-        "text": result.text,
-        "scores": result.scores,
-        "metadata": result.metadata,
+        "id": getattr(result, 'id', None) or "unknown",
+        "rank": getattr(result, 'rank', None) or 0,
+        "text": getattr(result, 'text', None) or "",
+        "scores": getattr(result, 'scores', None) or {},
+        "metadata": getattr(result, 'metadata', None) or {},
     }
     
-    if result.match_info:
-        formatted["match_info"] = result.match_info
+    # 선택적 필드들도 안전하게 처리
+    match_info = getattr(result, 'match_info', None)
+    if match_info:
+        formatted["match_info"] = match_info
     
-    if result.parent_chunk:
-        formatted["parent_chunk"] = result.parent_chunk
+    parent_chunk = getattr(result, 'parent_chunk', None)
+    if parent_chunk:
+        formatted["parent_chunk"] = parent_chunk
     
     return formatted
 
