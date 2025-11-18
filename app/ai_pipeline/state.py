@@ -3,7 +3,7 @@ state.py
 LangGraph 전역 State 스키마 정의 – Production Minimal Version
 """
 
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import Any, Dict, List, Optional, TypedDict, Literal
 
 
 # ---------------------------------------------------------------------------
@@ -65,8 +65,43 @@ class MappingResults(TypedDict):
     items: List[MappingItem]
 
 
+class MappingDebugInfo(TypedDict, total=False):
+    """매핑 결과 디버그 로그/파일 메타데이터."""
+
+    snapshot_path: str
+    total_items: int
+
+
 # ---------------------------------------------------------------------------
-# 4) 전략 결과 – 전략 노드 → 리포트 노드
+# 4) 프리프로세스/매핑 구성요소 보조 스키마
+# ---------------------------------------------------------------------------
+class PreprocessRequest(TypedDict, total=False):
+    """전처리 노드에 전달되는 입력 파라미터."""
+
+    pdf_paths: List[str]
+    skip_vectorstore: bool
+    product_info: ProductInfo
+
+
+class PreprocessSummary(TypedDict, total=False):
+    status: Literal["completed", "partial", "skipped", "error"]
+    processed_count: int
+    succeeded: int
+    failed: int
+    reason: Optional[str]
+
+
+class MappingContext(TypedDict, total=False):
+    """파이프라인 실행 시 주입 가능한 매핑 노드 의존성."""
+
+    llm_client: Any
+    search_tool: Any
+    top_k: Optional[int]
+    alpha: Optional[float]
+
+
+# ---------------------------------------------------------------------------
+# 5) 전략 결과 – 전략 노드 → 리포트 노드
 # ---------------------------------------------------------------------------
 class StrategyItem(TypedDict):
     feature_name: str
@@ -81,13 +116,27 @@ class StrategyResults(TypedDict):
     items: List[StrategyItem]
 
 
+class ReportDraft(TypedDict, total=False):
+    generated_at: str
+    status: str
+    sections: List[Dict[str, Any]]
+
+
 # ---------------------------------------------------------------------------
-# 5) LangGraph 전체 전역 State (AppState)
+# 6) LangGraph 전체 전역 State (AppState)
 #    → "딱 필요한 전역 key"만 정의한다.
 #    → 나머지 모든 값은 Node 내부 local 변수로만 사용한다.
 # ---------------------------------------------------------------------------
 class AppState(TypedDict, total=False):
+    preprocess_request: PreprocessRequest
+    preprocess_results: List[Dict[str, Any]]
+    preprocess_summary: PreprocessSummary
     product_info: ProductInfo
     retrieval: RetrievalResult
     mapping: MappingResults
+    mapping_debug: MappingDebugInfo
     strategy: StrategyResults
+    validation_strategy: bool
+    mapping_context: MappingContext
+    impact_scores: List[Dict[str, Any]]
+    report: ReportDraft
