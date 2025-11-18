@@ -225,12 +225,15 @@ class PreprocessOrchestrator:
                 }
             }
             
-            # Qdrant에 저장
+            # Qdrant에 이중 저장 (Docker + 로컬)
             try:
                 from app.vectorstore.vector_client import VectorClient
-                logger.info(f"  💾 Qdrant VectorDB에 저장 중...")
+                logger.info(f"  💾 Qdrant VectorDB에 이중 저장 중 (Docker + 로컬)...")
                 
-                vc = VectorClient()
+                # Docker VectorClient
+                vc_docker = VectorClient(use_local=False)
+                # 로컬 VectorClient  
+                vc_local = VectorClient(use_local=True)
                 
                 # 데이터 추출
                 texts = [d["text"] for d in qdrant_ready_data]
@@ -242,20 +245,33 @@ class PreprocessOrchestrator:
                 if qdrant_ready_data and "sparse_embedding" in qdrant_ready_data[0]["metadata"]:
                     sparse_embeddings = [d["metadata"].pop("sparse_embedding") for d in qdrant_ready_data]
                 
-                # Qdrant 저장
-                vc.insert(
+                # Docker에 저장
+                vc_docker.insert(
                     texts=texts,
                     dense_embeddings=embeddings,
                     metadatas=metadatas,
                     sparse_embeddings=sparse_embeddings
                 )
                 
-                logger.info(f"  ✅ Qdrant 저장 완료: {len(texts)}개 명제")
-                result["qdrant_status"] = "saved"
+                # 로컬에도 저장
+                logger.info(f"  💾 로컬 VectorDB에도 저장 중...")
+                vc_local.insert(
+                    texts=texts,
+                    dense_embeddings=embeddings,
+                    metadatas=metadatas,
+                    sparse_embeddings=sparse_embeddings
+                )
+                
+                logger.info(f"  ✅ Qdrant 이중 저장 완료: {len(texts)}개 명제 (Docker + 로컬)")
+                result["qdrant_status"] = "saved_dual"
                 result["qdrant_count"] = len(texts)
+                result["storage_locations"] = {
+                    "docker": "http://localhost:6333",
+                    "local": "/home/minje/remon/data/qdrant"
+                }
                 
             except Exception as e:
-                logger.error(f"  ❌ Qdrant 저장 실패: {e}")
+                logger.error(f"  ❌ Qdrant 이중 저장 실패: {e}")
                 result["qdrant_status"] = "failed"
                 result["qdrant_error"] = str(e)
             
