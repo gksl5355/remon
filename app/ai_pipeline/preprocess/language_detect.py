@@ -1,3 +1,0 @@
-"""Language detection utilities."""
-
-
