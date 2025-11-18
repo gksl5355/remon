@@ -27,12 +27,28 @@ import os
 
 logger = logging.getLogger(__name__)
 
-# 환경변수 설정
-QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
-QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
-QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "remon_regulations")
-QDRANT_PATH = os.getenv("QDRANT_PATH", "./data/qdrant")  # 로컬 저장소
-QDRANT_USE_LOCAL = os.getenv("QDRANT_USE_LOCAL", "true").lower() == "true"
+# settings.py 통합 (환경변수 폴백)
+try:
+    from app.config.settings import settings
+
+    QDRANT_HOST = (
+        getattr(settings, "QDRANT_URL", "http://localhost:6333")
+        .replace("http://", "")
+        .replace("https://", "")
+        .split(":")[0]
+    )
+    QDRANT_PORT = 6333
+    QDRANT_COLLECTION = getattr(settings, "QDRANT_COLLECTION", "remon_regulations")
+    QDRANT_PATH = getattr(settings, "QDRANT_PATH", "./data/qdrant")
+    # .env의 QDRANT_USE_LOCAL 값 우선 사용
+    QDRANT_USE_LOCAL = os.getenv("QDRANT_USE_LOCAL", "false").lower() == "true"
+except ImportError:
+    logger.warning("settings.py 로드 실패, 환경변수 사용")
+    QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
+    QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
+    QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "remon_regulations")
+    QDRANT_PATH = os.getenv("QDRANT_PATH", "./data/qdrant")
+    QDRANT_USE_LOCAL = os.getenv("QDRANT_USE_LOCAL", "false").lower() == "true"
 
 
 class VectorClient:
@@ -173,6 +189,8 @@ class VectorClient:
         Returns:
             {"ids": [...], "documents": [...], "metadatas": [...], "scores": [...]}
         """
+        # Qdrant 필터 생성
+        qdrant_filter = self._build_qdrant_filter(filters)
         if query_sparse:
             # 하이브리드 검색
             results = self.client.search_batch(
@@ -182,6 +200,7 @@ class VectorClient:
                         vector=NamedVector(name="dense", vector=query_dense),
                         limit=top_k,
                         with_payload=True,
+                        filter=qdrant_filter,
                     ),
                     SearchRequest(
                         vector=NamedSparseVector(
@@ -193,6 +212,7 @@ class VectorClient:
                         ),
                         limit=top_k,
                         with_payload=True,
+                        filter=qdrant_filter,
                     ),
                 ],
             )
@@ -208,6 +228,7 @@ class VectorClient:
                 query_vector=("dense", query_dense),
                 limit=top_k,
                 with_payload=True,
+                query_filter=qdrant_filter,
             )
 
             return {
@@ -254,6 +275,31 @@ class VectorClient:
         """컬렉션 삭제."""
         self.client.delete_collection(collection_name=self.collection_name)
         logger.info(f"✅ 컬렉션 삭제: {self.collection_name}")
+
+    def _build_qdrant_filter(self, filters: Optional[Dict[str, Any]]):
+        """Dict 필터 → Qdrant Filter 객체 변환."""
+        if not filters:
+            return None
+
+        from qdrant_client.models import Filter, FieldCondition, MatchValue, Range
+
+        conditions = []
+
+        for key, value in filters.items():
+            # 날짜 범위 필터
+            if key.endswith("_from"):
+                field = key.replace("_from", "")
+                conditions.append(FieldCondition(key=field, range=Range(gte=value)))
+            elif key.endswith("_to"):
+                field = key.replace("_to", "")
+                conditions.append(FieldCondition(key=field, range=Range(lte=value)))
+            # 일반 매칭 필터
+            else:
+                conditions.append(
+                    FieldCondition(key=key, match=MatchValue(value=value))
+                )
+
+        return Filter(must=conditions) if conditions else None
 
     def get_collection_info(self) -> Dict[str, Any]:
         """컬렉션 정보 조회."""
