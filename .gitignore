@@ -46,3 +46,5 @@ uv.lock
 data/
 data/*
 app/data/
+.uv-cache/
+
