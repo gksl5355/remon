@@ -10,23 +10,17 @@ load_dotenv()
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"  # 추가 필드 무시
+    )
 
     DATABASE_URL: str
     REDIS_URL: str
     SECRET_KEY: str
-    QDRANT_HOST: str
-    QDRANT_PORT: int
-    QDRANT_COLLECTION: str
-    # CHROMA_DB_PATH: str  # 사용 안함
-    # CHROMA_COLLECTION: str  # 사용 안함
-
-    model_config = {
-        "env_file": ".env",
-        "env_file_encoding": "utf-8",
-        "extra": "ignore",  # .env의 추가 필드 허용
-    }
+    QDRANT_URL: str = "http://localhost:6333"
     QDRANT_API_KEY: str | None = None
+    QDRANT_PATH: str = "./data/qdrant"
+    QDRANT_COLLECTION: str = "remon_regulations"
     QDRANT_PREFER_GRPC: bool = False
     QDRANT_TIMEOUT: float = 10.0
     MAPPING_TOP_K: int = 10
