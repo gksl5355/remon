@@ -3,7 +3,7 @@
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from app.core.models.regulation_model import RegulationTranslation
+from core.models.regulation_model import RegulationTranslation
 from .base_repository import BaseRepository
 
 class RegulationTranslationRepository(BaseRepository[RegulationTranslation]):

@@ -19,7 +19,7 @@ dependencies = [
   "torch>=2.6,<3.0", # 변경: 최소 2.6 이상 (CVE 대응)
   "numpy==2.1.2",
   "pandas==2.2.3",
-  "openai==1.43.0",
+
   # --- Crawler ---
   "requests==2.32.3",
   "beautifulsoup4==4.12.3",
