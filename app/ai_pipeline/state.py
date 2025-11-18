@@ -1,66 +1,156 @@
-"""Pipeline state definitions for LangGraph."""
+"""
+state.py
+LangGraph 전역 State 스키마 정의 – Production Minimal Version
+"""
 
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Any, Dict, List, Optional, TypedDict, Literal
 
 
-class AppState(BaseModel):
-    """
-    LangGraph 파이프라인 전체에서 공유되는 상태(State)
-    각 노드 간 데이터 교환의 공통 스키마
-    """
+# ---------------------------------------------------------------------------
+# 1) 제품 정보 – 모든 노드가 참조하는 전역 정보
+# ---------------------------------------------------------------------------
+class ProductInfo(TypedDict):
+    product_id: str
+    # TODO(remon-types): tighten Any → Union[float, str, bool, None] once product
+    # feature schema solidifies; currently heterogeneous values require Any.
+    features: Dict[str, Any]  # 예: {"battery_capacity": 3000, "noise": 70}
+    feature_units: Dict[str, str]  # 예: {"battery_capacity": "mAh", "noise": "dB"}
 
-    model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
-    # 1️⃣ 입력 (규제 데이터 및 메타정보)
-    regulation_text: Optional[str] = Field(None, description="규제 원문 텍스트")
-    metadata: Optional[Dict[str, Any]] = Field(
-        None, description="국가, 시행일 등 메타데이터"
-    )
+# ---------------------------------------------------------------------------
+# 2) 검색 결과 – 검색 TOOL → 매핑 노드로 전달되는 데이터 구조
+# ---------------------------------------------------------------------------
+class RetrievedChunk(TypedDict):
+    chunk_id: str
+    chunk_text: str
+    semantic_score: float
+    metadata: Dict[str, Any]
 
-    # 2️⃣ 전처리 결과
-    normalized_text: Optional[str] = Field(None, description="정규화된 규제 텍스트")
-    extracted_terms: Optional[List[str]] = Field(
-        None, description="추출된 핵심 용어 리스트"
-    )
 
-    # 3️⃣ 매핑 결과
-    mapped_products: Optional[List[Dict[str, Any]]] = Field(
-        None,
-        description="map_products 노드가 생성한 product↔regulation 매핑 결과(JSON dump, 점수·메타 데이타포함)",
-    )
+class RetrievalResult(TypedDict):
+    product_id: str
+    feature_name: str
+    feature_value: Any
+    feature_unit: Optional[str]
+    candidates: List[RetrievedChunk]
 
-    # 4️⃣ 영향도 분석 결과
-    impact_scores: Optional[Dict[str, float]] = Field(
-        None, description="제품별 영향도 점수 (product_id → score)"
-    )
 
-    # 5️⃣ 대응 전략
-    generated_strategy: Optional[str] = Field(
-        None, description="LLM 기반 생성된 대응 전략"
-    )
-    validation_strategy: Optional[bool] = Field(
-        None, description="전략 유효성 검증 결과 (True=통과, False=재생성)"
-    )
-
-    # 6️⃣ 리포트 결과
-    report_summary: Optional[str] = Field(None, description="최종 요약 리포트 텍스트")
-    report_data: Optional[Dict[str, Any]] = Field(
-        None, description="리포트 상세 데이터 구조"
-    )
+# ---------------------------------------------------------------------------
+# 3) 매핑 결과 – 매핑 노드 → 전략 노드
+# ---------------------------------------------------------------------------
+class MappingParsed(TypedDict):
+    category: Optional[str]
+    requirement_type: Optional[str]  # "max" | "min" | "range" | "boolean" | "other"
+    condition: Optional[str]
 
     # 7️⃣ RAG Retrieval 결과 (🆕)
     retrieved_contexts: Optional[List[Dict[str, Any]]] = Field(
-        None,
-        description="RAG 검색 결과 (벡터 제외, 메타데이터 + 텍스트 + 점수)"
+        None, description="RAG 검색 결과 (벡터 제외, 메타데이터 + 텍스트 + 점수)"
     )
     retrieval_metadata: Optional[Dict[str, Any]] = Field(
-        None,
-        description="검색 메타정보 (전략, 소요시간, 필터 등)"
+        None, description="검색 메타정보 (전략, 소요시간, 필터 등)"
     )
-    
+
     # 8️⃣ 내부 관리용
     error_log: Optional[List[str]] = Field(
         default_factory=list, description="에러/경고 로그"
     )
     run_id: Optional[str] = Field(None, description="실행 식별용 UUID")
+
+
+class MappingItem(TypedDict):
+    product_id: str
+    feature_name: str
+
+    applies: bool
+    required_value: Any
+    current_value: Any
+    gap: Any
+
+    regulation_chunk_id: str
+    regulation_summary: str
+    regulation_meta: Dict[str, Any]
+
+    parsed: MappingParsed
+
+
+class MappingResults(TypedDict):
+    product_id: str
+    items: List[MappingItem]
+
+
+class MappingDebugInfo(TypedDict, total=False):
+    """매핑 결과 디버그 로그/파일 메타데이터."""
+
+    snapshot_path: str
+    total_items: int
+
+
+# ---------------------------------------------------------------------------
+# 4) 프리프로세스/매핑 구성요소 보조 스키마
+# ---------------------------------------------------------------------------
+class PreprocessRequest(TypedDict, total=False):
+    """전처리 노드에 전달되는 입력 파라미터."""
+
+    pdf_paths: List[str]
+    skip_vectorstore: bool
+    product_info: ProductInfo
+
+
+class PreprocessSummary(TypedDict, total=False):
+    status: Literal["completed", "partial", "skipped", "error"]
+    processed_count: int
+    succeeded: int
+    failed: int
+    reason: Optional[str]
+
+
+class MappingContext(TypedDict, total=False):
+    """파이프라인 실행 시 주입 가능한 매핑 노드 의존성."""
+
+    llm_client: Any
+    search_tool: Any
+    top_k: Optional[int]
+    alpha: Optional[float]
+
+
+# ---------------------------------------------------------------------------
+# 5) 전략 결과 – 전략 노드 → 리포트 노드
+# ---------------------------------------------------------------------------
+class StrategyItem(TypedDict):
+    feature_name: str
+    regulation_chunk_id: str
+    impact_level: str
+    summary: str
+    recommendation: str
+
+
+class StrategyResults(TypedDict):
+    product_id: str
+    items: List[StrategyItem]
+
+
+class ReportDraft(TypedDict, total=False):
+    generated_at: str
+    status: str
+    sections: List[Dict[str, Any]]
+
+
+# ---------------------------------------------------------------------------
+# 6) LangGraph 전체 전역 State (AppState)
+#    → "딱 필요한 전역 key"만 정의한다.
+#    → 나머지 모든 값은 Node 내부 local 변수로만 사용한다.
+# ---------------------------------------------------------------------------
+class AppState(TypedDict, total=False):
+    preprocess_request: PreprocessRequest
+    preprocess_results: List[Dict[str, Any]]
+    preprocess_summary: PreprocessSummary
+    product_info: ProductInfo
+    retrieval: RetrievalResult
+    mapping: MappingResults
+    mapping_debug: MappingDebugInfo
+    strategy: StrategyResults
+    validation_strategy: bool
+    mapping_context: MappingContext
+    impact_scores: List[Dict[str, Any]]
+    report: ReportDraft
