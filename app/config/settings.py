@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     MAPPING_CONDITION_WEIGHT: float = 0.1
     MAPPING_SINK_TYPE: str = "rdb"
     MAPPING_SINK_DSN: str | None = None
+    MAPPING_DEBUG_ENABLED: bool = True
+    MAPPING_DEBUG_DIR: str = "logs/mapping"
+    MAPPING_DEBUG_MAX_ITEMS: int = 10
 
 
 settings = Settings()
