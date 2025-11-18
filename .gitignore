@@ -44,3 +44,5 @@ docs/
 tests/
 uv.lock
 data/
+data/*
+app/data/
