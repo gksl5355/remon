@@ -13,6 +13,11 @@ __pycache__/
 venv/
 .env
 .venv/
+<<<<<<< HEAD
+=======
+.ipynb_checkpoints/
+.pytest_cache/
+>>>>>>> 9c8d2e5de60743a693e60af5e8d67ba0c3fc7bc2
 
 # ============ Node ============
 node_modules/
@@ -41,6 +46,8 @@ app/ai_pipeline/preprocess/demo
 docs/
 tests/
 uv.lock
-
-# ============  Qdrant DB ============ 
 data/
+data/*
+app/data/
+.uv-cache/
+

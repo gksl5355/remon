@@ -30,7 +30,17 @@ logger = logging.getLogger(__name__)
 # settings.py 통합 (환경변수 폴백)
 try:
     from app.config.settings import settings
+<<<<<<< HEAD
     QDRANT_HOST = getattr(settings, "QDRANT_URL", "http://localhost:6333").replace("http://", "").replace("https://", "").split(":")[0]
+=======
+
+    QDRANT_HOST = (
+        getattr(settings, "QDRANT_URL", "http://localhost:6333")
+        .replace("http://", "")
+        .replace("https://", "")
+        .split(":")[0]
+    )
+>>>>>>> 9c8d2e5de60743a693e60af5e8d67ba0c3fc7bc2
     QDRANT_PORT = 6333
     QDRANT_COLLECTION = getattr(settings, "QDRANT_COLLECTION", "remon_regulations")
     QDRANT_PATH = getattr(settings, "QDRANT_PATH", "./data/qdrant")
@@ -185,6 +195,7 @@ class VectorClient:
         """
         # Qdrant 필터 생성
         qdrant_filter = self._build_qdrant_filter(filters)
+<<<<<<< HEAD
         if query_sparse:
             # 하이브리드 검색
             results = self.client.search_batch(
@@ -220,11 +231,20 @@ class VectorClient:
             results = self.client.search(
                 collection_name=self.collection_name,
                 query_vector=("dense", query_dense),
+=======
+        dense_results = list(
+            self.client.query_points(
+                collection_name=self.collection_name,
+                query=query_dense,
+                using="dense",
+>>>>>>> 9c8d2e5de60743a693e60af5e8d67ba0c3fc7bc2
                 limit=top_k,
                 with_payload=True,
                 query_filter=qdrant_filter,
             )
+        )
 
+<<<<<<< HEAD
             # Dense만 검색하는 경우에도 개별 점수를 metadata에 저장
             final_metadatas = []
             for result in results:
@@ -238,7 +258,34 @@ class VectorClient:
                 "documents": [r.payload.get("text", "") for r in results],
                 "metadatas": final_metadatas,
                 "scores": [r.score for r in results],
+=======
+        if not query_sparse:
+            return {
+                "ids": [r.id for r in dense_results],
+                "documents": [r.payload.get("text", "") for r in dense_results],
+                "metadatas": [r.payload for r in dense_results],
+                "scores": [r.score for r in dense_results],
+>>>>>>> 9c8d2e5de60743a693e60af5e8d67ba0c3fc7bc2
             }
+
+        sparse_vector = SparseVector(
+            indices=list(query_sparse.keys()),
+            values=list(query_sparse.values()),
+        )
+        sparse_results = list(
+            self.client.query_points(
+                collection_name=self.collection_name,
+                query=sparse_vector,
+                using="sparse",
+                limit=top_k,
+                with_payload=True,
+                query_filter=qdrant_filter,
+            )
+        )
+
+        return self._combine_results(
+            [dense_results, sparse_results], hybrid_alpha, top_k
+        )
 
     def _combine_results(
         self, batch_results: List[List], alpha: float, top_k: int
@@ -295,40 +342,27 @@ class VectorClient:
         """Dict 필터 → Qdrant Filter 객체 변환."""
         if not filters:
             return None
-        
+
         from qdrant_client.models import Filter, FieldCondition, MatchValue, Range
-        
+
         conditions = []
-        
+
         for key, value in filters.items():
             # 날짜 범위 필터
             if key.endswith("_from"):
                 field = key.replace("_from", "")
-                conditions.append(
-                    FieldCondition(
-                        key=field,
-                        range=Range(gte=value)
-                    )
-                )
+                conditions.append(FieldCondition(key=field, range=Range(gte=value)))
             elif key.endswith("_to"):
                 field = key.replace("_to", "")
-                conditions.append(
-                    FieldCondition(
-                        key=field,
-                        range=Range(lte=value)
-                    )
-                )
+                conditions.append(FieldCondition(key=field, range=Range(lte=value)))
             # 일반 매칭 필터
             else:
                 conditions.append(
-                    FieldCondition(
-                        key=key,
-                        match=MatchValue(value=value)
-                    )
+                    FieldCondition(key=key, match=MatchValue(value=value))
                 )
-        
+
         return Filter(must=conditions) if conditions else None
-    
+
     def get_collection_info(self) -> Dict[str, Any]:
         """컬렉션 정보 조회."""
         info = self.client.get_collection(collection_name=self.collection_name)

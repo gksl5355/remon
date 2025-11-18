@@ -166,12 +166,7 @@ class HybridStrategy(RetrievalStrategy):
         )
         
         # 결과 변환
-        formatted_results = self._format_results(results, strategy="hybrid", alpha=alpha)
-        
-        # 디버깅: 검색 결과 요약
-        logger.info(f"Hybrid search completed: {len(formatted_results)} results, sparse_used={query_sparse is not None}")
-        
-        return formatted_results
+        return self._format_results(results, strategy="hybrid", alpha=alpha)
     
     def _format_results(
         self,
@@ -400,9 +395,12 @@ class StrategyFactory:
         strategies = {
             "dense": DenseStrategy,
             "hybrid": HybridStrategy,
+<<<<<<< HEAD
             "metadata_first": MetadataFirstStrategy,
             "parent_child": ParentChildStrategy,
             "hierarchical": HierarchicalStrategy
+=======
+>>>>>>> 9c8d2e5de60743a693e60af5e8d67ba0c3fc7bc2
         }
         
         strategy_class = strategies.get(strategy_name.lower())
