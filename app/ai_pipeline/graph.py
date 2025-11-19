@@ -39,7 +39,7 @@ def build_graph():
     graph.add_node("map_products",        map_products_node)
     graph.add_node("generate_strategy",   generate_strategy_node)
     graph.add_node("score_impact",        score_impact_node)
-    graph.add_node("validator",   validator)
+    graph.add_node("validator",           validator)
     graph.add_node("report",              report_node)
 
     # 엔트리 포인트
@@ -54,10 +54,11 @@ def build_graph():
     graph.add_conditional_edges(
         "validator",
         _route_validation,
-        {"ok": "report", "fail": "map_products"},
+        {"ok": "report", "fail": "generate_strategy"},
     )
 
     # 영향도 → 리포트 → 종료
+    graph.add_edge("report", END)
     graph.add_edge("report", END)
 
     return graph.compile()
