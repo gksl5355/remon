@@ -1,11 +1,21 @@
 """
 map_products.py
-검색 TOOL + LLM 매핑 Node
+HybridRetriever 기반 검색 + LLM 매핑 Node (FINAL)
 """
 
 import json
 import logging
-from typing import Any, Dict, List, Protocol, TYPE_CHECKING
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+try:
+    from openai import AsyncOpenAI
+except Exception:
+    AsyncOpenAI = None
 
 from app.ai_pipeline.state import (
     ProductInfo,
@@ -14,82 +24,156 @@ from app.ai_pipeline.state import (
     MappingItem,
     MappingParsed,
     MappingResults,
+    AppState,
+    MappingContext,
 )
 
 from app.ai_pipeline.prompts.mapping_prompt import MAPPING_PROMPT
-from app.ai_pipeline.tools.retrieval_utils import build_product_filters
-
-
-if TYPE_CHECKING:
-    from app.ai_pipeline.tools.retrieval_tool import RetrievalOutput
-else:
-    class RetrievalOutput(Protocol):
-        results: List[Dict[str, Any]]
-        metadata: Dict[str, Any]
-
+from app.ai_pipeline.tools.hybrid_retriever import HybridRetriever
+from app.config.settings import settings
+from app.core.database import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
 
+# -------------------------------------------------------------
+# Product Repository (RDB → ProductInfo 직렬화)
+# -------------------------------------------------------------
+
+FEATURE_UNIT_MAP: Dict[str, str] = {
+    "nicotin": "mg",
+    "tarr": "mg",
+    "battery": "mAh",
+    "label_size": "mm^2",
+}
+
+BOOLEAN_FEATURES = {"menthol", "incense", "security_auth"}
+
+DEFAULT_EXPORT_COUNTRY = "US"
+
+PRODUCT_SELECT_BASE = """
+SELECT
+    p.product_id,
+    p.product_name,
+    p.product_category,
+    p.nicotin,
+    p.tarr,
+    p.menthol,
+    p.incense,
+    p.battery,
+    p.label_size,
+    p.security_auth,
+    COALESCE(pec.country_code, :default_country) AS export_country
+FROM products p
+LEFT JOIN product_export_countries pec
+    ON pec.product_id = p.product_id
+"""
+
+
+class ProductRepository:
+    """DB에서 제품을 읽어 ProductInfo로 직렬화"""
+
+    def __init__(self, session_factory: async_sessionmaker[AsyncSession]):
+        self._session_factory = session_factory
+
+    async def fetch_product(self, product_id: Optional[int]) -> ProductInfo:
+        params = {"default_country": DEFAULT_EXPORT_COUNTRY}
+
+        if product_id is not None:
+            query = text(
+                PRODUCT_SELECT_BASE + " WHERE p.product_id = :pid ORDER BY p.product_id LIMIT 1"
+            )
+            params["pid"] = product_id
+        else:
+            query = text(PRODUCT_SELECT_BASE + " ORDER BY p.product_id LIMIT 1")
+
+        async with self._session_factory() as session:
+            result = await session.execute(query, params)
+            row = result.mappings().first()
+
+        if not row:
+            raise ValueError("제품 정보를 찾을 수 없습니다.")
+
+        return self._serialize_product(dict(row))
+
+    def _serialize_product(self, row: Dict[str, Any]) -> ProductInfo:
+        features: Dict[str, Any] = {}
+        feature_units: Dict[str, str] = {}
+
+        for field, unit in FEATURE_UNIT_MAP.items():
+            v = row.get(field)
+            if v not in (None, ""):
+                features[field] = v
+                feature_units[field] = unit
+
+        for field in BOOLEAN_FEATURES:
+            v = row.get(field)
+            if v is not None:
+                features[field] = bool(v)
+                feature_units[field] = "boolean"
+
+        return {
+            "product_id": str(row["product_id"]),
+            "name": row.get("product_name"),
+            "export_country": row.get("export_country") or DEFAULT_EXPORT_COUNTRY,
+            "category": row.get("product_category"),
+            "features": features,
+            "feature_units": feature_units,
+        }
+
+
+# -------------------------------------------------------------
+# HybridRetriever + LLM 매핑 Node
+# -------------------------------------------------------------
 
 class MappingNode:
     """
-    검색 + 매핑 통합 Node
-    - 검색은 외부 search_tool(TOOL CALL)로 처리
-    - search_tool 시그니처는 아직 미정이므로 wrapper 내부 TODO 처리
+    🔥 기존 search_tool 기반 완전 제거
+    🔥 HybridRetriever 기반 검색 통합 Node
     """
 
     def __init__(
         self,
         llm_client,
-        search_tool,  # 🔥 LangGraph TOOL 자체
         top_k: int = 5,
-        alpha: float = 0.7,  # 🔥 hybrid dense/sparse 비율
+        product_repository: Optional[ProductRepository] = None,
     ):
         self.llm = llm_client
-        if search_tool is None:
-            from app.ai_pipeline.tools.retrieval_tool import get_retrieval_tool
-
-            self.search_tool = get_retrieval_tool()
-        else:
-            self.search_tool = search_tool
         self.top_k = top_k
-        self.alpha = alpha  # 🔥 dynamic hybrid weight
-        # TODO(remon-rag): replace any ad-hoc StaticRetrievalTool usage with the real
-        # RegulationRetrievalTool wired to the production VectorDB/RDB once torch
-        # dependencies are restored. This entry point already accepts an injected
-        # search tool, so future wiring should happen in the caller (pipeline graph).
 
-    # ----------------------------------------------------------------------
-    # 1) 검색 TOOL 호출 wrapper (search_tool 인터페이스 확정되면 이 부분만 수정)
-    # ----------------------------------------------------------------------
+        # 🔥 Hybrid Retriever 연결
+        DEFAULT_COLLECTION = "remon_regulations"
+        self.retriever = HybridRetriever(
+            default_collection=DEFAULT_COLLECTION,
+            host="localhost",
+            port=6333,
+        )
+
+        self.product_repository = (
+            product_repository or ProductRepository(AsyncSessionLocal)
+        )
+
+    # -----------------------------------------------------
+    # Hybrid 검색 wrapper
+    # -----------------------------------------------------
     async def _run_search(
         self,
         product: ProductInfo,
         feature_name: str,
         feature_value: Any,
-        feature_unit: str | None,
+        feature_unit: Optional[str],
     ) -> RetrievalResult:
-        """
-        검색 TOOL을 호출하는 wrapper.
-        Hybrid 검색 Tool을 호출하고 state 스키마에 맞춰 변환한다.
-        """
 
         product_id = product["product_id"]
         query = self._build_search_query(feature_name, feature_value, feature_unit)
-        filters = build_product_filters(product)
 
         try:
-            # TODO(remon-tuning): once live RetrievalTool is connected, benchmark per-feature
-            # top_k/alpha/filter settings instead of relying on demo defaults.
-            tool_result: RetrievalOutput = await self.search_tool.search(
+            # 🔥 HybridRetriever는 sync 함수 → await 필요 없음
+            results = self.retriever.search(
                 query=query,
-                strategy="hybrid",
-                top_k=self.top_k,
-                alpha=self.alpha,
-                filters=filters or None,
+                limit=self.top_k
             )
         except Exception as exc:
-            logger.warning("retrieval tool 호출 실패: %s", exc)
+            logger.warning("HybridRetriever 검색 실패: %s", exc)
             return RetrievalResult(
                 product_id=product_id,
                 feature_name=feature_name,
@@ -98,14 +182,15 @@ class MappingNode:
                 candidates=[],
             )
 
+        # Qdrant 결과 변환
         candidates: List[RetrievedChunk] = []
-        for item in tool_result.results:
+        for item in results:
             candidates.append(
                 RetrievedChunk(
-                    chunk_id=item.get("id", ""),
-                    chunk_text=item.get("text", ""),
-                    semantic_score=item.get("scores", {}).get("final_score", 0.0),
-                    metadata=item.get("metadata", {}),
+                    chunk_id=item["id"],
+                    chunk_text=item["payload"].get("text", ""),
+                    semantic_score=item["score"],
+                    metadata=item["payload"],
                 )
             )
 
@@ -117,9 +202,9 @@ class MappingNode:
             candidates=candidates,
         )
 
-    # ----------------------------------------------------------------------
-    # 2) 매핑 프롬프트 생성 (local 처리)
-    # ----------------------------------------------------------------------
+    # -----------------------------------------------------
+    # Prompt 생성
+    # -----------------------------------------------------
     def _build_prompt(self, feature_name, feature_value, feature_unit, chunk_text):
         feature = {
             "name": feature_name,
@@ -127,25 +212,19 @@ class MappingNode:
             "unit": feature_unit,
         }
         feature_json = json.dumps(feature, ensure_ascii=False)
-        return (
-            MAPPING_PROMPT.replace("{feature}", feature_json).replace("{chunk}", chunk_text)
-        )
+        return MAPPING_PROMPT.replace("{feature}", feature_json).replace("{chunk}", chunk_text)
 
     def _build_search_query(self, feature_name, feature_value, feature_unit):
-        """
-        검색 Tool에 전달할 기본 쿼리 문자열 생성.
-        """
-        parts: List[str] = [str(feature_name)]
+        parts = [str(feature_name)]
         if feature_value is not None:
             parts.append(str(feature_value))
         if feature_unit:
             parts.append(feature_unit)
-
         return " ".join(parts)
 
-    # ----------------------------------------------------------------------
-    # 3) LLM 매핑 호출
-    # ----------------------------------------------------------------------
+    # -----------------------------------------------------
+    # LLM mapping
+    # -----------------------------------------------------
     async def _call_llm(self, prompt: str) -> Dict:
         try:
             res = await self.llm.chat.completions.create(
@@ -153,7 +232,6 @@ class MappingNode:
                 messages=[{"role": "user", "content": prompt}],
             )
             return json.loads(res.choices[0].message.content)
-
         except Exception:
             return {
                 "applies": False,
@@ -167,37 +245,35 @@ class MappingNode:
                 },
             }
 
-    # ----------------------------------------------------------------------
-    # 4) LangGraph Node entrypoint
-    # ----------------------------------------------------------------------
+    # -----------------------------------------------------
+    # LangGraph Node entrypoint
+    # -----------------------------------------------------
     async def run(self, state: Dict) -> Dict:
-        product: ProductInfo = state["product_info"]
-        product_id = product["product_id"]
+        # 🔥 제품 정보가 없으면 DB에서 가져오기
+        product = state.get("product_info")
+        if not product:
+            product_id = state.get("mapping_filters", {}).get("product_id")
+            product = await self.product_repository.fetch_product(
+                int(product_id) if product_id else None
+            )
+            state["product_info"] = product
+
         features = product["features"]
-        units = product.get("feature_units", {})
+        units = product["feature_units"]
+        product_id = product["product_id"]
 
         mapping_results: List[MappingItem] = []
 
-        # 🔥 feature별로 검색 TOOL → 매핑
         for feature_name, value in features.items():
             unit = units.get(feature_name)
 
-            # -----------------------------------------
-            # a) 검색 TOOL 호출
-            # -----------------------------------------
-            retrieval: RetrievalResult = await self._run_search(
-                product, feature_name, value, unit
-            )
+            retrieval = await self._run_search(product, feature_name, value, unit)
 
-            # -----------------------------------------
-            # b) LLM 매핑 수행
-            # -----------------------------------------
             for cand in retrieval["candidates"]:
                 prompt = self._build_prompt(
                     feature_name, value, unit, cand["chunk_text"]
                 )
                 llm_out = await self._call_llm(prompt)
-
                 parsed: MappingParsed = llm_out.get("parsed", {})
 
                 mapping_results.append(
@@ -215,12 +291,51 @@ class MappingNode:
                     )
                 )
 
-        # -----------------------------------------
-        # c) 전역 State 업데이트
-        # -----------------------------------------
         state["mapping"] = MappingResults(
             product_id=product_id,
             items=mapping_results,
         )
-
         return state
+
+
+# -------------------------------------------------------------
+# Factory + LangGraph wrapper
+# -------------------------------------------------------------
+
+_DEFAULT_LLM_CLIENT = None
+_DEFAULT_PRODUCT_REPOSITORY = None
+_DEFAULT_MAPPING_NODE = None
+
+
+def _get_default_llm_client():
+    global _DEFAULT_LLM_CLIENT
+    if not _DEFAULT_LLM_CLIENT:
+        if AsyncOpenAI is None:
+            raise RuntimeError("openai 패키지 필요합니다.")
+        _DEFAULT_LLM_CLIENT = AsyncOpenAI()
+    return _DEFAULT_LLM_CLIENT
+
+
+def _get_default_mapping_node():
+    global _DEFAULT_MAPPING_NODE
+    if not _DEFAULT_MAPPING_NODE:
+        _DEFAULT_MAPPING_NODE = MappingNode(
+            llm_client=_get_default_llm_client(),
+            top_k=settings.MAPPING_TOP_K
+        )
+    return _DEFAULT_MAPPING_NODE
+
+
+async def map_products_node(state: AppState) -> AppState:
+    context: MappingContext = state.get("mapping_context", {}) or {}
+
+    if context:
+        return await MappingNode(
+            llm_client=context.get("llm_client", _get_default_llm_client()),
+            top_k=context.get("top_k", settings.MAPPING_TOP_K)
+        ).run(state)
+
+    return await _get_default_mapping_node().run(state)
+
+
+__all__ = ["MappingNode", "map_products_node"]
