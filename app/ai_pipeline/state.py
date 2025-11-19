@@ -18,6 +18,9 @@ class ProductInfo(TypedDict):
     features: Dict[str, Any]  # 예: {"battery_capacity": 3000, "noise": 70}
     feature_units: Dict[str, str]  # 예: {"battery_capacity": "mAh", "noise": "dB"}
 
+# app/state/pipeline_state.py
+from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
 # 2) 검색 결과 – 검색 TOOL → 매핑 노드로 전달되는 데이터 구조
