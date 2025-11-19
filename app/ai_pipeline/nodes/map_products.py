@@ -9,6 +9,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
 try:  # pragma: no cover - import guard
     from openai import AsyncOpenAI
 except Exception:  # pragma: no cover
