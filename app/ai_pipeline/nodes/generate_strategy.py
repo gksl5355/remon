@@ -4,16 +4,19 @@
 #
 # [State 입출력 요약]
 # --- INPUT (from AppState) ---
-#   mapping_results: MappingResults
+#   mapping: MappingResults
+#       - product_id: str
 #       - items: List[MappingItem]
 #           - regulation_summary: str        # 규제 요약 텍스트
-#           - mapped_products / products: List[str]  # 매핑된 제품명 리스트
+#           - ...                           # (기타 매핑 정보)
+#
+#   ※ map_products_node 가 state["mapping"] 에 채워주는 구조를 그대로 사용.
 #
 # --- OUTPUT (to AppState) ---
-#   strategies: List[str]                    # 최종 규제 대응 전략 리스트
+#   strategies: List[str]                    # 규제 기준 최종 대응 전략 문자열 리스트
 #
 # [큰 흐름]
-#   1) map_products 결과에서 현재 규제 요약 + 제품 리스트 추출
+#   1) map_products 결과에서 현재 규제 요약 + 제품 ID 추출
 #   2) HybridRetriever 로 Qdrant history에서 유사 규제-제품 포인트 검색
 #   3) payload.meta_strategies 기반으로 과거 대응 전략 리스트(history) 구성
 #   4) 현재 규제 + 제품 + history 를 LLM 프롬프트에 넣어
@@ -177,8 +180,8 @@ based on the information below.
 
 [REQUIREMENTS]
 1. Provide strategies that are immediately executable actions  
-   (e.g., “Establish a reformulation plan…”, “Initiate inventory withdrawal…”,  
-   “Prepare updated packaging…”).
+   (e.g., "Establish a reformulation plan…", "Initiate inventory withdrawal…",  
+   "Prepare updated packaging…").
 
 2. Consider both compliance (legal) requirements and business impact mitigation.
 
@@ -196,8 +199,8 @@ based on the information below.
    - Examples: update packaging/labeling, conduct additional testing,  
      execute inventory depletion, adjust product formulation,  
      update online/offline product descriptions.  
-   - Avoid vague principles such as “enhance compliance” or  
-     “improve internal processes.” Every line must be an action  
+   - Avoid vague principles such as "enhance compliance" or  
+     "improve internal processes." Every line must be an action  
      that a real operational team can immediately execute.
 
 6. Use the [REFERENCE: HISTORICAL STRATEGIES] only when they are relevant.  
@@ -261,25 +264,36 @@ def generate_strategy_node(state: AppState) -> Dict[str, Any]:
     """
     LangGraph node: generate_strategy
 
-    1) map_products 결과에서 현재 규제 요약 + 제품 리스트를 추출
+    1) map_products 결과에서 현재 규제 요약 + 제품 ID를 추출
     2) HybridRetriever 로 Qdrant history 에서 유사 규제-제품의 과거 전략 검색
     3) LLM 으로 새로운 대응 전략 생성
     4) {"strategies": ...} 형태로 반환하여 state에 merge
     5) StrategyHistoryTool 로 Qdrant history 에도 저장
     """
-    
     # 1) 현재 규제 요약 + 제품 리스트 추출
     # AppState 구현에 따라 dict / 객체 둘 다 대응
-    mapping_results = getattr(state, "mapping_results", None)
+    #   - 공식 필드: state["mapping"]
+    #   - 레거시 호환: state["mapping_results"] (있다면 fallback)
+    mapping_results = getattr(state, "mapping", None)
     if mapping_results is None and isinstance(state, dict):
-        mapping_results = state.get("mapping_results")
+        mapping_results = state.get("mapping") or state.get("mapping_results")
 
     if not mapping_results:
-        raise ValueError("state.mapping_results 가 비어 있습니다. map_products 노드 결과가 필요합니다.")
-
+        raise ValueError(
+            "state.mapping 이 비어 있습니다. "
+            "map_products 노드 결과가 필요합니다."
+        )
+    
     items: List[Dict[str, Any]] = mapping_results.get("items") or []
+
+    # 매핑 결과가 하나도 없는 경우: 파이프라인은 계속 진행하되, 전략은 빈 리스트로 반환
     if not items:
-        raise ValueError("mapping_results.items 가 비어 있습니다. 최소 1개의 MappingItem 이 필요합니다.")
+        print(
+            "[generate_strategy_node] mapping.items 가 비어 있습니다. "
+            "해당 product에 매핑된 규제가 없어 전략 생성을 건너뜁니다."
+        )
+        return {"strategies": []}
+
 
     # 현재 루프에서는 1개의 규제만 처리한다고 가정
     current_item = items[0]
@@ -288,14 +302,18 @@ def generate_strategy_node(state: AppState) -> Dict[str, Any]:
     if not regulation_summary:
         raise ValueError("MappingItem.regulation_summary 가 비어 있습니다.")
 
-    mapped_products: List[str] = (
-        current_item.get("mapped_products")
-        or current_item.get("products")
-        or []
-    )
+    # 제품 리스트: 현재 파이프라인은 단일 product 기준이므로 product_id 하나만 리스트로 사용
+    product_id = mapping_results.get("product_id")
+    mapped_products: List[str] = [product_id] if product_id else []
 
     # 2) history 검색 (HybridRetriever)
     query_text = _build_query_text(regulation_summary, mapped_products)
+
+    # 히스토리 컬렉션이 없을 경우 자동 생성 (검색·저장 모두 동일 컬렉션 사용)
+    try:
+        history_tool.ensure_collection()
+    except Exception as exc:
+        print(f"[generate_strategy_node] history 컬렉션 준비 중 예외 발생: {exc}")
 
     history_results = retriever.search(
         query=query_text,
@@ -334,8 +352,7 @@ def generate_strategy_node(state: AppState) -> Dict[str, Any]:
 
     new_strategies = _parse_strategies(raw_output_text)
 
- 
-    # 4) Qdrant history 저장
+    # 4) Qdrant history 저장 (실패해도 파이프라인은 계속 진행)
     try:
         history_tool.save_strategy_history(
             regulation_summary=regulation_summary,
@@ -345,4 +362,6 @@ def generate_strategy_node(state: AppState) -> Dict[str, Any]:
     except Exception as e:
         print(f"[generate_strategy_node] history 저장 중 예외 발생: {e}")
 
+    # LangGraph 에서는 이 dict 이 AppState 에 merge 됨
+    # (state["strategies"]: List[str])
     return {"strategies": new_strategies}

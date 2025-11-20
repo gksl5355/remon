@@ -49,6 +49,7 @@ def build_graph():
     graph.add_edge("preprocess",        "map_products")
     graph.add_edge("map_products",      "generate_strategy")
     graph.add_edge("generate_strategy", "score_impact")
+    graph.add_edge("score_impact",      "validator")
 
     # 유효성 분기: ok → score_impact / fail → generate_strategy(재생성)
     graph.add_conditional_edges(
@@ -58,7 +59,6 @@ def build_graph():
     )
 
     # 영향도 → 리포트 → 종료
-    graph.add_edge("report", END)
     graph.add_edge("report", END)
 
     return graph.compile()
