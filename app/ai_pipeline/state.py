@@ -125,10 +125,10 @@ class ReportDraft(TypedDict, total=False):
 # 6) 영향도 평가 결과 타입 정의 
 # ---------------------------------------------------------------------------
 class ImpactScoreItem(TypedDict):
-    product_id: str
-    raw_scores: Dict[str, Any]
-    weighted_score: float
-    impact_level: str
+    raw_scores: Dict[str, Any]         
+    reasoning: str         
+    weighted_score: float         
+    impact_level: str     
 
 # ---------------------------------------------------------------------------
 # 7) LangGraph 전체 전역 State (AppState)

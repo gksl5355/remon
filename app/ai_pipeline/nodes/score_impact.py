@@ -1,6 +1,5 @@
 """
 score_impact.py
-Impact scoring node (FINAL PRODUCTION VERSION)
 """
 
 from __future__ import annotations
@@ -15,7 +14,12 @@ import httpx
 from openai import OpenAI
 from typing import Any, Dict, List
 
-from app.ai_pipeline.state import AppState, MappingResults, StrategyResults
+from app.ai_pipeline.state import (
+    AppState,
+    MappingResults,
+    StrategyResults,
+    ImpactScoreItem,
+)
 from app.ai_pipeline.prompts.impact_prompt import IMPACT_PROMPT_TEMPLATE
 
 
@@ -26,11 +30,11 @@ ROOT_DIR = Path(__file__).resolve().parents[3]
 ENV_PATH = ROOT_DIR / ".env"
 load_dotenv(dotenv_path=ENV_PATH, override=True)
 
-# 단순화된 안전한 클라이언트 생성
 client_openai = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
     http_client=httpx.Client(trust_env=False)
 )
+
 
 # -----------------------------------------------------
 # Utility: months_left 계산
@@ -55,69 +59,75 @@ def calculate_months_left(effective_date: str, analysis_date: str):
 async def score_impact_node(state: AppState) -> AppState:
 
     regulation = state.get("regulation", {})
-    mapping: MappingResults = state.get("mapping")
-    strategy: StrategyResults = state.get("strategy")
+    mapping: MappingResults | None = state.get("mapping")
+    strategy: StrategyResults | None = state.get("strategy")
 
+    # 매핑/전략 없으면 스킵
     if not mapping or not strategy:
         return state
 
-    # -----------------------------------------------------
-    # INPUT 구성
-    # -----------------------------------------------------
+    # -----------------------------
+    # INPUT 전처리
+    # -----------------------------
     regulation_text = regulation.get("text", "")
     effective_date = regulation.get("effective_date")
-
-    # product list 생성
-    products = []
-    for item in mapping["items"]:
-        products.append({
-            "product_id": mapping.get("product_id"),
-            "feature": item.get("feature_name"),
-            "sales_amount": item.get("sales_amount", 0),
-        })
-
-    # strategy summary 합치기
-    strategy_text = " ".join([
-        s.get("summary", "") for s in strategy.get("items", [])
-    ]).strip()
-
-    # 날짜 계산
     analysis_date = datetime.today().strftime("%Y-%m-%d")
     months_left = calculate_months_left(effective_date, analysis_date)
 
-    # -----------------------------------------------------
-    # Prompt 생성
-    # -----------------------------------------------------
+    # -----------------------------
+    # 제품 매핑 정보 JSON 변환
+    # -----------------------------
+    products_json_list = []
+    for item in mapping["items"]:
+        products_json_list.append({
+            "product_id": item.get("product_id"),
+            "feature_name": item.get("feature_name"),
+            "current_value": item.get("current_value"),
+            "required_value": item.get("required_value"),
+            "gap": item.get("gap"),
+        })
+
+    strategy_text = " ".join(
+        s.get("summary", "") for s in strategy.get("items", [])
+    ).strip()
+
+    # -----------------------------
+    # 프롬프트 생성
+    # -----------------------------
     prompt = IMPACT_PROMPT_TEMPLATE.format(
         regulation_text=regulation_text,
-        products_json=json.dumps(products, ensure_ascii=False, indent=2),
+        products_json=json.dumps(products_json_list, ensure_ascii=False, indent=2),
         strategy_text=strategy_text,
         months_left=months_left,
     )
 
-    # -----------------------------------------------------
+    # -----------------------------
     # LLM 호출
-    # -----------------------------------------------------
+    # -----------------------------
     try:
         response = client_openai.chat.completions.create(
             model=os.getenv("LLM_MODEL", "gpt-4o-mini"),
             messages=[
-                {"role": "system", "content": "Respond ONLY with valid JSON. No comments."},
+                {"role": "system", "content": "Respond ONLY with valid JSON."},
                 {"role": "user", "content": prompt},
             ],
             temperature=0,
         )
-        content = response.choices[0].message.content
-        scores = json.loads(content)
+        llm_out = json.loads(response.choices[0].message.content)
 
     except Exception as e:
-        # LLM 오류 발생 시 fallback
         print("[ERROR] Impact scoring LLM parsing failed:", e)
         return state
 
-    # -----------------------------------------------------
+    # -----------------------------
+    # 점수 분리
+    # -----------------------------
+    reasoning = llm_out.pop("reasoning", "")
+    raw_scores = llm_out   # 나머지는 전부 점수로 간주
+
+    # -----------------------------
     # 가중합 계산
-    # -----------------------------------------------------
+    # -----------------------------
     weights = {
         "directness": 0.20,
         "legal_severity": 0.25,
@@ -127,9 +137,7 @@ async def score_impact_node(state: AppState) -> AppState:
         "response_cost": 0.20,
     }
 
-    weighted_score = 0
-    for key, weight in weights.items():
-        weighted_score += scores.get(key, 0) * weight
+    weighted_score = sum(raw_scores.get(k, 0) * w for k, w in weights.items())
 
     impact_level = (
         "High" if weighted_score >= 4 else
@@ -137,17 +145,20 @@ async def score_impact_node(state: AppState) -> AppState:
         "Low"
     )
 
-    # -----------------------------------------------------
-    # state 반영
-    # -----------------------------------------------------
-    if "impact_scores" not in state:
-        state["impact_scores"] = []
-
-    state["impact_scores"].append({
-        "product_id": mapping.get("product_id"),
-        "raw_scores": scores,
+    # -----------------------------
+    # ImpactScoreItem 생성
+    # -----------------------------
+    impact_item: ImpactScoreItem = {
+        "raw_scores": raw_scores,
         "weighted_score": round(weighted_score, 2),
         "impact_level": impact_level,
-    })
+        "reasoning": reasoning,
+    }
+
+    # -----------------------------
+    # State 업데이트
+    # -----------------------------
+    state.setdefault("impact_scores", [])
+    state["impact_scores"].append(impact_item)
 
     return state

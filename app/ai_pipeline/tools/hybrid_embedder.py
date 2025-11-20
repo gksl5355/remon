@@ -1,7 +1,9 @@
 # app/ai_pipeline/tools/hybrid_embedder.py
 
 from sentence_transformers import SentenceTransformer
+from qdrant_client.models import SparseVector
 from collections import Counter
+
 
 class HybridEmbedder:
     """
@@ -17,7 +19,7 @@ class HybridEmbedder:
         # Dense
         dense_vec = self.dense_model.encode(text).tolist()
 
-        # Sparse (BoW)
+        # Sparse
         tokens = text.lower().split()
         bow = Counter(tokens)
 
@@ -29,11 +31,7 @@ class HybridEmbedder:
             indices.append(idx)
             values.append(float(freq))
 
-        # 🔥 Qdrant Hybrid 검색은 SparseVector 객체를 받지 못함
-        sparse = {
-            "indices": indices,
-            "values": values
-        }
+        sparse = SparseVector(indices=indices, values=values)
 
         return {
             "dense": dense_vec,
