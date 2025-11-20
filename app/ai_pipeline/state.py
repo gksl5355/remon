@@ -5,6 +5,8 @@ LangGraph 전역 State 스키마 정의 – Production Minimal Version
 
 from typing import Any, Dict, List, Optional, TypedDict, Literal
 
+from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
 # 1) 제품 정보 – 모든 노드가 참조하는 전역 정보
@@ -16,6 +18,9 @@ class ProductInfo(TypedDict):
     features: Dict[str, Any]  # 예: {"battery_capacity": 3000, "noise": 70}
     feature_units: Dict[str, str]  # 예: {"battery_capacity": "mAh", "noise": "dB"}
 
+# app/state/pipeline_state.py
+from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
 # 2) 검색 결과 – 검색 TOOL → 매핑 노드로 전달되는 데이터 구조
@@ -110,7 +115,6 @@ class StrategyItem(TypedDict):
     summary: str
     recommendation: str
 
-
 class StrategyResults(TypedDict):
     product_id: str
     items: List[StrategyItem]
@@ -121,9 +125,17 @@ class ReportDraft(TypedDict, total=False):
     status: str
     sections: List[Dict[str, Any]]
 
+# ---------------------------------------------------------------------------
+# 6) 영향도 평가 결과 타입 정의 
+# ---------------------------------------------------------------------------
+class ImpactScoreItem(TypedDict):
+    raw_scores: Dict[str, Any]         
+    reasoning: str         
+    weighted_score: float         
+    impact_level: str 
 
 # ---------------------------------------------------------------------------
-# 6) LangGraph 전체 전역 State (AppState)
+# 7) LangGraph 전체 전역 State (AppState)
 #    → "딱 필요한 전역 key"만 정의한다.
 #    → 나머지 모든 값은 Node 내부 local 변수로만 사용한다.
 # ---------------------------------------------------------------------------
@@ -135,8 +147,8 @@ class AppState(TypedDict, total=False):
     retrieval: RetrievalResult
     mapping: MappingResults
     mapping_debug: MappingDebugInfo
-    strategy: StrategyResults
+    strategies: List[str]
     validation_strategy: bool
     mapping_context: MappingContext
-    impact_scores: List[Dict[str, Any]]
+    impact_scores: List[ImpactScoreItem]
     report: ReportDraft
