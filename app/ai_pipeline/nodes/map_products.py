@@ -8,6 +8,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol, TYPE_CHECKING
+# Protocol, TYPE_CHECKING 추가
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -30,6 +31,10 @@ from app.ai_pipeline.state import (
 
 from app.ai_pipeline.prompts.mapping_prompt import MAPPING_PROMPT
 from app.ai_pipeline.tools.retrieval_utils import build_product_filters
+from app.ai_pipeline.tools.retrieval_tool import (
+    RetrievalOutput,
+    get_retrieval_tool,
+)
 from app.config.settings import settings
 from app.core.database import AsyncSessionLocal
 
@@ -148,12 +153,7 @@ class MappingNode:
         product_repository: Optional[ProductRepository] = None,
     ):
         self.llm = llm_client
-        if search_tool is None:
-            from app.ai_pipeline.tools.retrieval_tool import get_retrieval_tool
-
-            self.search_tool = get_retrieval_tool()
-        else:
-            self.search_tool = search_tool
+        self.search_tool = search_tool or get_retrieval_tool()
         self.top_k = top_k
         self.alpha = alpha  # 🔥 dynamic hybrid weight
         # TODO(remon-rag): replace any ad-hoc StaticRetrievalTool usage with the real
@@ -183,6 +183,7 @@ class MappingNode:
         feature_name: str,
         feature_value: Any,
         feature_unit: str | None,
+        extra_filters: Optional[Dict[str, Any]] = None,
     ) -> RetrievalResult:
         """
         검색 TOOL을 호출하는 wrapper.
@@ -192,6 +193,8 @@ class MappingNode:
         product_id = product["product_id"]
         query = self._build_search_query(feature_name, feature_value, feature_unit)
         filters = build_product_filters(product)
+        if extra_filters:
+            filters.update(extra_filters)
 
         try:
             # TODO(remon-tuning): once live RetrievalTool is connected, benchmark per-feature
@@ -214,7 +217,7 @@ class MappingNode:
             )
 
         candidates: List[RetrievedChunk] = []
-        for item in tool_result.results:
+        for item in tool_result["results"]:
             candidates.append(
                 RetrievedChunk(
                     chunk_id=item.get("id", ""),
@@ -287,6 +290,7 @@ class MappingNode:
     # ----------------------------------------------------------------------
     async def run(self, state: Dict) -> Dict:
         product: Optional[ProductInfo] = state.get("product_info")
+        mapping_filters: Dict[str, Any] = state.get("mapping_filters") or {}
         if not product:
             filters = state.get("mapping_filters") or {}
             product_id = filters.get("product_id")
@@ -310,6 +314,14 @@ class MappingNode:
         units = product.get("feature_units", {})
 
         mapping_results: List[MappingItem] = []
+
+        extra_search_filters = {
+            key: value
+            for key, value in mapping_filters.items()
+            if key not in {"product_id"}
+        }
+        if not extra_search_filters:
+            extra_search_filters = None
 
         if self.debug_enabled:
             logger.info(
@@ -336,7 +348,7 @@ class MappingNode:
                     unit or "-",
                 )
             retrieval: RetrievalResult = await self._run_search(
-                product, feature_name, value, unit
+                product, feature_name, value, unit, extra_search_filters
             )
             if self.debug_enabled:
                 logger.info(
@@ -382,10 +394,12 @@ class MappingNode:
         # -----------------------------------------
         # c) 전역 State 업데이트
         # -----------------------------------------
-        state["mapping"] = MappingResults(
+        mapping_payload = MappingResults(
             product_id=product_id,
             items=mapping_results,
         )
+        state["mapping"] = mapping_payload
+        state["mapping_results"] = mapping_payload
         if self.debug_enabled:
             _log_mapping_preview(product_id, mapping_results)
             snapshot_path = _persist_mapping_snapshot(
