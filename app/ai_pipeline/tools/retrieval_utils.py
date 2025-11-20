@@ -19,22 +19,11 @@ def build_product_filters(product: ProductInfo) -> Dict[str, Any]:
     """
     제품 정보(ProductInfo)를 기반으로 Qdrant 메타데이터 필터를 생성한다.
 
-    현재는 제품의 수출 국가와 카테고리를 규제 청크 메타데이터의
-    ``meta_country`` / ``meta_category`` 필드에 매핑한다.
-    추후 더 많은 필터 조건이 필요해지면 이 함수만 확장하면 된다.
+    현재는 메타데이터 필터를 비활성화한다.
+    (메타데이터 키 불일치로 검색 결과가 0건 되는 문제를 예방하기 위해)
     """
 
-    filters: Dict[str, Any] = {}
-
-    export_country = product.get("export_country")
-    if export_country:
-        filters[META_COUNTRY_KEY] = export_country
-
-    category = product.get("category")
-    if category:
-        filters[META_CATEGORY_KEY] = category
-
-    return filters
+    return {}
 
 
 __all__ = ["build_product_filters", "META_COUNTRY_KEY", "META_CATEGORY_KEY"]
