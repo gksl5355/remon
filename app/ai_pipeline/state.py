@@ -125,6 +125,14 @@ class ReportDraft(TypedDict, total=False):
     status: str
     sections: List[Dict[str, Any]]
 
+# ---------------------------------------------------------------------------
+# 6) 영향도 평가 결과 타입 정의 
+# ---------------------------------------------------------------------------
+class ImpactScoreItem(TypedDict):
+    raw_scores: Dict[str, Any]         
+    reasoning: str         
+    weighted_score: float         
+    impact_level: str 
 
 # ---------------------------------------------------------------------------
 # 6) LangGraph 전체 전역 State (AppState)
@@ -139,8 +147,9 @@ class AppState(TypedDict, total=False):
     retrieval: RetrievalResult
     mapping: MappingResults
     mapping_debug: MappingDebugInfo
-    strategy: StrategyResults
+    #strategy: StrategyResults
+    strategies: List[str]
     validation_strategy: bool
     mapping_context: MappingContext
-    impact_scores: List[Dict[str, Any]]
+    impact_scores: List[ImpactScoreItem]
     report: ReportDraft
