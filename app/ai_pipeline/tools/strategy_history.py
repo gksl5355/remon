@@ -29,7 +29,12 @@ import os
 import uuid
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import PointStruct
+from qdrant_client.models import (
+    PointStruct,
+    Distance,
+    VectorParams,
+    SparseVectorParams,
+)
 
 from .hybrid_embedder import HybridEmbedder
 
@@ -67,6 +72,39 @@ class StrategyHistoryTool:
 
         # 규제+제품 텍스트 → dense/sparse 임베딩용
         self.embedder = HybridEmbedder()
+
+    # ------------------------------------------------------------------
+    # 컬렉션 존재 보장
+    # ------------------------------------------------------------------
+    def ensure_collection(self) -> None:
+        """
+        전략 히스토리 컬렉션이 없을 경우 생성한다.
+        - named vectors: dense (cosine), sparse
+        """
+        try:
+            self.client.get_collection(self.collection)
+            return
+        except Exception as exc:
+            msg = str(exc).lower()
+            if "not found" not in msg and "doesn't exist" not in msg:
+                raise
+
+        # 컬렉션 생성: dense 차원은 임베딩 결과 길이로 결정
+        probe = self.embedder.embed("init strategy history")
+        dense_dim = len(probe["dense"])
+
+        self.client.create_collection(
+            collection_name=self.collection,
+            vectors_config={
+                "dense": VectorParams(
+                    size=dense_dim,
+                    distance=Distance.COSINE,
+                )
+            },
+            sparse_vectors_config={
+                "sparse": SparseVectorParams(),
+            },
+        )
 
     # ------------------------------------------------------------------
     # 임베딩용 텍스트 빌드
@@ -115,6 +153,9 @@ class StrategyHistoryTool:
         # 전략이 아예 없으면 굳이 저장하지 않고 return
         if not strategies:
             return
+
+        # 컬렉션이 없으면 만들고 진행
+        self.ensure_collection()
 
         # 1) 임베딩 텍스트 생성
         embed_text = self._build_embedding_text(

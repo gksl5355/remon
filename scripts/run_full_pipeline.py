@@ -208,7 +208,12 @@ async def main() -> None:
     logger.info("Strategies: %s", strategies)
 
     report = result.get("report")
-    logger.info("Report: %s", report)
+    if report:
+        logger.info("Report summary:\n%s", report.get("summary_text", report))
+        if report.get("llm_report"):
+            logger.info("Report (LLM):\n%s", report["llm_report"])
+    else:
+        logger.info("Report: %s", report)
 
 
 if __name__ == "__main__":
