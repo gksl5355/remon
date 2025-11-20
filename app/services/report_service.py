@@ -38,7 +38,7 @@ class ReportService:
         
         try:
             
-            report = await self.repo.get_with_items(db, regulation_id)
+            report = await self.repo.get_by_regulation_id(db, regulation_id)
             
             if not report:
                 logger.warning(f"Report not found: regulation_id={regulation_id}")

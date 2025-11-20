@@ -86,6 +86,33 @@ class ReportRepository(BaseRepository[Report]):
         result = await db.execute(query)
         return list(result.scalars().all())
 
+    async def create_with_items(
+        self, 
+        db: AsyncSession, 
+        report_data: dict, 
+        items_data: List[dict],
+        summaries_data: List[dict]
+    ) -> Report:
+        """리포트와 항목들을 함께 생성"""
+        # Report 생성
+        report = Report(**report_data)
+        db.add(report)
+        await db.flush()
+        
+        # Items 생성
+        for item_data in items_data:
+            item = ReportItem(**item_data, report_id=report.report_id)
+            db.add(item)
+        
+        # Summaries 생성
+        for summary_data in summaries_data:
+            summary = ReportSummary(**summary_data, report_id=report.report_id)
+            db.add(summary)
+        
+        await db.flush()
+        await db.refresh(report)
+        return report
+    
 class ReportSummaryRepository(BaseRepository[ReportSummary]):
     """리포트 서머리 Repository"""
     
@@ -132,32 +159,6 @@ class ReportSummaryRepository(BaseRepository[ReportSummary]):
 #         )
 #         return result.scalar_one_or_none()
     
-#     async def create_with_items(
-#         self, 
-#         db: AsyncSession, 
-#         report_data: dict, 
-#         items_data: List[dict],
-#         summaries_data: List[dict]
-#     ) -> Report:
-#         """리포트와 항목들을 함께 생성"""
-#         # Report 생성
-#         report = Report(**report_data)
-#         db.add(report)
-#         await db.flush()
-        
-#         # Items 생성
-#         for item_data in items_data:
-#             item = ReportItem(**item_data, report_id=report.report_id)
-#             db.add(item)
-        
-#         # Summaries 생성
-#         for summary_data in summaries_data:
-#             summary = ReportSummary(**summary_data, report_id=report.report_id)
-#             db.add(summary)
-        
-#         await db.flush()
-#         await db.refresh(report)
-#         return report
     
 #     async def get_by_country_and_product(
 #         self, db: AsyncSession, country_code: str, product_id: int
