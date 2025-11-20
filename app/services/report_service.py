@@ -3,7 +3,7 @@ module: report_service.py
 description: 리포트 생성, 조회 및 관련 비즈니스 로직을 처리하는 서비스 계층
 author: 조영우
 created: 2025-11-10
-updated: 2025-11-14
+updated: 2025-11-20
 dependencies:
     - sqlalchemy.ext.asyncio
     - core.repositories.report_repository
@@ -37,47 +37,28 @@ class ReportService:
         logger.info(f"Fetching report detail: regulation_id={regulation_id}")
         
         try:
-            
             report = await self.repo.get_by_regulation_id(db, regulation_id)
             
             if not report:
                 logger.warning(f"Report not found: regulation_id={regulation_id}")
                 return None
             
-            # 프론트 형식으로 변환 (더미 데이터 구조 유지)
-            return {
-                "regulation_id": regulation_id,
-                "title": "리포트 제목",  # TODO: 실제 데이터
-                "last_updated": report.created_at.isoformat() if report.created_at else None,
-                "sections": {
-                    "summary": {
-                        "title": "1. 규제 변경 요약",
-                        "type": "paragraph",
-                        "content": [report.created_reason]
-                    },
-                    "products": {
-                        "title": "2. 영향받는 제품 목록",
-                        "type": "table",
-                        "headers": ["제품명", "브랜드", "조치"],
-                        "rows": []
-                    },
-                    "changes": {
-                        "title": "3. 주요 변경 사항 해석",
-                        "type": "list",
-                        "content": []
-                    },
-                    "strategy": {
-                        "title": "4. 대응 전략 제안",
-                        "type": "paragraph",
-                        "content": []
-                    },
-                    "references": {
-                        "title": "5. 참고 및 원문 링크",
-                        "type": "links",
-                        "content": []
+            # JSONB에서 직접 가져오기
+            if report.summaries and len(report.summaries) > 0:
+                summary_data = report.summaries[0].summary_text
+                
+                if summary_data:
+                    # JSONB 데이터 그대로 반환 (배열 형식)
+                    return {
+                        "regulation_id": regulation_id,
+                        "title": "리포트 제목",
+                        "last_updated": report.created_at.isoformat() if report.created_at else None,
+                        "sections": summary_data  # 이미 배열 형식으로 순서 보장
                     }
-                }
-            }
+            
+            # JSONB 데이터가 없으면 None 반환
+            logger.warning(f"No summary data found for regulation_id={regulation_id}")
+            return None
             
         except Exception as e:
             logger.error(f"Error fetching report detail: {e}", exc_info=True)

@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from . import Base
@@ -38,7 +39,8 @@ class ReportSummary(Base):
     summary_id = Column(Integer, primary_key=True, autoincrement=True)
     report_id = Column(Integer, ForeignKey("reports.report_id"), nullable=False)
     impact_score_id = Column(Integer, ForeignKey("impact_scores.impact_score_id"), nullable=False)
-    summary_text = Column(Text, nullable=True)
+    # summary_text = Column(Text, nullable=True)  # 기존 마크다운 (deprecated)
+    summary_text = Column(JSONB, nullable=True)  # 새로운 JSON 형식
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
