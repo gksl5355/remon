@@ -115,7 +115,6 @@ class StrategyItem(TypedDict):
     summary: str
     recommendation: str
 
-
 class StrategyResults(TypedDict):
     product_id: str
     items: List[StrategyItem]
