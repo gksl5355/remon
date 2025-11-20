@@ -135,7 +135,7 @@ class ImpactScoreItem(TypedDict):
     impact_level: str 
 
 # ---------------------------------------------------------------------------
-# 6) LangGraph 전체 전역 State (AppState)
+# 7) LangGraph 전체 전역 State (AppState)
 #    → "딱 필요한 전역 key"만 정의한다.
 #    → 나머지 모든 값은 Node 내부 local 변수로만 사용한다.
 # ---------------------------------------------------------------------------
@@ -147,7 +147,6 @@ class AppState(TypedDict, total=False):
     retrieval: RetrievalResult
     mapping: MappingResults
     mapping_debug: MappingDebugInfo
-    #strategy: StrategyResults
     strategies: List[str]
     validation_strategy: bool
     mapping_context: MappingContext
