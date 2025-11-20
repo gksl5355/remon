@@ -3,20 +3,24 @@ module: settings.py
 description: 환경 변수 및 기본 설정 관리
 """
 
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from dotenv import load_dotenv
 
-load_dotenv()
+ROOT_DIR = Path(__file__).resolve().parents[2]
+load_dotenv(ROOT_DIR / ".env")
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"  # 추가 필드 무시
+        extra="ignore"
+        # env_file=".env", env_file_encoding="utf-8", extra="ignore"  # 추가 필드 무시
     )
 
     DATABASE_URL: str
-    REDIS_URL: str
-    SECRET_KEY: str
+    REDIS_URL: str = "redis://localhost:6379/0"
+    SECRET_KEY: str = "change_me"
     QDRANT_URL: str = "http://localhost:6333"
     QDRANT_API_KEY: str | None = None
     QDRANT_PATH: str = "./data/qdrant"
@@ -31,6 +35,13 @@ class Settings(BaseSettings):
     MAPPING_CONDITION_WEIGHT: float = 0.1
     MAPPING_SINK_TYPE: str = "rdb"
     MAPPING_SINK_DSN: str | None = None
+    MAPPING_DEBUG_ENABLED: bool = True
+    MAPPING_DEBUG_DIR: str = "logs/mapping"
+    MAPPING_DEBUG_MAX_ITEMS: int = 10
+
+    OPENAI_API_KEY: str | None = None
+    OPENAI_BASE_URL: str | None = None
+    OPENAI_MODEL: str = "gpt-4o-mini"
 
 
 settings = Settings()

@@ -1,35 +1,31 @@
-#======================================================================
-# 대응 전략
-# RAG로 이전 규제 대응 history 반영 
-# input : 
-# output : 대응 전략 3가지 str 리스트 
-#======================================================================
-
-
 """
 generate_strategy.py
-HybridRetriever 기반 KTNG 내부 전략 추천 Node
+HybridRetriever 기반 KTNG 내부 전략 추천 Node (FINAL PRODUCTION VERSION)
 """
 
-import json
-from typing import Dict, List
+from __future__ import annotations
+
+import logging
+from typing import Dict, List, Any
 
 from app.ai_pipeline.tools.hybrid_retriever import HybridRetriever
 from app.ai_pipeline.state import (
+    AppState,
+    MappingResults,
     StrategyItem,
     StrategyResults,
-    MappingResults,
 )
 
-import logging
 logger = logging.getLogger(__name__)
 
 
+# ==========================================================================
+# StrategyNode Class
+# ==========================================================================
 class StrategyNode:
     """
-    규제-제품 매핑 결과를 기반으로
-    내부 대응전략 DB(remon_internal_ktng)에 hybrid 검색하여
-    유사 사례 전략(meta_strategy)을 추천하는 Node
+    매핑 결과(MappingResults)를 기반으로 내부 전략 DB(remon_internal_ktng)를
+    HybridRetriever로 검색하여 StrategyItem 리스트를 생성한다.
     """
 
     def __init__(
@@ -39,20 +35,11 @@ class StrategyNode:
         dense_weight: float = 0.7,
         sparse_weight: float = 0.3,
     ):
-        """
-        Parameters
-        ----------
-        collection_name : Qdrant collection name
-        limit : 검색 후보 개수
-        dense_weight : hybrid dense 비중
-        sparse_weight : hybrid sparse 비중
-        """
         self.collection_name = collection_name
         self.limit = limit
         self.dense_weight = dense_weight
         self.sparse_weight = sparse_weight
 
-        # HybridRetriever 생성 (기본 host/port)
         self.retriever = HybridRetriever(
             default_collection=collection_name,
             host="localhost",
@@ -60,28 +47,30 @@ class StrategyNode:
         )
 
     # ----------------------------------------------------------------------
-    # 1) 검색 query 생성
+    # Query builder
     # ----------------------------------------------------------------------
-    def _build_query_from_mapping(self, mapping: MappingResults) -> List[str]:
+    def _build_queries(self, mapping: MappingResults) -> List[str]:
         """
-        MappingNode의 결과 중 regulation_summary / parsed 데이터를 활용해
-        검색 query를 생성.
+        매핑 결과의 regulation_summary 및 parsed 정보를 사용하여
+        검색용 query를 생성한다.
         """
 
         queries = []
 
         for item in mapping["items"]:
             summary = item.get("regulation_summary", "")
-            parsed = item.get("parsed", {})
 
-            # parsed 기반 쿼리 예: "nicotine limit 10mg"
+            parsed = item.get("parsed", {})
             parsed_query = " ".join(
-                [
-                    parsed.get("category") or "",
-                    parsed.get("requirement_type") or "",
-                    str(item.get("required_value") or ""),
-                ]
-            ).strip()
+                filter(
+                    None,
+                    [
+                        parsed.get("category"),
+                        parsed.get("requirement_type"),
+                        str(item.get("required_value")),
+                    ],
+                )
+            )
 
             if summary:
                 queries.append(summary)
@@ -92,74 +81,94 @@ class StrategyNode:
         return queries
 
     # ----------------------------------------------------------------------
-    # 2) KTNG 내부 전략 DB hybrid 검색
+    # Search internal strategy DB
     # ----------------------------------------------------------------------
-    def _search_internal_strategies(self, queries: List[str]):
-        """
-        Query 리스트를 기반으로 KTNG 내부 전략 데이터 hybrid 검색 수행.
-        """
+    def _search_internal(self, queries: List[str]):
+        """HybridRetriever로 내부 전략 DB를 검색한다."""
 
         all_results = []
 
         for q in queries:
             try:
-                results = self.retriever.search(
+                res = self.retriever.search(
                     query=q,
                     collection=self.collection_name,
                     limit=self.limit,
                     dense_weight=self.dense_weight,
                     sparse_weight=self.sparse_weight,
                 )
-                all_results.extend(results)
-
+                all_results.extend(res)
             except Exception as e:
-                logger.warning(f"내부 전략 hybrid 검색 실패: {e}")
+                logger.warning(f"[StrategyNode] 검색 실패: {e}")
 
         return all_results[: self.limit]
 
     # ----------------------------------------------------------------------
-    # 3) Node entrypoint
+    # StrategyItem 생성기
     # ----------------------------------------------------------------------
-    async def run(self, state: Dict) -> Dict:
+    def _convert_to_items(self, results: List[Dict[str, Any]]) -> List[StrategyItem]:
         """
-        LangGraph Pipeline에서 호출되는 main entrypoint.
-        MappingNode 결과를 기반으로 전략 후보를 생성한다.
+        Qdrant 검색 결과(payload)의 구조를 StrategyItem 스키마로 변환한다.
+        state.py 기준 필드:
+            feature_name: str
+            regulation_chunk_id: str
+            impact_level: str
+            summary: str
+            recommendation: str
         """
 
+        items: List[StrategyItem] = []
+
+        for r in results:
+            payload = r.get("payload", {})
+
+            items.append(
+                StrategyItem(
+                    feature_name=payload.get("feature_name", "GENERAL"),
+                    regulation_chunk_id=str(payload.get("chunk_id", "")),
+                    impact_level=payload.get("impact_level", "medium"),
+                    summary=payload.get("meta_strategy", "") or payload.get("text", ""),
+                    recommendation=payload.get("recommendation", ""),
+                )
+            )
+
+        return items
+
+    # ----------------------------------------------------------------------
+    # Main entrypoint for LangGraph
+    # ----------------------------------------------------------------------
+    async def run(self, state: AppState) -> AppState:
+
         mapping: MappingResults = state.get("mapping")
-        if mapping is None or not mapping["items"]:
-            logger.warning("mapping 결과 없음 → 전략 생성 불가")
+        if not mapping or not mapping.get("items"):
+            logger.warning("[StrategyNode] mapping 결과 없음, strategy 생성 불가")
             state["strategy"] = StrategyResults(product_id="", items=[])
             return state
 
-        # a) 검색 query 생성
-        queries = self._build_query_from_mapping(mapping)
+        # 1) Query 생성
+        queries = self._build_queries(mapping)
 
-        # b) 내부 전략 DB hybrid 검색
-        results = self._search_internal_strategies(queries)
+        # 2) 내부 전략 검색
+        results = self._search_internal(queries)
 
-        # c) StrategyItem 생성
-        strategy_items: List[StrategyItem] = []
+        # 3) StrategyItem 변환
+        items = self._convert_to_items(results)
 
-        for r in results:
-            payload = r["payload"]
-
-            strategy_items.append(
-                StrategyItem(
-                    case_id=payload.get("meta_case_id") or r["id"],   # fallback → point.id
-                    strategy_text=payload.get("meta_strategy") or payload.get("text") or "",  
-                    regulation_text=payload.get("meta_regulation_text") or payload.get("text") or "",
-                    score=r["score"],
-                    products=payload.get("meta_products", []),  # 없으면 빈 리스트
-                    metadata=payload,                           # payload 원본 유지
-                )
-            )
-        
-        
-        # d) state 업데이트
+        # 4) state 업데이트
         state["strategy"] = StrategyResults(
             product_id=mapping["product_id"],
-            items=strategy_items,
+            items=items,
         )
 
         return state
+
+
+# ==========================================================================
+# LangGraph에서 직접 사용하는 Node 함수
+# ==========================================================================
+strategy_node_instance = StrategyNode()
+
+
+async def generate_strategy_node(state: AppState) -> AppState:
+    """LangGraph pipeline에서 호출되는 wrapper 함수"""
+    return await strategy_node_instance.run(state)

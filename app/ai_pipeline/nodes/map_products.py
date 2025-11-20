@@ -1,14 +1,16 @@
 """
 map_products.py
-HybridRetriever 기반 검색 + LLM 매핑 Node (FINAL)
+HybridRetriever 기반 검색 + LLM 매핑 Node (FINAL PRODUCTION VERSION)
 """
+
+from __future__ import annotations
 
 import json
 import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-
+import httpx
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -127,7 +129,6 @@ class ProductRepository:
 
 class MappingNode:
     """
-    🔥 기존 search_tool 기반 완전 제거
     🔥 HybridRetriever 기반 검색 통합 Node
     """
 
@@ -135,13 +136,16 @@ class MappingNode:
         self,
         llm_client,
         top_k: int = 5,
+        alpha: float = 0.7,
         product_repository: Optional[ProductRepository] = None,
     ):
         self.llm = llm_client
         self.top_k = top_k
+        self.alpha = alpha
 
-        # 🔥 Hybrid Retriever 연결
         DEFAULT_COLLECTION = "remon_regulations"
+
+        # 🔥 Qdrant Hybrid Retriever 연결
         self.retriever = HybridRetriever(
             default_collection=DEFAULT_COLLECTION,
             host="localhost",
@@ -151,6 +155,8 @@ class MappingNode:
         self.product_repository = (
             product_repository or ProductRepository(AsyncSessionLocal)
         )
+
+        self.debug_enabled = settings.MAPPING_DEBUG_ENABLED
 
     # -----------------------------------------------------
     # Hybrid 검색 wrapper
@@ -167,10 +173,11 @@ class MappingNode:
         query = self._build_search_query(feature_name, feature_value, feature_unit)
 
         try:
-            # 🔥 HybridRetriever는 sync 함수 → await 필요 없음
             results = self.retriever.search(
                 query=query,
-                limit=self.top_k
+                limit=self.top_k,
+                dense_weight=self.alpha,
+                sparse_weight=1 - self.alpha,
             )
         except Exception as exc:
             logger.warning("HybridRetriever 검색 실패: %s", exc)
@@ -182,7 +189,6 @@ class MappingNode:
                 candidates=[],
             )
 
-        # Qdrant 결과 변환
         candidates: List[RetrievedChunk] = []
         for item in results:
             candidates.append(
@@ -206,13 +212,17 @@ class MappingNode:
     # Prompt 생성
     # -----------------------------------------------------
     def _build_prompt(self, feature_name, feature_value, feature_unit, chunk_text):
-        feature = {
+        feature_dict = {
             "name": feature_name,
             "value": feature_value,
             "unit": feature_unit,
         }
-        feature_json = json.dumps(feature, ensure_ascii=False)
-        return MAPPING_PROMPT.replace("{feature}", feature_json).replace("{chunk}", chunk_text)
+        feature_json = json.dumps(feature_dict, ensure_ascii=False)
+        return (
+            MAPPING_PROMPT
+            .replace("{feature}", feature_json)
+            .replace("{chunk}", chunk_text)
+        )
 
     def _build_search_query(self, feature_name, feature_value, feature_unit):
         parts = [str(feature_name)]
@@ -248,8 +258,8 @@ class MappingNode:
     # -----------------------------------------------------
     # LangGraph Node entrypoint
     # -----------------------------------------------------
-    async def run(self, state: Dict) -> Dict:
-        # 🔥 제품 정보가 없으면 DB에서 가져오기
+    async def run(self, state: AppState) -> AppState:
+
         product = state.get("product_info")
         if not product:
             product_id = state.get("mapping_filters", {}).get("product_id")
@@ -267,12 +277,12 @@ class MappingNode:
         for feature_name, value in features.items():
             unit = units.get(feature_name)
 
-            retrieval = await self._run_search(product, feature_name, value, unit)
+            retrieval = await self._run_search(
+                product, feature_name, value, unit
+            )
 
             for cand in retrieval["candidates"]:
-                prompt = self._build_prompt(
-                    feature_name, value, unit, cand["chunk_text"]
-                )
+                prompt = self._build_prompt(feature_name, value, unit, cand["chunk_text"])
                 llm_out = await self._call_llm(prompt)
                 parsed: MappingParsed = llm_out.get("parsed", {})
 
@@ -299,11 +309,15 @@ class MappingNode:
 
 
 # -------------------------------------------------------------
-# Factory + LangGraph wrapper
+# Factory wrapper
 # -------------------------------------------------------------
 
-_DEFAULT_LLM_CLIENT = None
-_DEFAULT_PRODUCT_REPOSITORY = None
+# _DEFAULT_LLM_CLIENT = None
+_DEFAULT_LLM_CLIENT = AsyncOpenAI(
+    api_key=settings.OPENAI_API_KEY,
+    base_url=settings.OPENAI_BASE_URL,
+    http_client=httpx.AsyncClient(trust_env=False)
+)
 _DEFAULT_MAPPING_NODE = None
 
 
@@ -321,18 +335,20 @@ def _get_default_mapping_node():
     if not _DEFAULT_MAPPING_NODE:
         _DEFAULT_MAPPING_NODE = MappingNode(
             llm_client=_get_default_llm_client(),
-            top_k=settings.MAPPING_TOP_K
+            top_k=settings.MAPPING_TOP_K,
+            alpha=settings.MAPPING_ALPHA,
         )
     return _DEFAULT_MAPPING_NODE
 
 
 async def map_products_node(state: AppState) -> AppState:
     context: MappingContext = state.get("mapping_context", {}) or {}
-
+    
     if context:
         return await MappingNode(
             llm_client=context.get("llm_client", _get_default_llm_client()),
-            top_k=context.get("top_k", settings.MAPPING_TOP_K)
+            top_k=context.get("top_k", settings.MAPPING_TOP_K),
+            alpha=context.get("alpha", settings.MAPPING_ALPHA),
         ).run(state)
 
     return await _get_default_mapping_node().run(state)
