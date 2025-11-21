@@ -178,7 +178,7 @@ class EmbeddingPipeline:
             result["sparse"] = sparse_embeddings  # List[Dict[int, float]]
         
         logger.info(
-            f"✅ 임베딩 생성 완료: {len(texts)}개 텍스트, "
+            f"✅ 원문 청크 임베딩 완료: {len(texts)}개, "
             f"캐시 히트율 {(len(texts) - len(uncached_texts)) / len(texts) * 100:.1f}%"
         )
         

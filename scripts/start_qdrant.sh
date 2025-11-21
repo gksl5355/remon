@@ -11,6 +11,7 @@ docker run -d \
   --name remon-qdrant \
   -p 6333:6333 \
   -p 6334:6334 \
+  ## 6334 포트는 고성능 데이터 전송용 및 대량 임베딩 삽입용 입니다.
   -v "$(pwd)/data/qdrant:/qdrant/storage" \
   qdrant/qdrant:latest
 
