@@ -35,6 +35,10 @@ class ProcessedChunk:
         metadata: 청크 메타데이터
         chunk_type: "parent" | "child"
         parent_id: Parent 청크 ID (Child인 경우)
+        embedding: Dense 벡터 (Child)
+        parent_embedding: Dense 벡터 (Parent)
+        sparse_embedding: Sparse 벡터 (Child)
+        parent_sparse_embedding: Sparse 벡터 (Parent)
     """
     chunk_id: str
     text: str
@@ -44,6 +48,8 @@ class ProcessedChunk:
     parent_id: Optional[str] = None
     embedding: Optional[List[float]] = None
     parent_embedding: Optional[List[float]] = None
+    sparse_embedding: Optional[Dict[int, float]] = None
+    parent_sparse_embedding: Optional[Dict[int, float]] = None
 
 # 청킹에 통합된 모듈들
 try:

@@ -4,6 +4,7 @@ LangGraph 전역 State 스키마 정의 – Production Minimal Version
 """
 
 from typing import Any, Dict, List, Optional, TypedDict, Literal
+from pydantic import Field
 
 
 # ---------------------------------------------------------------------------

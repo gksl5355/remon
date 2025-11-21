@@ -3,9 +3,9 @@ module: vector_client.py
 description: Qdrant VectorDB 클라이언트 (하이브리드 서칭: dense + sparse)
 author: AI Agent
 created: 2025-11-12
-updated: 2025-11-12
+updated: 2025-01-18
 dependencies:
-    - qdrant-client>=1.7.0
+    - qdrant-client>=1.15.1
     - app.config.settings
 """
 
@@ -18,10 +18,6 @@ from qdrant_client.models import (
     PointStruct,
     SparseVector,
     SparseVectorParams,
-    NamedVector,
-    NamedSparseVector,
-    SearchRequest,
-    Prefetch,
 )
 import os
 
@@ -30,21 +26,15 @@ logger = logging.getLogger(__name__)
 # settings.py 통합 (환경변수 폴백)
 try:
     from app.config.settings import settings
-<<<<<<< HEAD
-    QDRANT_HOST = getattr(settings, "QDRANT_URL", "http://localhost:6333").replace("http://", "").replace("https://", "").split(":")[0]
-=======
-
     QDRANT_HOST = (
         getattr(settings, "QDRANT_URL", "http://localhost:6333")
         .replace("http://", "")
         .replace("https://", "")
         .split(":")[0]
     )
->>>>>>> 9c8d2e5de60743a693e60af5e8d67ba0c3fc7bc2
     QDRANT_PORT = 6333
     QDRANT_COLLECTION = getattr(settings, "QDRANT_COLLECTION", "remon_regulations")
     QDRANT_PATH = getattr(settings, "QDRANT_PATH", "./data/qdrant")
-    # .env의 QDRANT_USE_LOCAL 값 우선 사용
     QDRANT_USE_LOCAL = os.getenv("QDRANT_USE_LOCAL", "false").lower() == "true"
 except ImportError:
     logger.warning("settings.py 로드 실패, 환경변수 사용")
@@ -78,7 +68,6 @@ class VectorClient:
         """
         self.collection_name = collection_name
 
-        # 환경변수에서 모드 결정
         if use_local is None:
             use_local = QDRANT_USE_LOCAL
 
@@ -124,12 +113,11 @@ class VectorClient:
         Args:
             texts: 문서 텍스트 리스트
             dense_embeddings: Dense 벡터 (1024차원)
-            metadatas: 메타데이터 (clause_id, meta_country, meta_regulation_id 등)
-            sparse_embeddings: Sparse 벡터 (선택, BM25 스타일)
-            batch_size: 배치 크기 (기본 100개씩)
+            metadatas: 메타데이터
+            sparse_embeddings: Sparse 벡터 (선택)
+            batch_size: 배치 크기
         """
         import uuid
-        from datetime import datetime
 
         total = len(texts)
         for batch_start in range(0, total, batch_size):
@@ -141,9 +129,7 @@ class VectorClient:
                 dense = dense_embeddings[idx]
                 meta = metadatas[idx]
 
-                # UUID 기반 고유 ID 생성
                 point_id = str(uuid.uuid4())
-
                 vectors = {"dense": dense}
 
                 if sparse_embeddings and idx < len(sparse_embeddings):
@@ -184,90 +170,39 @@ class VectorClient:
         하이브리드 검색 (dense + sparse).
 
         Args:
-            query_dense: Dense 쿼리 벡터 (1024차원)
+            query_dense: Dense 쿼리 벡터
             query_sparse: Sparse 쿼리 벡터 (선택)
             top_k: 반환 개수
-            filters: 메타데이터 필터 (예: {"meta_country": "KR"})
-            hybrid_alpha: Dense 가중치 (0~1, 1=dense만, 0=sparse만)
+            filters: 메타데이터 필터
+            hybrid_alpha: Dense 가중치 (0~1)
 
         Returns:
-            {"ids": [...], "documents": [...], "metadatas": [...], "scores": [...]}
+            검색 결과 딕셔너리
         """
-        # Qdrant 필터 생성
         qdrant_filter = self._build_qdrant_filter(filters)
-<<<<<<< HEAD
-        if query_sparse:
-            # 하이브리드 검색
-            results = self.client.search_batch(
-                collection_name=self.collection_name,
-                requests=[
-                    SearchRequest(
-                        vector=NamedVector(name="dense", vector=query_dense),
-                        limit=top_k,
-                        with_payload=True,
-                        filter=qdrant_filter,
-                    ),
-                    SearchRequest(
-                        vector=NamedSparseVector(
-                            name="sparse",
-                            vector=SparseVector(
-                                indices=list(query_sparse.keys()),
-                                values=list(query_sparse.values()),
-                            ),
-                        ),
-                        limit=top_k,
-                        with_payload=True,
-                        filter=qdrant_filter,
-                    ),
-                ],
-            )
-
-            # 점수 결합 (RRF 또는 가중 평균)
-            combined = self._combine_results(results, hybrid_alpha, top_k)
-            return combined
-
-        else:
-            # Dense 검색만
-            results = self.client.search(
-                collection_name=self.collection_name,
-                query_vector=("dense", query_dense),
-=======
+        
+        # Dense 검색
         dense_results = list(
             self.client.query_points(
                 collection_name=self.collection_name,
                 query=query_dense,
                 using="dense",
->>>>>>> 9c8d2e5de60743a693e60af5e8d67ba0c3fc7bc2
                 limit=top_k,
                 with_payload=True,
                 query_filter=qdrant_filter,
             )
         )
-
-<<<<<<< HEAD
-            # Dense만 검색하는 경우에도 개별 점수를 metadata에 저장
-            final_metadatas = []
-            for result in results:
-                metadata = result.payload.copy()
-                metadata["_dense_score"] = result.score
-                metadata["_sparse_score"] = None
-                final_metadatas.append(metadata)
-
-            return {
-                "ids": [r.id for r in results],
-                "documents": [r.payload.get("text", "") for r in results],
-                "metadatas": final_metadatas,
-                "scores": [r.score for r in results],
-=======
+        
+        # Sparse 없으면 Dense만 반환
         if not query_sparse:
             return {
                 "ids": [r.id for r in dense_results],
                 "documents": [r.payload.get("text", "") for r in dense_results],
                 "metadatas": [r.payload for r in dense_results],
                 "scores": [r.score for r in dense_results],
->>>>>>> 9c8d2e5de60743a693e60af5e8d67ba0c3fc7bc2
             }
-
+        
+        # Sparse 검색
         sparse_vector = SparseVector(
             indices=list(query_sparse.keys()),
             values=list(query_sparse.values()),
@@ -290,7 +225,7 @@ class VectorClient:
     def _combine_results(
         self, batch_results: List[List], alpha: float, top_k: int
     ) -> Dict[str, Any]:
-        """하이브리드 결과 결합 (Reciprocal Rank Fusion)."""
+        """하이브리드 결과 결합 (RRF)."""
         dense_results, sparse_results = batch_results
 
         scores = {}
@@ -298,14 +233,12 @@ class VectorClient:
         dense_scores = {}
         sparse_scores = {}
 
-        # Dense 점수
         for rank, result in enumerate(dense_results, 1):
             rrf_score = alpha * (1 / (rank + 60))
             scores[result.id] = scores.get(result.id, 0) + rrf_score
             dense_scores[result.id] = result.score
             payloads[result.id] = result.payload
 
-        # Sparse 점수
         for rank, result in enumerate(sparse_results, 1):
             rrf_score = (1 - alpha) * (1 / (rank + 60))
             scores[result.id] = scores.get(result.id, 0) + rrf_score
@@ -313,12 +246,10 @@ class VectorClient:
             if result.id not in payloads:
                 payloads[result.id] = result.payload
 
-        # 정렬
         sorted_ids = sorted(scores.keys(), key=lambda x: scores[x], reverse=True)[
             :top_k
         ]
 
-        # 메타데이터에 개별 점수 추가
         final_metadatas = []
         for doc_id in sorted_ids:
             metadata = payloads[doc_id].copy()
@@ -339,7 +270,7 @@ class VectorClient:
         logger.info(f"✅ 컬렉션 삭제: {self.collection_name}")
 
     def _build_qdrant_filter(self, filters: Optional[Dict[str, Any]]):
-        """Dict 필터 → Qdrant Filter 객체 변환."""
+        """Dict 필터 → Qdrant Filter 변환."""
         if not filters:
             return None
 
@@ -348,14 +279,12 @@ class VectorClient:
         conditions = []
 
         for key, value in filters.items():
-            # 날짜 범위 필터
             if key.endswith("_from"):
                 field = key.replace("_from", "")
                 conditions.append(FieldCondition(key=field, range=Range(gte=value)))
             elif key.endswith("_to"):
                 field = key.replace("_to", "")
                 conditions.append(FieldCondition(key=field, range=Range(lte=value)))
-            # 일반 매칭 필터
             else:
                 conditions.append(
                     FieldCondition(key=key, match=MatchValue(value=value))
@@ -367,7 +296,7 @@ class VectorClient:
         """컬렉션 정보 조회."""
         info = self.client.get_collection(collection_name=self.collection_name)
         return {
-            "name": info.config.params.vectors["dense"].size,
+            "name": self.collection_name,
             "points_count": info.points_count,
             "vectors_config": str(info.config.params.vectors),
         }
