@@ -36,9 +36,9 @@ class RegulationService:
         
         # risk_level 한글 변환 맵
         RISK_LEVEL_MAP = {
-            "LOW": "낮음",
-            "MEDIUM": "보통",
-            "HIGH": "높음"
+            "L": "낮음",
+            "M": "보통",
+            "H": "높음"
         }
         
         try:
@@ -55,22 +55,22 @@ class RegulationService:
                     if latest_version.keynotes:
                         keynote = latest_version.keynotes[0]
                 
-                # keynote에서 impact, category, summary 모두 추출
+                # keynote에서 impact, category, title 모두 추출
                 if keynote and keynote.impact_score:
                     impact = RISK_LEVEL_MAP.get(keynote.impact_score.risk_level, "보통")
                     category = keynote.regulation_type 
-                    summary = keynote.title 
+                    title = keynote.title 
                 else:
                     impact = "보통"
                     category = "기타"
-                    summary = reg.title or ""
+                    title = reg.title or ""
                 
                 result.append({
                     "id": reg.regulation_id,
                     "country": reg.country_code,
                     "impact": impact,
                     "category": category,
-                    "summary": summary
+                    "summary": title
                 })
             
             logger.info(f"Found {len(result)} regulations")
