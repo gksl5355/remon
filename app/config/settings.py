@@ -3,27 +3,30 @@ module: settings.py
 description: 환경 변수 및 기본 설정 관리
 """
 
-from pathlib import Path
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from dotenv import load_dotenv
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-load_dotenv(ROOT_DIR / ".env")
+load_dotenv()
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"  # 추가 필드 무시
-    )
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     DATABASE_URL: str
-    REDIS_URL: str = "redis://localhost:6379/0"
-    SECRET_KEY: str = "change_me"
-    QDRANT_URL: str = "http://localhost:6333"
+    REDIS_URL: str
+    SECRET_KEY: str
+    QDRANT_HOST: str
+    QDRANT_PORT: int
+    QDRANT_COLLECTION: str
+    # CHROMA_DB_PATH: str  # 사용 안함
+    # CHROMA_COLLECTION: str  # 사용 안함
+
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "extra": "ignore",  # .env의 추가 필드 허용
+    }
     QDRANT_API_KEY: str | None = None
-    QDRANT_PATH: str = "./data/qdrant"
-    QDRANT_COLLECTION: str = "remon_regulations"
     QDRANT_PREFER_GRPC: bool = False
     QDRANT_TIMEOUT: float = 10.0
     MAPPING_TOP_K: int = 10
@@ -34,9 +37,6 @@ class Settings(BaseSettings):
     MAPPING_CONDITION_WEIGHT: float = 0.1
     MAPPING_SINK_TYPE: str = "rdb"
     MAPPING_SINK_DSN: str | None = None
-    MAPPING_DEBUG_ENABLED: bool = True
-    MAPPING_DEBUG_DIR: str = "logs/mapping"
-    MAPPING_DEBUG_MAX_ITEMS: int = 10
 
 
 settings = Settings()

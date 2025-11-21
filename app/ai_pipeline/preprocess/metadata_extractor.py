@@ -9,35 +9,14 @@ dependencies:
     - re, json, logging, datetime, pathlib
 """
 
-from typing import Optional, Dict, Any, List, Tuple, Union
+from typing import Optional, Dict, Any, List, Tuple
 import re
 import json
 import logging
 from datetime import datetime
 from pathlib import Path
 
-# LangChain imports (optional)
-try:
-    from langchain_community.document_loaders import (
-        PyPDFLoader, 
-        TextLoader, 
-        UnstructuredPDFLoader,
-        UnstructuredWordDocumentLoader
-    )
-    from langchain.schema import Document
-    LANGCHAIN_AVAILABLE = True
-except ImportError:
-    LANGCHAIN_AVAILABLE = False
-    # 폴백용 더미 클래스
-    class Document:
-        def __init__(self, page_content="", metadata=None):
-            self.page_content = page_content
-            self.metadata = metadata or {}
-
 logger = logging.getLogger(__name__)
-
-if not LANGCHAIN_AVAILABLE:
-    logger.warning("LangChain not available. Using pattern-based extraction only.")
 
 
 class RegulationPatterns:
@@ -166,19 +145,10 @@ class MetadataExtractor:
     - confidence: 추출 신뢰도 (0.0~1.0)
     """
     
-    def __init__(self, use_langchain: bool = True):
-        """초기화.
-        
-        Args:
-            use_langchain: LangChain DocumentLoader 사용 여부
-        """
+    def __init__(self):
+        """초기화."""
         self.patterns = RegulationPatterns()
-        self.use_langchain = use_langchain and LANGCHAIN_AVAILABLE
-        
-        if self.use_langchain:
-            logger.info("✅ MetadataExtractor v2 initialized (LangChain + Pattern-based)")
-        else:
-            logger.info("✅ MetadataExtractor v2 initialized (Pattern-based only)")
+        logger.info("✅ MetadataExtractor v2 initialized (tobacco-specialized)")
     
     def extract_metadata(
         self,
@@ -250,47 +220,31 @@ class MetadataExtractor:
     # ==================== 추출 메서드 ====================
     
     def _extract_title(self, text: str) -> str:
-        """제목 추출 (UI 텍스트 필터링 개선)."""
+        """제목 추출."""
         lines = text.strip().split("\n")
         
-        # UI/웹페이지 텍스트 패턴 (제외할 것들)
-        ui_patterns = [
-            r"^(?:code|select|search|section|up|add|to|my|favorites)\s*:?",
-            r"^[\d\s\|\-\+\=]+$",  # 숫자/기호만
-            r"^\s*[\"\']?case_id[\"\']?\s*:",  # JSON 키
-            r"^\s*\{|^\s*\[",  # JSON 시작
-        ]
-        
-        for line in lines[:15]:  # 더 많은 줄 검사
+        for line in lines[:10]:
             line = line.strip()
             
-            # 기본 필터
+            # 공백 and 특수 문자 제거
             if not line or len(line) < 5 or len(line) > 500:
                 continue
             
-            # UI 패턴 제외
-            if any(re.search(p, line, re.IGNORECASE) for p in ui_patterns):
-                continue
-            
-            # 숫자/기호만 있는 줄 제외
+            # 숫자/로마자만 있는 줄 제외
             if not re.search(r"[가-힣a-zA-Z]", line):
                 continue
             
-            # 법률 제목 패턴 우선 (더 정확한 제목)
-            if re.search(r"(?:public\s+law|act|법률|규정|고시)", line, re.IGNORECASE):
-                return line
-            
             # 일반적인 제목 길이 체크
-            if 15 < len(line) < 200:  # 범위 조정
+            if 10 < len(line) < 300:
                 return line
         
         return "제목 미확인"
     
     def _extract_country(self, text: str, filename: Optional[str]) -> str:
-        """국가 코드 추출 (미국 규제 전용)."""
+        """국가 코드 추출 (텍스트 우선, 파일명은 보조)."""
         text_lower = text.lower()
         
-        # 미국 지표 (점수 시스템)
+        # 미국 지표 (텍스트 기반)
         us_score = sum([
             2 if re.search(r"united\s+states", text_lower) else 0,
             2 if re.search(r"congress", text_lower) else 0,
@@ -299,7 +253,7 @@ class MetadataExtractor:
             1 if re.search(r"california|florida|texas|new\s+york", text_lower) else 0,
         ])
         
-        # 파일명 보조 점수
+        # 파일명 보조 점수 (낮은 가중치)
         if filename:
             filename_lower = filename.lower()
             if "fda" in filename_lower or "congress" in filename_lower:
@@ -308,56 +262,30 @@ class MetadataExtractor:
         return "US" if us_score >= 2 else "UNKNOWN"
     
     def _extract_jurisdiction(self, text: str, filename: Optional[str]) -> str:
-        """관할권 추출 (개선된 우선순위)."""
+        """관할권 추출 (federal/state/local)."""
         text_lower = text.lower()
         
-        # Local 확인 (우선순위 높임 - 구체적 패턴)
-        local_strong_patterns = [
-            r"san\s+francisco", r"los\s+angeles", r"new\s+york\s+city",
-            r"municipal\s+code", r"city\s+ordinance", r"county\s+health"
-        ]
-        if any(re.search(p, text_lower) for p in local_strong_patterns):
-            return "local"
-        
-        # Federal 확인 (강한 지표)
-        federal_strong_patterns = [
-            r"public\s+law\s+\d+[-–]\d+", r"congress(?:ional)?",
-            r"federal\s+register", r"\d+\s+u\.?s\.?c\.?"
-        ]
-        if any(re.search(p, text_lower) for p in federal_strong_patterns):
+        # Federal 확인
+        if any(re.search(p, text_lower) for p in self.patterns.FEDERAL_INDICATORS):
             return "federal"
         
         # State 확인
         if any(re.search(p, text_lower) for p in self.patterns.STATE_INDICATORS):
             return "state"
         
-        # 약한 Federal 패턴 (마지막 체크)
-        if any(re.search(p, text_lower) for p in self.patterns.FEDERAL_INDICATORS):
-            return "federal"
+        # Local 확인
+        if any(re.search(p, text_lower) for p in self.patterns.LOCAL_INDICATORS):
+            return "local"
         
         return "unknown"
     
     def _extract_regulatory_body(self, text: str) -> Optional[str]:
-        """규제기관 추출 (우선순위 수정으로 오매칭 방지)."""
+        """규제기관 추출 (FDA/State Board/Local Health Dept)."""
         text_lower = text.lower()
         
-        # FDA 우선 확인 (가장 구체적)
-        fda_patterns = self.patterns.REGULATORY_BODY_MAP["FDA"]
-        if any(re.search(p, text_lower) for p in fda_patterns):
-            return "FDA"
-        
-        # State Board 확인
-        state_patterns = self.patterns.REGULATORY_BODY_MAP["State Board"]
-        if any(re.search(p, text_lower) for p in state_patterns):
-            return "State Board"
-        
-        # Local Health Dept 확인 (마지막, 가장 일반적)
-        local_patterns = self.patterns.REGULATORY_BODY_MAP["Local Health Dept"]
-        if any(re.search(p, text_lower) for p in local_patterns):
-            # 연방법 문서에서는 Local Health Dept 제외
-            if re.search(r"public\s+law|congress|federal\s+register", text_lower):
-                return None
-            return "Local Health Dept"
+        for body, patterns in self.patterns.REGULATORY_BODY_MAP.items():
+            if any(re.search(p, text_lower) for p in patterns):
+                return body
         
         return None
     
@@ -459,7 +387,7 @@ class MetadataExtractor:
         return cleaned[:max_length] + ("..." if len(cleaned) > max_length else "")
     
     def _normalize_date(self, date_str: str) -> Optional[str]:
-        """날짜 문자열을 ISO 형식으로 정규화 (개선된 검증)."""
+        """날짜 문자열을 ISO 형식으로 정규화."""
         if not date_str:
             return None
         
@@ -469,15 +397,13 @@ class MetadataExtractor:
         match = re.match(r"(\d{4})[년-](\d{1,2})[월-](\d{1,2})[일]?", date_str)
         if match:
             year, month, day = match.groups()
-            if self._is_valid_date(int(year), int(month), int(day)):
-                return f"{year}-{int(month):02d}-{int(day):02d}"
+            return f"{year}-{int(month):02d}-{int(day):02d}"
         
         # 표준 형식: 2025-01-12 or 2025/01/12
         match = re.match(r"(\d{4})[/-](\d{1,2})[/-](\d{1,2})", date_str)
         if match:
             year, month, day = match.groups()
-            if self._is_valid_date(int(year), int(month), int(day)):
-                return f"{year}-{int(month):02d}-{int(day):02d}"
+            return f"{year}-{int(month):02d}-{int(day):02d}"
         
         # 영문 월: January 12, 2025
         match = re.search(r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+(\d{1,2}),?\s+(\d{4})", 
@@ -489,70 +415,38 @@ class MetadataExtractor:
                 "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
             }
             month_num = months.get(month_str[:3].lower(), 1)
-            if self._is_valid_date(int(year), month_num, int(day)):
-                return f"{year}-{month_num:02d}-{int(day):02d}"
+            return f"{year}-{month_num:02d}-{int(day):02d}"
         
         return None
     
-    def _is_valid_date(self, year: int, month: int, day: int) -> bool:
-        """날짜 유효성 검증."""
-        if year < 1900 or year > 2100:
-            return False
-        if month < 1 or month > 12:
-            return False
-        if day < 1 or day > 31:
-            return False
-        # 간단한 월별 일수 체크
-        days_in_month = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-        return day <= days_in_month[month - 1]
-    
-
-    
     def _extract_legal_hierarchy(self, text: str) -> Optional[Dict[str, str]]:
-        """법률 계층 메타데이터 추출 (개선된 패턴 매칭)."""
+        """법률 계층 메타데이터 추출 (CFR/USC/State Law)."""
         hierarchy = {}
         
-        # CFR 우선 확인: 21 CFR § 1160.10
-        cfr_match = re.search(r'(\d+)\s+CFR\s+(?:Part\s+)?(\d+)(?:\.(\d+))?', text, re.IGNORECASE)
+        # CFR: 21 CFR § 1160.10
+        cfr_match = re.search(r'(\d+)\s+CFR\s+§?\s*(\d+)\.(\d+)', text, re.IGNORECASE)
         if cfr_match:
             hierarchy['regulation_type'] = 'CFR'
             hierarchy['title'] = cfr_match.group(1)
-            hierarchy['part'] = cfr_match.group(2)
-            if cfr_match.group(3):
-                hierarchy['section'] = f"{cfr_match.group(2)}.{cfr_match.group(3)}"
-                hierarchy['full_citation'] = f"{cfr_match.group(1)} CFR § {cfr_match.group(2)}.{cfr_match.group(3)}"
-            else:
-                hierarchy['section'] = cfr_match.group(2)
-                hierarchy['full_citation'] = f"{cfr_match.group(1)} CFR Part {cfr_match.group(2)}"
-            return hierarchy
+            hierarchy['section'] = f"{cfr_match.group(2)}.{cfr_match.group(3)}"
+            hierarchy['full_citation'] = f"{cfr_match.group(1)} CFR § {cfr_match.group(2)}.{cfr_match.group(3)}"
         
-        # USC 확인: 21 U.S.C. § 387
+        # USC: 21 U.S.C. § 387
         usc_match = re.search(r'(\d+)\s+U\.?S\.?C\.?\s+§?\s*(\d+)', text, re.IGNORECASE)
         if usc_match:
             hierarchy['regulation_type'] = 'USC'
             hierarchy['title'] = usc_match.group(1)
             hierarchy['section'] = usc_match.group(2)
             hierarchy['full_citation'] = f"{usc_match.group(1)} U.S.C. § {usc_match.group(2)}"
-            return hierarchy
         
-        # Public Law 확인: Public Law 111-31
-        publaw_match = re.search(r'public\s+law\s+(\d+)[-–](\d+)', text, re.IGNORECASE)
-        if publaw_match:
-            hierarchy['regulation_type'] = 'Public Law'
-            hierarchy['congress'] = publaw_match.group(1)
-            hierarchy['law_number'] = publaw_match.group(2)
-            hierarchy['full_citation'] = f"Public Law {publaw_match.group(1)}-{publaw_match.group(2)}"
-            return hierarchy
-        
-        # State Code 확인: California Business and Professions Code Section 22975
-        state_match = re.search(r'(california|florida|texas|new\s+york).*?(?:code|law).*?section\s+(\d+(?:\.\d+)?)', text, re.IGNORECASE)
+        # State Law: California Section 22977.2
+        state_match = re.search(r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+.*?[Ss]ection\s+(\d+(?:\.\d+)?)', text)
         if state_match:
             hierarchy['regulation_type'] = 'State Law'
-            hierarchy['state'] = state_match.group(1).title()
+            hierarchy['state'] = state_match.group(1)
             hierarchy['section'] = state_match.group(2)
-            return hierarchy
         
-        return None
+        return hierarchy if hierarchy else None
     
     def _extract_external_id(self, filename: str) -> Optional[str]:
         """외부 문서 ID 추출 (예: 2025-00397)."""
@@ -590,330 +484,6 @@ class MetadataExtractor:
             score += 1.0
         
         return min(score / max_score, 1.0)
-    
-    # ==================== LangChain 통합 메서드 ====================
-    
-    def extract_from_file(
-        self, 
-        file_path: Union[str, Path], 
-        use_langchain: Optional[bool] = None
-    ) -> Dict[str, Any]:
-        """
-        파일에서 직접 메타데이터 추출 (LangChain + 패턴 기반 하이브리드).
-        
-        Args:
-            file_path: 파일 경로
-            use_langchain: LangChain 사용 여부 (None이면 인스턴스 설정 따름)
-        
-        Returns:
-            Dict[str, Any]: 추출된 메타데이터
-        """
-        file_path = Path(file_path)
-        
-        if not file_path.exists():
-            raise FileNotFoundError(f"File not found: {file_path}")
-        
-        use_lc = use_langchain if use_langchain is not None else self.use_langchain
-        
-        if use_lc and LANGCHAIN_AVAILABLE:
-            return self._extract_with_langchain(file_path)
-        else:
-            return self._extract_with_existing_processor(file_path)
-    
-    def _extract_with_langchain(self, file_path: Path) -> Dict[str, Any]:
-        """
-        LangChain DocumentLoader 표준화 기반 메타데이터 추출.
-        
-        핵심 개선:
-        1. Document 구조 표준화 (page_content + metadata)
-        2. 도메인 메타데이터 자동 추가
-        3. 메타데이터 전파 보장
-        4. 기존 pdf_processor 활용
-        """
-        logger.info(f"🔍 DocumentLoader 표준화 추출: {file_path.name}")
-        
-        try:
-            # 1. LangChain 로더로 Document 구조 생성
-            loader = self._get_langchain_loader(file_path)
-            documents = loader.load()
-            
-            if not documents:
-                raise ValueError("No documents loaded")
-            
-            # 2. 도메인 메타데이터 표준화
-            standardized_docs = self._standardize_documents(documents, file_path)
-            
-            # 3. 전체 텍스트 결합 (메타데이터 보존)
-            full_text = "\n\n".join([doc.page_content for doc in standardized_docs])
-            
-            # 4. 패턴 기반 추출 + Document 메타데이터 결합
-            pattern_metadata = self.extract_metadata(
-                document_text=full_text,
-                filename=file_path.name,
-                source_url=standardized_docs[0].metadata.get('source')
-            )
-            
-            # 5. Document 메타데이터와 패턴 메타데이터 통합
-            final_metadata = self._merge_document_metadata(
-                documents=standardized_docs,
-                pattern_meta=pattern_metadata
-            )
-            
-            logger.info(
-                f"✅ 표준화 추출 완료: {len(documents)}페이지, "
-                f"confidence={final_metadata['confidence']:.2f}"
-            )
-            
-            return final_metadata
-            
-        except Exception as e:
-            logger.error(f"❌ DocumentLoader 실패, 기존 processor 사용: {e}")
-            return self._extract_with_existing_processor(file_path)
-    
-    def _get_langchain_loader(self, file_path: Path):
-        """
-        파일 확장자별 최적 LangChain 로더 선택.
-        
-        논리:
-        - PDF: PyPDFLoader (구조 보존) vs UnstructuredPDFLoader (텍스트 품질)
-        - DOCX: UnstructuredWordDocumentLoader
-        - TXT: TextLoader
-        - 기타: 텍스트로 처리
-        """
-        suffix = file_path.suffix.lower()
-        
-        if suffix == '.pdf':
-            # PDF: 구조화된 추출 우선
-            try:
-                return UnstructuredPDFLoader(str(file_path))
-            except:
-                return PyPDFLoader(str(file_path))
-        
-        elif suffix in ['.docx', '.doc']:
-            return UnstructuredWordDocumentLoader(str(file_path))
-        
-        elif suffix in ['.txt', '.md']:
-            return TextLoader(str(file_path), encoding='utf-8')
-        
-        else:
-            # 기타 파일: 텍스트로 시도
-            logger.warning(f"Unknown file type: {suffix}, using TextLoader")
-            return TextLoader(str(file_path), encoding='utf-8')
-    
-    def _extract_langchain_metadata(self, documents: List[Document]) -> Dict[str, Any]:
-        """
-        LangChain Document 객체에서 메타데이터 추출.
-        
-        LangChain의 장점:
-        - 파일 시스템 메타데이터 (생성일, 수정일, 크기)
-        - 문서 구조 정보 (페이지 수, 섹션)
-        - 자동 언어 감지
-        """
-        if not documents:
-            return {}
-        
-        primary_doc = documents[0]
-        metadata = primary_doc.metadata.copy()
-        
-        # LangChain 기본 메타데이터 정규화
-        langchain_meta = {
-            'langchain_source': metadata.get('source'),
-            'langchain_page_count': len(documents),
-            'langchain_total_chars': sum(len(doc.page_content) for doc in documents),
-            'langchain_avg_page_length': sum(len(doc.page_content) for doc in documents) // len(documents),
-        }
-        
-        # 파일 시스템 메타데이터 (있으면)
-        if 'file_path' in metadata:
-            file_path = Path(metadata['file_path'])
-            if file_path.exists():
-                stat = file_path.stat()
-                langchain_meta.update({
-                    'file_size_bytes': stat.st_size,
-                    'file_created_at': datetime.fromtimestamp(stat.st_ctime).isoformat(),
-                    'file_modified_at': datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                })
-        
-        # PDF 특화 메타데이터
-        if 'page' in metadata:
-            langchain_meta['pdf_page_number'] = metadata['page']
-        
-        return langchain_meta
-    
-    def _merge_document_metadata(
-        self,
-        documents: List[Document],
-        pattern_meta: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """
-        Document 메타데이터와 패턴 기반 메타데이터 통합.
-        
-        핵심: Document 구조의 메타데이터를 최대한 활용하여
-        Qdrant 저장 시 필터링/검색에 최적화된 메타데이터 생성
-        """
-        # 패턴 기반을 기본으로 시작
-        merged = pattern_meta.copy()
-        
-        # Document 메타데이터 통합
-        if documents:
-            primary_doc = documents[0]
-            doc_meta = primary_doc.metadata
-            
-            merged.update({
-                'extraction_method': 'document_loader_standardized',
-                'page_count': len(documents),
-                'source_file': doc_meta.get('source_file'),
-                
-                # 도메인 메타데이터 우선 적용 (Document에서 자동 감지된 것)
-                'jurisdiction': doc_meta.get('jurisdiction', merged.get('jurisdiction')),
-                'agency': doc_meta.get('agency', merged.get('regulatory_body')),
-                'regulation_type': doc_meta.get('regulation_type', merged.get('regulation_type')),
-                
-                # Qdrant 필터링용 메타데이터
-                'meta_source_type': 'document_loader',
-                'meta_page_count': len(documents),
-                'meta_extraction_method': 'langchain_standardized',
-            })
-            
-            # 제목 개선 (Document source 활용)
-            if merged['title'] == '제목 미확인' and doc_meta.get('source_file'):
-                source_name = Path(doc_meta['source_file']).stem
-                if len(source_name) > 5:
-                    merged['title'] = source_name.replace('_', ' ').title()
-            
-            # 신뢰도 재계산 (Document 구조 정보 반영)
-            confidence_boost = 0.0
-            if len(documents) > 1:
-                confidence_boost += 0.1  # 다중 페이지
-            if doc_meta.get('jurisdiction'):
-                confidence_boost += 0.1  # 자동 감지된 관할권
-            if doc_meta.get('agency'):
-                confidence_boost += 0.1  # 자동 감지된 기관
-            
-            merged['confidence'] = min(merged['confidence'] + confidence_boost, 1.0)
-        
-        return merged
-    
-    def _extract_with_existing_processor(self, file_path: Path) -> Dict[str, Any]:
-        """
-        기존 pdf_processor.py 활용한 안정적 추출.
-        """
-        logger.info(f"📄 기존 processor 활용: {file_path.name}")
-        
-        try:
-            if file_path.suffix.lower() == '.pdf':
-                # 기존 PDFProcessor 활용
-                from app.ai_pipeline.preprocess.pdf_processor import PDFProcessor
-                
-                processor = PDFProcessor()
-                pdf_result = processor.load_and_extract(str(file_path))
-                
-                if pdf_result["status"] == "success":
-                    text = pdf_result["full_text"]
-                    
-                    # 패턴 기반 메타데이터 추출
-                    metadata = self.extract_metadata(
-                        document_text=text,
-                        filename=file_path.name
-                    )
-                    
-                    # PDFProcessor 메타데이터 추가
-                    metadata.update({
-                        'extraction_method': 'existing_pdf_processor',
-                        'pdf_metadata': pdf_result.get('metadata', {}),
-                        'page_count': pdf_result.get('metadata', {}).get('num_pages', 0)
-                    })
-                    
-                    return metadata
-                else:
-                    raise RuntimeError(f"PDF 처리 실패: {pdf_result.get('error')}")
-            else:
-                # 텍스트 파일
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    text = f.read()
-                
-                metadata = self.extract_metadata(
-                    document_text=text,
-                    filename=file_path.name
-                )
-                metadata['extraction_method'] = 'text_file'
-                return metadata
-                
-        except Exception as e:
-            logger.error(f"❌ 기존 processor 실패: {e}")
-            raise
-    
-    def _standardize_documents(self, documents: List[Document], file_path: Path) -> List[Document]:
-        """
-        Document 구조 표준화 및 도메인 메타데이터 추가.
-        
-        핵심: 규제 도메인 특화 메타데이터를 로딩 직후 추가하여
-        청킹/임베딩/검색 단계에서 메타데이터가 전파되도록 보장
-        """
-        standardized = []
-        
-        for idx, doc in enumerate(documents):
-            # 기본 메타데이터 보강
-            enhanced_metadata = doc.metadata.copy()
-            enhanced_metadata.update({
-                # 파일 정보
-                'source_file': file_path.name,
-                'source_path': str(file_path),
-                'page_number': enhanced_metadata.get('page', idx + 1),
-                
-                # 도메인 메타데이터 (규제 특화)
-                'document_type': 'regulation',
-                'extraction_timestamp': datetime.utcnow().isoformat() + 'Z',
-                
-                # 청킹/검색용 메타데이터
-                'chunk_source': 'document_loader',
-                'parent_document': file_path.stem,
-            })
-            
-            # 규제 도메인 메타데이터 자동 감지
-            domain_meta = self._extract_domain_metadata_from_content(doc.page_content)
-            enhanced_metadata.update(domain_meta)
-            
-            # 새 Document 생성 (메타데이터 전파 보장)
-            standardized_doc = Document(
-                page_content=doc.page_content,
-                metadata=enhanced_metadata
-            )
-            standardized.append(standardized_doc)
-        
-        return standardized
-    
-    def _extract_domain_metadata_from_content(self, content: str) -> Dict[str, Any]:
-        """
-        텍스트 내용에서 규제 도메인 메타데이터 자동 감지.
-        """
-        domain_meta = {}
-        content_lower = content.lower()
-        
-        # 관할권 자동 감지
-        if any(pattern in content_lower for pattern in ['congress', 'federal', 'u.s.c']):
-            domain_meta['jurisdiction'] = 'federal'
-        elif any(pattern in content_lower for pattern in ['california', 'state', 'division']):
-            domain_meta['jurisdiction'] = 'state'
-        elif any(pattern in content_lower for pattern in ['city', 'county', 'municipal']):
-            domain_meta['jurisdiction'] = 'local'
-        
-        # 규제 기관 자동 감지
-        if 'fda' in content_lower or 'food and drug' in content_lower:
-            domain_meta['agency'] = 'FDA'
-        elif 'state board' in content_lower:
-            domain_meta['agency'] = 'State Board'
-        
-        # 규제 타입 자동 감지
-        if any(kw in content_lower for kw in ['tobacco', 'cigarette', 'nicotine']):
-            domain_meta['regulation_type'] = 'tobacco_control'
-        
-        # 조항 ID 추출 (간단한 패턴)
-        section_match = re.search(r'section\s+(\d+)', content_lower)
-        if section_match:
-            domain_meta['clause_id'] = f"sec_{section_match.group(1)}"
-        
-        return domain_meta
     
     def batch_extract_metadata(
         self,

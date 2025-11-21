@@ -1,479 +1,150 @@
-"""
-map_products.py
-검색 TOOL + LLM 매핑 Node
-"""
+"""LangGraph node: map_products."""
 
-import json
-import logging
-from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol, TYPE_CHECKING
+from __future__ import annotations
 
-from sqlalchemy import text
+import asyncio
+from dataclasses import asdict, dataclass
+from time import perf_counter
+from typing import Any, Dict, List, Protocol, Sequence
+
+from loguru import logger
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-try:  # pragma: no cover - import guard
-    from openai import AsyncOpenAI
-except Exception:  # pragma: no cover
-    AsyncOpenAI = None  # type: ignore[assignment]
-
-from app.ai_pipeline.state import (
-    ProductInfo,
-    RetrievedChunk,
-    RetrievalResult,
-    MappingItem,
-    MappingParsed,
-    MappingResults,
-    AppState,
-    MappingContext,
-)
-
-from app.ai_pipeline.prompts.mapping_prompt import MAPPING_PROMPT
-from app.ai_pipeline.tools.retrieval_utils import build_product_filters
+from app.ai_pipeline.state import AppState
 from app.config.settings import settings
 from app.core.database import AsyncSessionLocal
+from app.vectorstore.vector_client import VectorClient, VectorMatch
+from app.vectorstore.vector_schema import MappingResult, ProductSnapshot
+from db.models import MappingResult as MappingResultORM
+from db.models import Product as ProductORM
 
 
-if TYPE_CHECKING:
-    from app.ai_pipeline.tools.retrieval_tool import RetrievalOutput
-else:
-    class RetrievalOutput(Protocol):
-        results: List[Dict[str, Any]]
-        metadata: Dict[str, Any]
+# -----------------------------------------------------------------------------
+# Config & Port definitions
+# -----------------------------------------------------------------------------
 
 
-logger = logging.getLogger(__name__)
+@dataclass
+class MappingConfig:
+    top_k: int
+    threshold: float
+    alpha: float
+    semantic_weight: float
+    numeric_weight: float
+    condition_weight: float
 
-FEATURE_UNIT_MAP: Dict[str, str] = {
-    "nicotin": "mg",
-    "tarr": "mg",
-    "battery": "mAh",
-    "label_size": "mm^2",
-}
-BOOLEAN_FEATURES = {"menthol", "incense", "security_auth"}
-DEFAULT_EXPORT_COUNTRY = "US"
-PRODUCT_SELECT_BASE = """
-SELECT
-    p.product_id,
-    p.product_name,
-    p.product_category,
-    p.nicotin,
-    p.tarr,
-    p.menthol,
-    p.incense,
-    p.battery,
-    p.label_size,
-    p.security_auth,
-    COALESCE(pec.country_code, :default_country) AS export_country
-FROM products p
-LEFT JOIN product_export_countries pec
-    ON pec.product_id = p.product_id
-"""
-
-
-class ProductRepository:
-    """RDB에서 제품 정보를 읽어 MappingNode가 소비하는 형태로 직렬화한다."""
-
-    def __init__(self, session_factory: async_sessionmaker[AsyncSession]):
-        self._session_factory = session_factory
-
-    async def fetch_product(self, product_id: Optional[int]) -> ProductInfo:
-        params = {"default_country": DEFAULT_EXPORT_COUNTRY}
-        if product_id is not None:
-            query = text(
-                PRODUCT_SELECT_BASE
-                + " WHERE p.product_id = :pid ORDER BY p.product_id LIMIT 1"
-            )
-            params["pid"] = product_id
-        else:
-            query = text(PRODUCT_SELECT_BASE + " ORDER BY p.product_id LIMIT 1")
-
-        async with self._session_factory() as session:
-            result = await session.execute(query, params)
-            row = result.mappings().first()
-
-        if not row:
-            raise ValueError("제품 정보를 찾을 수 없습니다.")
-
-        return self._serialize_product(dict(row))
-
-    def _serialize_product(self, row: Dict[str, Any]) -> ProductInfo:
-        features: Dict[str, Any] = {}
-        feature_units: Dict[str, str] = {}
-
-        for field, unit in FEATURE_UNIT_MAP.items():
-            value = row.get(field)
-            if value in (None, ""):
-                continue
-            features[field] = value
-            feature_units[field] = unit
-
-        for field in BOOLEAN_FEATURES:
-            value = row.get(field)
-            if value is None:
-                continue
-            features[field] = bool(value)
-            feature_units[field] = "boolean"
-
-        product: ProductInfo = {
-            "product_id": str(row["product_id"]),
-            "name": row.get("product_name"),
-            "export_country": row.get("export_country") or DEFAULT_EXPORT_COUNTRY,
-            "category": row.get("product_category"),
-            "features": features,
-            "feature_units": feature_units,
-        }
-        return product
-
-
-class MappingNode:
-    """
-    검색 + 매핑 통합 Node
-    - 검색은 외부 search_tool(TOOL CALL)로 처리
-    - search_tool 시그니처는 아직 미정이므로 wrapper 내부 TODO 처리
-    """
-
-    def __init__(
-        self,
-        llm_client,
-        search_tool,  # 🔥 LangGraph TOOL 자체
-        top_k: int = 5,
-        alpha: float = 0.7,  # 🔥 hybrid dense/sparse 비율
-        product_repository: Optional[ProductRepository] = None,
-    ):
-        self.llm = llm_client
-        if search_tool is None:
-            from app.ai_pipeline.tools.retrieval_tool import get_retrieval_tool
-
-            self.search_tool = get_retrieval_tool()
-        else:
-            self.search_tool = search_tool
-        self.top_k = top_k
-        self.alpha = alpha  # 🔥 dynamic hybrid weight
-        # TODO(remon-rag): replace any ad-hoc StaticRetrievalTool usage with the real
-        # RegulationRetrievalTool wired to the production VectorDB/RDB once torch
-        # dependencies are restored. This entry point already accepts an injected
-        # search tool, so future wiring should happen in the caller (pipeline graph).
-        # TODO(remon-qdrant): VectorClient / RegulationRetrievalTool rework
-        # 현재 Qdrant SDK 호출과 호환되지 않아 search_tool 호출에서 연속적으로 실패 중.
-        # 새 하이브리드 검색 Tool 도입 시 아래 search_tool 인스턴스만 교체하면 됨.
-        self.product_repository = (
-            product_repository or ProductRepository(AsyncSessionLocal)
-        )
-        self.debug_enabled = settings.MAPPING_DEBUG_ENABLED
-
-    # ----------------------------------------------------------------------
-    # 1) 검색 TOOL 호출 wrapper (search_tool 인터페이스 확정되면 이 부분만 수정)
-    # ----------------------------------------------------------------------
-    async def _run_search(
-        self,
-        product: ProductInfo,
-        feature_name: str,
-        feature_value: Any,
-        feature_unit: str | None,
-    ) -> RetrievalResult:
-        """
-        검색 TOOL을 호출하는 wrapper.
-        Hybrid 검색 Tool을 호출하고 state 스키마에 맞춰 변환한다.
-        """
-
-        product_id = product["product_id"]
-        query = self._build_search_query(feature_name, feature_value, feature_unit)
-        filters = build_product_filters(product)
-
-        try:
-            # TODO(remon-tuning): once live RetrievalTool is connected, benchmark per-feature
-            # top_k/alpha/filter settings instead of relying on demo defaults.
-            tool_result: RetrievalOutput = await self.search_tool.search(
-                query=query,
-                strategy="hybrid",
-                top_k=self.top_k,
-                alpha=self.alpha,
-                filters=filters or None,
-            )
-        except Exception as exc:
-            logger.warning("retrieval tool 호출 실패: %s", exc)
-            return RetrievalResult(
-                product_id=product_id,
-                feature_name=feature_name,
-                feature_value=feature_value,
-                feature_unit=feature_unit,
-                candidates=[],
-            )
-
-        candidates: List[RetrievedChunk] = []
-        for item in tool_result.results:
-            candidates.append(
-                RetrievedChunk(
-                    chunk_id=item.get("id", ""),
-                    chunk_text=item.get("text", ""),
-                    semantic_score=item.get("scores", {}).get("final_score", 0.0),
-                    metadata=item.get("metadata", {}),
-                )
-            )
-
-        return RetrievalResult(
-            product_id=product_id,
-            feature_name=feature_name,
-            feature_value=feature_value,
-            feature_unit=feature_unit,
-            candidates=candidates,
+    @classmethod
+    def from_settings(cls) -> "MappingConfig":
+        return cls(
+            top_k=settings.MAPPING_TOP_K,
+            threshold=settings.MAPPING_THRESHOLD,
+            alpha=settings.MAPPING_ALPHA,
+            semantic_weight=settings.MAPPING_SEMANTIC_WEIGHT,
+            numeric_weight=settings.MAPPING_NUMERIC_WEIGHT,
+            condition_weight=settings.MAPPING_CONDITION_WEIGHT,
         )
 
-    # ----------------------------------------------------------------------
-    # 2) 매핑 프롬프트 생성 (local 처리)
-    # ----------------------------------------------------------------------
-    def _build_prompt(self, feature_name, feature_value, feature_unit, chunk_text):
-        feature = {
-            "name": feature_name,
-            "value": feature_value,
-            "unit": feature_unit,
-        }
-        feature_json = json.dumps(feature, ensure_ascii=False)
-        return (
-            MAPPING_PROMPT.replace("{feature}", feature_json).replace("{chunk}", chunk_text)
+    def normalize(self) -> "MappingConfig":
+        total = self.semantic_weight + self.numeric_weight + self.condition_weight
+        if not total:
+            return self
+        return MappingConfig(
+            top_k=self.top_k,
+            threshold=self.threshold,
+            alpha=self.alpha,
+            semantic_weight=self.semantic_weight / total,
+            numeric_weight=self.numeric_weight / total,
+            condition_weight=self.condition_weight / total,
         )
 
-    def _build_search_query(self, feature_name, feature_value, feature_unit):
-        """
-        검색 Tool에 전달할 기본 쿼리 문자열 생성.
-        """
-        parts: List[str] = [str(feature_name)]
-        if feature_value is not None:
-            parts.append(str(feature_value))
-        if feature_unit:
-            parts.append(feature_unit)
 
-        return " ".join(parts)
+class ProductRepository(Protocol):
+    async def fetch_for_mapping(
+        self, *, country: str | None, category: str | None
+    ) -> Sequence[ProductSnapshot]: ...
 
-    # ----------------------------------------------------------------------
-    # 3) LLM 매핑 호출
-    # ----------------------------------------------------------------------
-    async def _call_llm(self, prompt: str) -> Dict:
-        try:
-            res = await self.llm.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-            )
-            return json.loads(res.choices[0].message.content)
 
-        except Exception:
-            return {
-                "applies": False,
-                "required_value": None,
-                "current_value": None,
-                "gap": None,
-                "parsed": {
-                    "category": None,
-                    "requirement_type": "other",
-                    "condition": None,
-                },
-            }
+class MappingSink(Protocol):
+    async def save(self, results: Sequence[MappingResult]) -> None: ...
 
-    # ----------------------------------------------------------------------
-    # 4) LangGraph Node entrypoint
-    # ----------------------------------------------------------------------
-    async def run(self, state: Dict) -> Dict:
-        product: Optional[ProductInfo] = state.get("product_info")
-        if not product:
-            filters = state.get("mapping_filters") or {}
-            product_id = filters.get("product_id")
-            product = await self.product_repository.fetch_product(
-                int(product_id) if product_id is not None else None
-            )
-            state["product_info"] = product
 
-        product_id = product["product_id"]
-        features = product["features"]
-        units = product.get("feature_units", {})
+# -----------------------------------------------------------------------------
+# Repository & Sink implementations (RDB 기본값)
+# -----------------------------------------------------------------------------
 
-        mapping_results: List[MappingItem] = []
 
-        if self.debug_enabled:
-            logger.info(
-                "🧭 Mapping start: product=%s name=%s features=%d top_k=%d alpha=%.2f",
-                product_id,
-                product.get("name", "unknown"),
-                len(features),
-                self.top_k,
-                self.alpha,
-            )
+class RDBProductRepository(ProductRepository):
+    """제품 RDB 조회 기본 구현."""
 
-        # 🔥 feature별로 검색 TOOL → 매핑
-        for feature_name, value in features.items():
-            unit = units.get(feature_name)
+    # TODO(remon-ai): @bofoto 만약 조회 관련해서 분리해서 가져갈 준비되면 이 구현을 어댑터 처럼 구현하여 가져가주세요
 
-            # -----------------------------------------
-            # a) 검색 TOOL 호출
-            # -----------------------------------------
-            if self.debug_enabled:
-                logger.info(
-                    "🔍 Searching feature=%s value=%s unit=%s",
-                    feature_name,
-                    value,
-                    unit or "-",
-                )
-            retrieval: RetrievalResult = await self._run_search(
-                product, feature_name, value, unit
-            )
-            if self.debug_enabled:
-                logger.info(
-                    "   ↳ candidates=%d",
-                    len(retrieval["candidates"]),
-                )
+    def __init__(self, session_maker: async_sessionmaker[AsyncSession]):
+        self._session_maker = session_maker
 
-            # -----------------------------------------
-            # b) LLM 매핑 수행
-            # -----------------------------------------
-            for cand in retrieval["candidates"]:
-                prompt = self._build_prompt(
-                    feature_name, value, unit, cand["chunk_text"]
-                )
-                llm_out = await self._call_llm(prompt)
+    async def fetch_for_mapping(
+        self, *, country: str | None, category: str | None
+    ) -> Sequence[ProductSnapshot]:
+        stmt = select(ProductORM)
+        if country:
+            stmt = stmt.where(ProductORM.export_country == country)
+        if category:
+            stmt = stmt.where(ProductORM.category == category)
 
-                parsed: MappingParsed = llm_out.get("parsed", {})
+        async with self._session_maker() as session:
+            rows = await session.execute(stmt)
+            products = rows.scalars().all()
 
-                item = MappingItem(
-                    product_id=product_id,
-                    feature_name=feature_name,
-                    applies=llm_out["applies"],
-                    required_value=llm_out["required_value"],
-                    current_value=llm_out["current_value"],
-                    gap=llm_out["gap"],
-                    regulation_chunk_id=cand["chunk_id"],
-                    regulation_summary=cand["chunk_text"][:120],
-                    regulation_meta=cand["metadata"],
-                    parsed=parsed,
-                )
-                mapping_results.append(item)
+        return [ProductSnapshot.model_validate(p) for p in products]
 
-                if self.debug_enabled:
-                    logger.info(
-                        "🧩 applies=%s required=%s current=%s chunk=%s (%s)",
-                        item["applies"],
-                        item["required_value"],
-                        item["current_value"],
-                        item["regulation_chunk_id"],
-                        item["feature_name"],
+
+class RDBMappingSink(MappingSink):
+    """매핑 결과를 RDB `mapping_result` 테이블에 저장."""
+
+    # TODO(remon-ai): @bofoto 만약 조회 관련해서 분리해서 가져갈 준비되면 이 구현을 어댑터 처럼 구현하여 가져가주세요
+
+    def __init__(self, session_maker: async_sessionmaker[AsyncSession]):
+        self._session_maker = session_maker
+
+    async def save(self, results: Sequence[MappingResult]) -> None:
+        if not results:
+            return
+
+        async with self._session_maker() as session:
+            orm_rows = []
+            for result in results:
+                product_id = _to_int_or_none(result.product_id)
+                regulation_id = _to_int_or_none(result.regulation_id)
+                if product_id is None or regulation_id is None:
+                    logger.warning(
+                        "MappingSink skip persist: invalid ids product={} regulation={}",
+                        result.product_id,
+                        result.regulation_id,
                     )
+                    continue
 
-        # -----------------------------------------
-        # c) 전역 State 업데이트
-        # -----------------------------------------
-        state["mapping"] = MappingResults(
-            product_id=product_id,
-            items=mapping_results,
-        )
-        if self.debug_enabled:
-            _log_mapping_preview(product_id, mapping_results)
-            snapshot_path = _persist_mapping_snapshot(
-                product,
-                mapping_results,
-                state,
-                self.top_k,
-                self.alpha,
-            )
-            if snapshot_path:
-                state["mapping_debug"] = {
-                    "snapshot_path": snapshot_path,
-                    "total_items": len(mapping_results),
-                }
+                orm_rows.append(
+                    MappingResultORM(
+                        product_id=product_id,
+                        regulation_id=regulation_id,
+                        hybrid_score=result.final_score,
+                        matched_fields=result.matched_fields,
+                        impact_level=result.impact_level,
+                    )
+                )
 
-        return state
+            if not orm_rows:
+                return
+            session.add_all(orm_rows)
+            await session.commit()
 
 
-_DEFAULT_LLM_CLIENT = None
-_DEFAULT_PRODUCT_REPOSITORY: Optional[ProductRepository] = None
-_DEFAULT_MAPPING_NODE: Optional[MappingNode] = None
-
-
-def _get_default_llm_client():
-    """AsyncOpenAI 싱글톤을 구성한다."""
-    global _DEFAULT_LLM_CLIENT
-    if _DEFAULT_LLM_CLIENT is not None:
-        return _DEFAULT_LLM_CLIENT
-
-    if AsyncOpenAI is None:
-        raise RuntimeError(
-            "openai 패키지를 찾을 수 없습니다. `pip install openai` 후 다시 시도하세요."
-        )
-
-    _DEFAULT_LLM_CLIENT = AsyncOpenAI()
-    return _DEFAULT_LLM_CLIENT
-
-
-def _get_default_product_repository() -> ProductRepository:
-    global _DEFAULT_PRODUCT_REPOSITORY
-    if _DEFAULT_PRODUCT_REPOSITORY is None:
-        _DEFAULT_PRODUCT_REPOSITORY = ProductRepository(AsyncSessionLocal)
-    return _DEFAULT_PRODUCT_REPOSITORY
-
-
-def _build_mapping_node(
-    *,
-    llm_client=None,
-    search_tool=None,
-    top_k: Optional[int] = None,
-    alpha: Optional[float] = None,
-    product_repository: Optional[ProductRepository] = None,
-) -> MappingNode:
-    """MappingNode 인스턴스를 생성한다."""
-    resolved_llm = llm_client or _get_default_llm_client()
-    resolved_top_k = top_k if top_k is not None else settings.MAPPING_TOP_K
-    resolved_alpha = alpha if alpha is not None else settings.MAPPING_ALPHA
-    resolved_repo = product_repository or _get_default_product_repository()
-    return MappingNode(
-        llm_client=resolved_llm,
-        search_tool=search_tool,
-        top_k=resolved_top_k,
-        alpha=resolved_alpha,
-        product_repository=resolved_repo,
-    )
-
-
-def _get_default_mapping_node() -> MappingNode:
-    """파이프라인 전용 기본 MappingNode."""
-    global _DEFAULT_MAPPING_NODE
-    if _DEFAULT_MAPPING_NODE is None:
-        _DEFAULT_MAPPING_NODE = _build_mapping_node()
-    return _DEFAULT_MAPPING_NODE
-
-
-async def map_products_node(state: AppState) -> AppState:
-    """
-    LangGraph entrypoint wrapping MappingNode.
-
-    state["mapping_context"]를 통해 테스트/특수 실행 시 LLM 또는 Tool을 주입할 수 있다.
-    """
-
-    context: MappingContext = state.get("mapping_context", {}) or {}
-    has_override = any(
-        key in context for key in ("llm_client", "search_tool", "top_k", "alpha")
-    )
-    if has_override:
-        node = _build_mapping_node(
-            llm_client=context.get("llm_client"),
-            search_tool=context.get("search_tool"),
-            top_k=context.get("top_k"),
-            alpha=context.get("alpha"),
-        )
-    else:
-        node = _get_default_mapping_node()
-
-    return await node.run(state)
-
-
-__all__ = ["MappingNode", "map_products_node"]
-
-
-def _log_mapping_preview(product_id: str, items: List[MappingItem]) -> None:
-    max_items = max(1, settings.MAPPING_DEBUG_MAX_ITEMS)
-    preview = items[:max_items]
-    if not preview:
-        logger.info("📭 Mapping produced no items for product=%s", product_id)
+class NoOpMappingSink(MappingSink):
+    async def save(
+        self, results: Sequence[MappingResult]
+    ) -> None:  # pragma: no cover - noop
         return
 
-<<<<<<< HEAD
 
 # -----------------------------------------------------------------------------
 # Core mapping logic
@@ -486,20 +157,12 @@ class MapProductsDependencies:
     product_repository: ProductRepository
     mapping_sink: MappingSink
     config: MappingConfig
-    # 🆕 Tools 추가
-    retrieval_tool: RetrievalTool
-    filter_builder: FilterBuilder
 
     @classmethod
     def default(cls) -> "MapProductsDependencies":
         vector_client = VectorClient.from_settings()
         session_maker = AsyncSessionLocal
         product_repo = RDBProductRepository(session_maker)
-        
-        # 🆕 Tools 초기화
-        retrieval_tool = RetrievalTool(vector_client=vector_client)
-        filter_builder = FilterBuilder()
-        
         sink: MappingSink
         if settings.MAPPING_SINK_TYPE.lower() == "rdb":
             sink = RDBMappingSink(session_maker)
@@ -511,8 +174,6 @@ class MapProductsDependencies:
             product_repository=product_repo,
             mapping_sink=sink,
             config=MappingConfig.from_settings().normalize(),
-            retrieval_tool=retrieval_tool,
-            filter_builder=filter_builder,
         )
 
 
@@ -539,12 +200,7 @@ class MapProductsNode:
             logger.warning("map_products: no products fetched for filters {}", metadata)
             return {"mapped_products": []}
 
-        # 🆕 FilterBuilder 사용
-        where_filters = self.deps.filter_builder.build_filters(
-            country=country,
-            category=category,
-            metadata=metadata
-        )
+        where_filters = _build_regulation_where(metadata)
         mapped: List[MappingResult] = []
         query_tasks = []
 
@@ -568,24 +224,18 @@ class MapProductsNode:
         elapsed_ms = (perf_counter() - start_ts) * 1000
         await self.deps.mapping_sink.save(mapped)
 
-=======
-    logger.info(
-        "📒 Mapping preview (showing %d/%d items):", len(preview), len(items)
-    )
-    for idx, item in enumerate(preview, 1):
->>>>>>> 9c8d2e5de60743a693e60af5e8d67ba0c3fc7bc2
         logger.info(
-            "  %d) feature=%s applies=%s required=%s current=%s chunk=%s",
-            idx,
-            item["feature_name"],
-            item["applies"],
-            item["required_value"],
-            item["current_value"],
-            item["regulation_chunk_id"],
+            "map_products: mapped {} pairs ({:.2f} ms)",
+            len(mapped),
+            elapsed_ms,
         )
 
+        if state.error_log is None:
+            state.error_log = []
+        state.error_log.append(
+            f"map_products: mapped={len(mapped)} elapsed_ms={elapsed_ms:.1f}"
+        )
 
-<<<<<<< HEAD
         return {"mapped_products": [result.model_dump() for result in mapped]}
 
     def _log_config_snapshot(self, run_id: str | None) -> None:
@@ -604,13 +254,11 @@ class MapProductsNode:
         query_text: str,
         where_filters: Dict[str, Any] | None,
     ) -> List[MappingResult]:
-        # 🆕 RetrievalTool 사용 (고급 검색)
-        query_response = await self.deps.retrieval_tool.search(
-            query=query_text,
-            strategy="hybrid",  # 하이브리드 검색 전략
-            top_k=self.deps.config.top_k,
-            filters=where_filters,
+        query_response = await self.deps.vector_client.query(
+            query_text=query_text,
             alpha=self.deps.config.alpha,
+            n_results=self.deps.config.top_k,
+            where=where_filters,
         )
 
         return self._score_product(product, query_response)
@@ -762,7 +410,6 @@ def _evaluate_condition(value: Any, expected: Any, comparator: str | None) -> bo
 
 
 def _build_regulation_where(metadata: Dict[str, Any]) -> Dict[str, Any] | None:
-    """레거시 필터 빌더 (FilterBuilder로 대체됨)."""
     filters = {}
     if metadata.get("country"):
         filters["country"] = metadata["country"]
@@ -789,49 +436,18 @@ def _to_int_or_none(value: Any) -> int | None:
     try:
         return int(value)
     except (TypeError, ValueError):
-=======
-def _persist_mapping_snapshot(
-    product: ProductInfo,
-    items: List[MappingItem],
-    state: AppState,
-    top_k: int,
-    alpha: float,
-) -> Optional[str]:
-    if not settings.MAPPING_DEBUG_DIR:
->>>>>>> 9c8d2e5de60743a693e60af5e8d67ba0c3fc7bc2
         return None
 
-    target_dir = Path(settings.MAPPING_DEBUG_DIR)
-    try:
-        target_dir.mkdir(parents=True, exist_ok=True)
-    except Exception as exc:  # pragma: no cover - disk trouble
-        logger.warning("Failed to create mapping debug dir: %s", exc)
-        return None
 
-    product_id = product["product_id"]
-    timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-    doc_id = None
-    preprocess_results = state.get("preprocess_results") or []
-    if preprocess_results:
-        doc_id = preprocess_results[0].get("doc_id")
-    doc_suffix = doc_id or "unknown-doc"
-    filename = f"{timestamp}_{product_id}_{doc_suffix}.json"
-    snapshot_path = target_dir / filename
+# -----------------------------------------------------------------------------
+# entry point
+# -----------------------------------------------------------------------------
 
-    payload = {
-        "generated_at": datetime.utcnow().isoformat(),
-        "product": product,
-        "preprocess_summary": state.get("preprocess_summary"),
-        "mapping_config": {
-            "top_k": top_k,
-            "alpha": alpha,
-        },
-        "total_items": len(items),
-        "items": items,
-    }
 
-    snapshot_path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    logger.info("📝 Mapping snapshot saved: %s", snapshot_path)
-    return str(snapshot_path)
+_default_node = MapProductsNode(MapProductsDependencies.default())
+
+
+async def map_products_node(state: AppState) -> Dict[str, Any]:
+    """LangGraph entry point."""
+
+    return await _default_node(state)

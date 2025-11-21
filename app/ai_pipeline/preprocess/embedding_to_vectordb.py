@@ -23,7 +23,7 @@ import json
 import logging
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 
 # 로깅 설정
 logging.basicConfig(
@@ -229,7 +229,7 @@ class EmbeddingToVectorDB:
             num_chunks = len(chunks)
             logger.info(f"   ✅ 유효한 청크: {num_chunks}개")
 
-            # 각 청크 처리 (원문 청크 기반)
+            # 각 청크 처리
             chunk_texts = []
             chunk_metadatas = []
             chunk_ids = []
@@ -237,12 +237,11 @@ class EmbeddingToVectorDB:
             for chunk in chunks:
                 chunk_id = chunk.get("chunk_id", "unknown")
                 text = chunk.get("text", "")
-                propositions = chunk.get("propositions", [])  # 명제 정보 (메타데이터용)
 
                 chunk_ids.append(chunk_id)
-                chunk_texts.append(text)  # 원문 청크 저장
+                chunk_texts.append(text)
 
-                # 메타데이터 구성 (명제 포함)
+                # 메타데이터 구성
                 metadata = {
                     "chunk_id": chunk_id,
                     "section": chunk.get("section", ""),
@@ -253,16 +252,14 @@ class EmbeddingToVectorDB:
                     "has_table": chunk.get("has_table", False),
                     "tokens_estimate": chunk.get("tokens_estimate", 0),
                     "source_file": chunk_file.stem,  # 파일명 (확장자 제외)
-                    "propositions": propositions,  # 명제는 메타데이터로 저장
-                    "num_propositions": len(propositions),
                 }
                 chunk_metadatas.append(metadata)
 
-            # 임베딩 생성 (원문 청크 기반)
-            logger.info(f"   🧠 원문 청크 임베딩 생성 중... ({num_chunks}개)")
+            # 임베딩 생성
+            logger.info(f"   🧠 임베딩 생성 중... ({num_chunks}개)")
             embeddings_result = self.embedder.embed_texts(chunk_texts, normalize=True)
             embeddings = embeddings_result.get("dense", [])
-            logger.info(f"   ✓ 원문 청크 임베딩 생성 완료")
+            logger.info(f"   ✓ 임베딩 생성 완료")
 
             # Qdrant에 저장
             logger.info(f"   💾 Qdrant에 저장 중...")
@@ -298,123 +295,6 @@ class EmbeddingToVectorDB:
             file_result["error"] = str(e)
 
         return file_result
-    
-    def store_parent_child_chunks(
-        self,
-        processed_chunks: List,  # ProcessedChunk 리스트
-        batch_size: int = 50
-    ) -> Dict[str, Any]:
-        """
-        Parent-Child 청크를 Qdrant에 효율적으로 저장.
-        
-        Args:
-            processed_chunks: ProcessedChunk 객체 리스트
-            batch_size: 배치 크기
-            
-        Returns:
-            Dict: 저장 결과
-        """
-        logger.info(f"💾 Parent-Child 청크 저장 시작: {len(processed_chunks)}개")
-        
-        try:
-            # 데이터 분리
-            texts = []
-            embeddings = []
-            metadatas = []
-            
-            for chunk in processed_chunks:
-                # 임베딩 선택 (Child는 검색용, Parent는 맥락용)
-                embedding = chunk.embedding if chunk.chunk_type == "child" else chunk.parent_embedding
-                
-                if not embedding:
-                    logger.warning(f"임베딩 누락 스킵: {chunk.chunk_id}")
-                    continue
-                    
-                texts.append(chunk.text)
-                embeddings.append(embedding)
-                
-                # 메타데이터 구성
-                metadata = {
-                    "text": chunk.text,
-                    "type": chunk.chunk_type,
-                    "parent_id": chunk.parent_id,
-                    "context_text": chunk.context_text[:500] + "..." if len(chunk.context_text) > 500 else chunk.context_text,
-                    **chunk.metadata
-                }
-                metadatas.append(metadata)
-            
-            # 배치 저장
-            total_saved = 0
-            for i in range(0, len(texts), batch_size):
-                batch_texts = texts[i:i+batch_size]
-                batch_embeddings = embeddings[i:i+batch_size]
-                batch_metadatas = metadatas[i:i+batch_size]
-                
-                self.vc.insert(
-                    texts=batch_texts,
-                    dense_embeddings=batch_embeddings,
-                    metadatas=batch_metadatas
-                )
-                
-                total_saved += len(batch_texts)
-                logger.info(f"  배치 {i//batch_size + 1}: {len(batch_texts)}개 저장")
-            
-            logger.info(f"✅ Parent-Child 저장 완료: {total_saved}개")
-            
-            return {
-                "status": "success",
-                "total_chunks": len(processed_chunks),
-                "saved_chunks": total_saved,
-                "parent_chunks": len([c for c in processed_chunks if c.chunk_type == "parent"]),
-                "child_chunks": len([c for c in processed_chunks if c.chunk_type == "child"])
-            }
-            
-        except Exception as e:
-            logger.error(f"❌ Parent-Child 저장 실패: {e}")
-            return {
-                "status": "error",
-                "error": str(e)
-            }
-    
-    def search_with_parent_context(
-        self,
-        query_text: str,
-        top_k: int = 5,
-        filters: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
-        """
-        Child로 검색하고 Parent 맥락을 함께 반환.
-        
-        Args:
-            query_text: 검색 쿼리
-            top_k: 반환 개수
-            filters: 메타데이터 필터
-            
-        Returns:
-            Dict: 검색 결과 + Parent 맥락
-        """
-        try:
-            # 쿼리 임베딩 생성
-            query_embedding_result = self.embedder.embed_single_text(query_text)
-            query_embedding = query_embedding_result["dense"]
-            
-            # Child 청크로 검색
-            child_filters = {"type": "child"}
-            if filters:
-                child_filters.update(filters)
-                
-            search_results = self.vc.search(
-                query_dense=query_embedding,
-                top_k=top_k,
-                filters=child_filters
-            )
-            
-            logger.info(f"🔍 원문 청크 기반 검색 완료: {len(search_results.get('ids', []))}개 결과")
-            return search_results
-            
-        except Exception as e:
-            logger.error(f"❌ Parent-Child 검색 실패: {e}")
-            return {"ids": [], "documents": [], "metadatas": [], "scores": []}
 
     def _print_summary(self) -> None:
         """최종 요약 출력"""

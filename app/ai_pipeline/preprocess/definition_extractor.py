@@ -1,9 +1,9 @@
 """
-module: definition_extractor.py
-description: 청킹 전략에 통합된 정의 및 약어 추출기
+module: definition_extractor_v2.py
+description: 규제 문서에서 용어, 정의, 약자, 계층 구조 추출 (도메인 특화)
 author: AI Agent
 created: 2025-11-12
-updated: 2025-11-18
+updated: 2025-11-12
 dependencies:
     - re, logging, json
 """
@@ -11,134 +11,154 @@ dependencies:
 import re
 import json
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 
 logger = logging.getLogger(__name__)
 
 
 class DefinitionExtractor:
     """
-    청킹 전략에 통합된 정의 및 약어 추출기 (미국 규제 전용).
+    규제 문서에서 정의/용어/약자/계층 구조를 추출합니다.
     
-    역할:
-    - 용어 정의 감지 ("means", "is defined as")
-    - 약어 감지 (FDA, CFR 등)
-    - 청킹 시 정의 영역 보존
-    - 담배 규제 도메인 특화 용어 정규화
+    주요 기능:
+    1. 용어 정의 자동 감지 (미국: "As used in", "the term", 한국: "라는", "이란")
+    2. 약자 감지 및 정규화 (FDA, CFR, BPC 등)
+    3. 계층 구조 추출 (장→절→조→항 or Division→Chapter→Section)
+    4. 교차 참조 링크 생성
     """
     
-    # 담배 규제 도메인 특화 용어 사전
-    TOBACCO_TERMS_DICT = {
-        # 기관 및 법률
-        "FDA": "Food and Drug Administration (FDA)",
-        "CFR": "Code of Federal Regulations (CFR)",
-        "USC": "United States Code (USC)",
-        "FR": "Federal Register (FR)",
-        "FFDCA": "Federal Food, Drug, and Cosmetic Act (FFDCA)",
-        "FSPTCA": "Family Smoking Prevention and Tobacco Control Act (FSPTCA)",
-        
-        # 담배 제품 관련
-        "HPHC": "Harmful and Potentially Harmful Constituent (HPHC)",
-        "MRTP": "Modified Risk Tobacco Product (MRTP)",
-        "VLNC": "Very Low Nicotine Content (VLNC)",
-        "PMTA": "Premarket Tobacco Application (PMTA)",
-        "SE": "Substantial Equivalence (SE)",
-        "ENDS": "Electronic Nicotine Delivery Systems (ENDS)",
-        
-        # 화학 성분
-        "TPM": "Total Particulate Matter (TPM)",
-        "NFDPM": "Nicotine-Free Dry Particulate Matter (NFDPM)",
-        "CO": "Carbon Monoxide (CO)",
-        "TAR": "Tar (TAR)",
-        "NNN": "N-Nitrosonornicotine (NNN)",
-        "NNK": "4-(Methylnitrosamino)-1-(3-pyridyl)-1-butanone (NNK)",
-        
-        # 측정 및 시험
-        "ISO": "International Organization for Standardization (ISO)",
-        "FTC": "Federal Trade Commission (FTC)",
-        "HCI": "Health Canada Intense (HCI)",
-        "CRM": "Certified Reference Material (CRM)",
-        
-        # 규제 용어
-        "GRAS": "Generally Recognized as Safe (GRAS)",
-        "GMP": "Good Manufacturing Practice (GMP)",
-        "QC": "Quality Control (QC)",
-        "SOP": "Standard Operating Procedure (SOP)"
+    # ==================== 정의 패턴 ====================
+    DEFINITION_PATTERNS = [
+        r'(?:as\s+used\s+in\s+)?(?:the\s+)?["\']?([a-zA-Z_][a-zA-Z0-9\s_-]*?)["\']?\s+(?:means?|is|shall\s+be|includes?)',
+        r'["\']([a-zA-Z_][a-zA-Z0-9\s_-]*?)["\']\s+shall\s+(?:be\s+)?(?:defined\s+)?as',
+        r'definition(?:s)?:?\s+["\']?([a-zA-Z_][a-zA-Z0-9\s_-]*?)["\']?\s+(?:means?|is)',
+    ]
+    
+    # ==================== 약자 패턴 ====================
+    ACRONYM_PATTERNS = [
+        # "FDA (Food and Drug Administration)" 형식
+        r'\b([A-Z]{2,})\s*\(\s*([^)]{5,100}?)\s*\)',
+        # "FDA, the Food and Drug Administration" 형식
+        r'\b([A-Z]{2,})\s*,\s*(?:the\s+)?([a-zA-Z\s]{5,100})',
+    ]
+    
+    # ==================== 미국 계층 구조 패턴 ====================
+    US_HIERARCHY_PATTERNS = {
+        "division": r'(?:division|div\.?)\s+(\d+[.,]?\d*)',  # Division 8.6
+        "chapter": r'(?:chapter|ch\.?)\s+(\d+)',  # Chapter 3
+        "section": r'(?:section|sec\.?|§)\s+(\d+)',  # Section 22975
+        "subsection": r'(?:\(\s*[a-z]\s*\)|subsection)',  # (a), (b)
     }
     
-    # 정의 패턴 (미국 규제 전용)
-    DEFINITION_PATTERNS = [
-        r'["\']?([a-zA-Z\s]{3,30})["\']?\s+(?:means?|is\s+defined\s+as|shall\s+be)',
-        r'(?:the\s+term\s+)?["\']?([a-zA-Z\s]{3,30})["\']?\s+(?:means?|includes?)',
-        r'"([^"]{3,30})"\s+(?:means?|refers\s+to)',
+    # ==================== 참조 패턴 ====================
+    REFERENCE_PATTERNS = [
+        r'(?:see|section\s+\d+)',
     ]
     
-    # 약어 패턴 (강화)
-    ACRONYM_PATTERNS = [
-        r'\b([A-Z]{2,6})\s*\(([^)]{5,50})\)',  # FDA (Food and Drug Administration)
-        r'\(([A-Z]{2,6})\)\s*([^.]{5,50})',   # (FDA) Food and Drug Administration
-        r'([A-Z]{2,6})\s*[–—-]\s*([^.]{5,50})',  # FDA – Food and Drug Administration
-    ]
+    def __init__(self):
+        """초기화."""
+        logger.info("✅ DefinitionExtractor v2 initialized")
     
-    def __init__(self, use_domain_dict: bool = True):
+    def extract_definitions(
+        self,
+        document_text: str,
+        country: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
-        초기화 (청킹 통합용).
+        문서에서 정의/용어를 추출합니다.
         
         Args:
-            use_domain_dict: 도메인 특화 용어 사전 사용 여부
-        """
-        self.use_domain_dict = use_domain_dict
-        logger.info(f"✅ DefinitionExtractor 초기화: domain_dict={use_domain_dict}")
-    
-    def extract_definitions_and_acronyms(self, text: str) -> Dict[str, Any]:
-        """
-        텍스트에서 정의와 약어를 추출 (청킹용).
+            document_text: 규제 문서 텍스트
+            country: 국가 코드 (KR, US 등) - 패턴 최적화용
         
         Returns:
-            Dict[str, Any]: {
-                "definitions": [{"term": str, "definition": str, "position": int}, ...],
-                "acronyms": [{"acronym": str, "full_form": str, "position": int}, ...]
+            Dict with:
+            {
+                "definitions": [
+                    {"term": "담배", "definition": "...", "confidence": 0.95},
+                    ...
+                ],
+                "acronyms": [
+                    {"acronym": "FDA", "full_form": "Food and Drug Administration", "confidence": 1.0},
+                    ...
+                ],
+                "hierarchy": {
+                    "type": "korean" | "american",
+                    "structure": [...],
+                },
+                "references": [
+                    {"source": "제1조", "target": "제2조", "type": "cross_reference"},
+                    ...
+                ],
             }
         """
         return {
-            "definitions": self._extract_term_definitions(text),
-            "acronyms": self._extract_acronyms(text)
+            "definitions": self._extract_term_definitions(document_text),
+            "acronyms": self._extract_acronyms(document_text),
+            "hierarchy": self._extract_hierarchy(document_text, country),
+            "references": self._extract_references(document_text),
         }
     
+    # ==================== 정의 추출 ====================
+    
     def _extract_term_definitions(self, text: str) -> List[Dict[str, Any]]:
-        """용어 정의 추출 (청킹용)."""
+        """용어 정의 추출."""
         definitions = []
         seen_terms = set()
         
         for pattern in self.DEFINITION_PATTERNS:
-            for match in re.finditer(pattern, text, re.IGNORECASE):
-                term = match.group(1).strip()
+            matches = re.finditer(pattern, text, re.IGNORECASE)
+            
+            for match in matches:
+                term = match.group(1).strip() if match.lastindex >= 1 else None
                 
-                if not term or len(term) < 3 or len(term) > 30 or term.lower() in seen_terms:
+                if not term or len(term) < 2 or len(term) > 100:
                     continue
                 
-                # 정의 문장 추출 (간단하게)
-                start = max(0, match.start() - 20)
-                end = min(len(text), match.end() + 100)
-                definition = text[start:end].strip()
+                if term.lower() in seen_terms:
+                    continue
+                
+                # 앞뒤 맥락 추출 (200자)
+                start = max(0, match.start() - 50)
+                end = min(len(text), match.end() + 150)
+                context = text[start:end].strip()
                 
                 definitions.append({
                     "term": term,
-                    "definition": definition,
-                    "position": match.start()
+                    "definition": context,
+                    "confidence": self._calculate_definition_confidence(context),
                 })
                 
                 seen_terms.add(term.lower())
         
-        return definitions[:10]  # 최대 10개
+        logger.debug(f"✅ Found {len(definitions)} term definitions")
+        return definitions[:50]  # 최대 50개
+    
+    def _calculate_definition_confidence(self, context: str) -> float:
+        """정의의 신뢰도 계산."""
+        score = 0.5  # 기본점
+        
+        # 명시적 정의 표현
+        if re.search(r'(?:means?|is|shall\s+be|defined|라는|이란)', context, re.IGNORECASE):
+            score += 0.3
+        
+        # 길이 (너무 짧거나 길면 낮은 신뢰도)
+        if 20 < len(context) < 300:
+            score += 0.2
+        
+        return min(score, 1.0)
+    
+    # ==================== 약자 추출 ====================
     
     def _extract_acronyms(self, text: str) -> List[Dict[str, Any]]:
-        """약어 추출 (청킹용)."""
+        """약자 및 약자 정의 추출."""
         acronyms = []
         seen_acronyms = set()
         
         for pattern in self.ACRONYM_PATTERNS:
-            for match in re.finditer(pattern, text):
+            matches = re.finditer(pattern, text)
+            
+            for match in matches:
                 acronym = match.group(1).strip()
                 full_form = match.group(2).strip()
                 
@@ -148,111 +168,158 @@ class DefinitionExtractor:
                 acronyms.append({
                     "acronym": acronym,
                     "full_form": full_form,
-                    "position": match.start()
+                    "confidence": 1.0 if len(full_form) > 5 else 0.7,
                 })
                 
                 seen_acronyms.add(acronym)
         
-        return acronyms[:5]  # 최대 5개
+        logger.debug(f"✅ Found {len(acronyms)} acronyms")
+        return acronyms[:30]  # 최대 30개
     
-    def has_definition_in_range(self, text: str, start: int, end: int) -> bool:
-        """
-        특정 범위에 정의가 있는지 확인 (청킹용).
-        
-        Args:
-            text: 전체 텍스트
-            start: 시작 위치
-            end: 끝 위치
-        
-        Returns:
-            bool: 정의 존재 여부
-        """
-        chunk_text = text[start:end]
-        for pattern in self.DEFINITION_PATTERNS:
-            if re.search(pattern, chunk_text, re.IGNORECASE):
-                return True
-        return False
+    # ==================== 계층 구조 추출 ====================
     
-    def normalize_tobacco_terms(self, text: str) -> str:
-        """
-        담배 규제 도메인 특화 용어 정규화.
+    def _extract_hierarchy(
+        self,
+        text: str,
+        country: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """문서 계층 구조 추출 (미국 규제 전용)."""
+        return self._extract_american_hierarchy(text)
+    
+    def _extract_american_hierarchy(self, text: str) -> Dict[str, Any]:
+        """미국식 계층 구조 추출 (Division→Chapter→Section)."""
+        structure = []
+        current_division = None
+        current_chapter = None
         
-        Args:
-            text: 원본 텍스트
+        # Division 추출
+        for match in re.finditer(self.US_HIERARCHY_PATTERNS["division"], text):
+            division_num = match.group(1)
             
-        Returns:
-            str: 정규화된 텍스트 (약어 → 풀네임 확장)
-        """
-        if not self.use_domain_dict or not text:
-            return text
-            
-        normalized_text = text
+            current_division = {
+                "level": "Division",
+                "number": division_num,
+                "title": self._extract_section_title(text, match.end(), "Chapter"),
+                "children": [],
+            }
+            structure.append(current_division)
+            current_chapter = None
         
-        # 도메인 사전 적용
-        for abbr, full_form in self.TOBACCO_TERMS_DICT.items():
-            # 이미 확장된 형태가 아닌 경우에만 치환
-            if abbr in normalized_text and full_form not in normalized_text:
-                # 단어 경계 확인하여 정확한 매칭
-                pattern = r'\b' + re.escape(abbr) + r'\b'
-                normalized_text = re.sub(pattern, full_form, normalized_text)
+        # Chapter 추출
+        for match in re.finditer(self.US_HIERARCHY_PATTERNS["chapter"], text):
+            chapter_num = match.group(1)
+            
+            current_chapter = {
+                "level": "Chapter",
+                "number": chapter_num,
+                "title": self._extract_section_title(text, match.end(), "Section"),
+                "children": [],
+            }
+            
+            if current_division:
+                current_division["children"].append(current_chapter)
+            else:
+                structure.append(current_chapter)
+        
+        # Section 추출
+        for match in re.finditer(self.US_HIERARCHY_PATTERNS["section"], text):
+            section_num = match.group(1)
+            section_text = self._extract_section_title(text, match.end(), None)
+            
+            section_obj = {
+                "level": "Section",
+                "number": section_num,
+                "title": section_text,
+            }
+            
+            if current_chapter:
+                current_chapter["children"].append(section_obj)
+            elif current_division:
+                current_division["children"].append(section_obj)
+            else:
+                structure.append(section_obj)
+        
+        return {
+            "type": "american",
+            "structure": structure,
+            "total_divisions": len([s for s in structure if s.get("level") == "Division"]),
+            "total_chapters": sum(
+                len(c.get("children", [])) for c in structure 
+                if c.get("level") == "Division"
+            ),
+        }
+    
+    def _extract_section_title(
+        self,
+        text: str,
+        start_pos: int,
+        end_marker: Optional[str] = None,
+        max_chars: int = 100
+    ) -> str:
+        """섹션 제목 추출."""
+        end_pos = min(start_pos + max_chars, len(text))
+        
+        if end_marker:
+            marker_pos = text.find(end_marker, start_pos)
+            if marker_pos != -1:
+                end_pos = marker_pos
+        
+        title = text[start_pos:end_pos].strip()
+        # 첫 줄만 사용
+        title = title.split("\n")[0]
+        
+        return title[:100]  # 최대 100자
+    
+    # ==================== 교차 참조 추출 ====================
+    
+    def _extract_references(self, text: str) -> List[Dict[str, str]]:
+        """문서 내 교차 참조 추출."""
+        references = []
+        
+        # 미국식 참조 (Section X)
+        us_ref_pattern = r'(?:section|sec\.?|§)\s+(\d+)'
+        for match in re.finditer(us_ref_pattern, text, re.IGNORECASE):
+            section = match.group(1)
+            
+            references.append({
+                "source": f"Section {section}",
+                "target": f"Section {section}",
+                "type": "cross_reference",
+            })
+        
+        logger.debug(f"✅ Found {len(references)} cross references")
+        return list({json.dumps(r, sort_keys=True): r for r in references}.values())[:30]
+    
+    def batch_extract_definitions(
+        self,
+        documents: List[Dict[str, str]],
+        show_progress: bool = True
+    ) -> List[Dict[str, Any]]:
+        """여러 문서에서 정의를 배치 추출합니다."""
+        results = []
+        total = len(documents)
+        
+        for i, doc in enumerate(documents, 1):
+            try:
+                definitions = self.extract_definitions(
+                    document_text=doc.get("text", ""),
+                    country=doc.get("country")
+                )
+                results.append(definitions)
                 
-        return normalized_text
-    
-    def extract_domain_specific_terms(self, text: str) -> List[Dict[str, str]]:
-        """
-        텍스트에서 도메인 특화 용어 추출.
-        
-        Args:
-            text: 분석할 텍스트
+                if show_progress:
+                    logger.info(
+                        f"[{i}/{total}] ✅ Extracted: "
+                        f"definitions={len(definitions['definitions'])}, "
+                        f"acronyms={len(definitions['acronyms'])}"
+                    )
             
-        Returns:
-            List[Dict]: 발견된 용어 리스트
-        """
-        found_terms = []
+            except Exception as e:
+                logger.error(f"[{i}/{total}] ❌ Error: {str(e)}")
+                results.append({"error": str(e)})
         
-        for abbr, full_form in self.TOBACCO_TERMS_DICT.items():
-            # 약어가 텍스트에 있는지 확인
-            pattern = r'\b' + re.escape(abbr) + r'\b'
-            matches = list(re.finditer(pattern, text))
-            
-            if matches:
-                found_terms.append({
-                    "term": abbr,
-                    "full_form": full_form,
-                    "count": len(matches),
-                    "positions": [m.start() for m in matches]
-                })
-                
-        return found_terms
-    
-    def get_term_definition(self, term: str) -> Optional[str]:
-        """
-        특정 용어의 정의 반환.
-        
-        Args:
-            term: 조회할 용어
-            
-        Returns:
-            Optional[str]: 용어 정의 (없으면 None)
-        """
-        return self.TOBACCO_TERMS_DICT.get(term.upper())
-    
-    def add_custom_term(self, abbr: str, full_form: str) -> None:
-        """
-        사용자 정의 용어 추가.
-        
-        Args:
-            abbr: 약어
-            full_form: 풀네임
-        """
-        self.TOBACCO_TERMS_DICT[abbr.upper()] = full_form
-        logger.debug(f"사용자 정의 용어 추가: {abbr} → {full_form}")
-    
-    def get_all_terms(self) -> Dict[str, str]:
-        """
-        모든 도메인 용어 사전 반환.
-        
-        Returns:
-            Dict[str, str]: 전체 용어 사전
-        """
-        return self.TOBACCO_TERMS_DICT.copy()
+        logger.info(f"✅ Batch extraction complete: {total} documents processed")
+        return results
+
+
+

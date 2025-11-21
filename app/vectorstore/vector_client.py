@@ -3,9 +3,9 @@ module: vector_client.py
 description: Qdrant VectorDB 클라이언트 (하이브리드 서칭: dense + sparse)
 author: AI Agent
 created: 2025-11-12
-updated: 2025-01-18
+updated: 2025-11-12
 dependencies:
-    - qdrant-client>=1.15.1
+    - qdrant-client>=1.7.0
     - app.config.settings
 """
 
@@ -18,31 +18,21 @@ from qdrant_client.models import (
     PointStruct,
     SparseVector,
     SparseVectorParams,
+    NamedVector,
+    NamedSparseVector,
+    SearchRequest,
+    Prefetch,
 )
 import os
 
 logger = logging.getLogger(__name__)
 
-# settings.py 통합 (환경변수 폴백)
-try:
-    from app.config.settings import settings
-    QDRANT_HOST = (
-        getattr(settings, "QDRANT_URL", "http://localhost:6333")
-        .replace("http://", "")
-        .replace("https://", "")
-        .split(":")[0]
-    )
-    QDRANT_PORT = 6333
-    QDRANT_COLLECTION = getattr(settings, "QDRANT_COLLECTION", "remon_regulations")
-    QDRANT_PATH = getattr(settings, "QDRANT_PATH", "./data/qdrant")
-    QDRANT_USE_LOCAL = os.getenv("QDRANT_USE_LOCAL", "false").lower() == "true"
-except ImportError:
-    logger.warning("settings.py 로드 실패, 환경변수 사용")
-    QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
-    QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
-    QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "remon_regulations")
-    QDRANT_PATH = os.getenv("QDRANT_PATH", "./data/qdrant")
-    QDRANT_USE_LOCAL = os.getenv("QDRANT_USE_LOCAL", "false").lower() == "true"
+# 환경변수 설정
+QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
+QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
+QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "remon_regulations")
+QDRANT_PATH = os.getenv("QDRANT_PATH", "./data/qdrant")  # 로컬 저장소
+QDRANT_USE_LOCAL = os.getenv("QDRANT_USE_LOCAL", "true").lower() == "true"
 
 
 class VectorClient:
@@ -68,6 +58,7 @@ class VectorClient:
         """
         self.collection_name = collection_name
 
+        # 환경변수에서 모드 결정
         if use_local is None:
             use_local = QDRANT_USE_LOCAL
 
@@ -113,11 +104,12 @@ class VectorClient:
         Args:
             texts: 문서 텍스트 리스트
             dense_embeddings: Dense 벡터 (1024차원)
-            metadatas: 메타데이터
-            sparse_embeddings: Sparse 벡터 (선택)
-            batch_size: 배치 크기
+            metadatas: 메타데이터 (clause_id, meta_country, meta_regulation_id 등)
+            sparse_embeddings: Sparse 벡터 (선택, BM25 스타일)
+            batch_size: 배치 크기 (기본 100개씩)
         """
         import uuid
+        from datetime import datetime
 
         total = len(texts)
         for batch_start in range(0, total, batch_size):
@@ -129,7 +121,9 @@ class VectorClient:
                 dense = dense_embeddings[idx]
                 meta = metadatas[idx]
 
+                # UUID 기반 고유 ID 생성
                 point_id = str(uuid.uuid4())
+
                 vectors = {"dense": dense}
 
                 if sparse_embeddings and idx < len(sparse_embeddings):
@@ -170,97 +164,89 @@ class VectorClient:
         하이브리드 검색 (dense + sparse).
 
         Args:
-            query_dense: Dense 쿼리 벡터
+            query_dense: Dense 쿼리 벡터 (1024차원)
             query_sparse: Sparse 쿼리 벡터 (선택)
             top_k: 반환 개수
-            filters: 메타데이터 필터
-            hybrid_alpha: Dense 가중치 (0~1)
+            filters: 메타데이터 필터 (예: {"meta_country": "KR"})
+            hybrid_alpha: Dense 가중치 (0~1, 1=dense만, 0=sparse만)
 
         Returns:
-            검색 결과 딕셔너리
+            {"ids": [...], "documents": [...], "metadatas": [...], "scores": [...]}
         """
-        qdrant_filter = self._build_qdrant_filter(filters)
-        
-        # Dense 검색
-        dense_results = list(
-            self.client.query_points(
+        if query_sparse:
+            # 하이브리드 검색
+            results = self.client.search_batch(
                 collection_name=self.collection_name,
-                query=query_dense,
-                using="dense",
-                limit=top_k,
-                with_payload=True,
-                query_filter=qdrant_filter,
+                requests=[
+                    SearchRequest(
+                        vector=NamedVector(name="dense", vector=query_dense),
+                        limit=top_k,
+                        with_payload=True,
+                    ),
+                    SearchRequest(
+                        vector=NamedSparseVector(
+                            name="sparse",
+                            vector=SparseVector(
+                                indices=list(query_sparse.keys()),
+                                values=list(query_sparse.values()),
+                            ),
+                        ),
+                        limit=top_k,
+                        with_payload=True,
+                    ),
+                ],
             )
-        )
-        
-        # Sparse 없으면 Dense만 반환
-        if not query_sparse:
-            return {
-                "ids": [r.id for r in dense_results],
-                "documents": [r.payload.get("text", "") for r in dense_results],
-                "metadatas": [r.payload for r in dense_results],
-                "scores": [r.score for r in dense_results],
-            }
-        
-        # Sparse 검색
-        sparse_vector = SparseVector(
-            indices=list(query_sparse.keys()),
-            values=list(query_sparse.values()),
-        )
-        sparse_results = list(
-            self.client.query_points(
-                collection_name=self.collection_name,
-                query=sparse_vector,
-                using="sparse",
-                limit=top_k,
-                with_payload=True,
-                query_filter=qdrant_filter,
-            )
-        )
 
-        return self._combine_results(
-            [dense_results, sparse_results], hybrid_alpha, top_k
-        )
+            # 점수 결합 (RRF 또는 가중 평균)
+            combined = self._combine_results(results, hybrid_alpha, top_k)
+            return combined
+
+        else:
+            # Dense 검색만
+            results = self.client.search(
+                collection_name=self.collection_name,
+                query_vector=("dense", query_dense),
+                limit=top_k,
+                with_payload=True,
+            )
+
+            return {
+                "ids": [r.id for r in results],
+                "documents": [r.payload.get("text", "") for r in results],
+                "metadatas": [r.payload for r in results],
+                "scores": [r.score for r in results],
+            }
 
     def _combine_results(
         self, batch_results: List[List], alpha: float, top_k: int
     ) -> Dict[str, Any]:
-        """하이브리드 결과 결합 (RRF)."""
+        """하이브리드 결과 결합 (Reciprocal Rank Fusion)."""
         dense_results, sparse_results = batch_results
 
         scores = {}
         payloads = {}
-        dense_scores = {}
-        sparse_scores = {}
 
+        # Dense 점수
         for rank, result in enumerate(dense_results, 1):
-            rrf_score = alpha * (1 / (rank + 60))
-            scores[result.id] = scores.get(result.id, 0) + rrf_score
-            dense_scores[result.id] = result.score
+            scores[result.id] = scores.get(result.id, 0) + alpha * (1 / (rank + 60))
             payloads[result.id] = result.payload
 
+        # Sparse 점수
         for rank, result in enumerate(sparse_results, 1):
-            rrf_score = (1 - alpha) * (1 / (rank + 60))
-            scores[result.id] = scores.get(result.id, 0) + rrf_score
-            sparse_scores[result.id] = result.score
-            if result.id not in payloads:
-                payloads[result.id] = result.payload
+            scores[result.id] = scores.get(result.id, 0) + (1 - alpha) * (
+                1 / (rank + 60)
+            )
+            payloads[result.id] = result.payload
 
+        # 정렬
         sorted_ids = sorted(scores.keys(), key=lambda x: scores[x], reverse=True)[
             :top_k
         ]
 
-        final_metadatas = []
-        for doc_id in sorted_ids:
-            metadata = payloads[doc_id].copy()
-            metadata["_dense_score"] = dense_scores.get(doc_id)
-            metadata["_sparse_score"] = sparse_scores.get(doc_id)
-            final_metadatas.append(metadata)
-
         return {
             "ids": sorted_ids,
             "documents": [payloads[id].get("text", "") for id in sorted_ids],
-            "metadatas": final_metadatas,
+            "metadatas": [payloads[id] for id in sorted_ids],
             "scores": [scores[id] for id in sorted_ids],
         }
 
@@ -269,34 +255,11 @@ class VectorClient:
         self.client.delete_collection(collection_name=self.collection_name)
         logger.info(f"✅ 컬렉션 삭제: {self.collection_name}")
 
-    def _build_qdrant_filter(self, filters: Optional[Dict[str, Any]]):
-        """Dict 필터 → Qdrant Filter 변환."""
-        if not filters:
-            return None
-
-        from qdrant_client.models import Filter, FieldCondition, MatchValue, Range
-
-        conditions = []
-
-        for key, value in filters.items():
-            if key.endswith("_from"):
-                field = key.replace("_from", "")
-                conditions.append(FieldCondition(key=field, range=Range(gte=value)))
-            elif key.endswith("_to"):
-                field = key.replace("_to", "")
-                conditions.append(FieldCondition(key=field, range=Range(lte=value)))
-            else:
-                conditions.append(
-                    FieldCondition(key=key, match=MatchValue(value=value))
-                )
-
-        return Filter(must=conditions) if conditions else None
-
     def get_collection_info(self) -> Dict[str, Any]:
         """컬렉션 정보 조회."""
         info = self.client.get_collection(collection_name=self.collection_name)
         return {
-            "name": self.collection_name,
+            "name": info.config.params.vectors["dense"].size,
             "points_count": info.points_count,
             "vectors_config": str(info.config.params.vectors),
         }
