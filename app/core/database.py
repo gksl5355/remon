@@ -63,3 +63,11 @@ async def get_db():
             raise
         finally:
             await session.close()
+
+# database.py에 아래 함수 추가 (동일 파일 내에 넣기)
+def get_db_session():
+    """
+    report.py 등 외부 코드에서 직접 비동기 세션 객체를 반환(생성)하는 함수.
+    비동기 환경에서 await와 호환(예: await session.execute(...))
+    """
+    return AsyncSessionLocal()
