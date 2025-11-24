@@ -19,6 +19,67 @@ from app.ai_pipeline.state import AppState
 load_dotenv()
 os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "")
 
+# 전략 LLM 재사용 (실패 시 None으로 두고 fallback 사용)
+try:  # pragma: no cover - import guard
+    from app.ai_pipeline.nodes.llm import llm as strategy_llm
+except Exception:  # pragma: no cover
+    strategy_llm = None  # type: ignore[assignment]
+
+
+def _build_facts(
+    preprocess_summary: Dict[str, Any],
+    mapping_results: Dict[str, Any],
+    strategies: List[str],
+    impact_scores: List[Dict[str, Any]],
+) -> str:
+    """LLM에 넣을 요약용 사실 문자열을 구성한다."""
+    mapping_items = mapping_results.get("items") or []
+    mapping_preview = []
+    for item in mapping_items[:3]:
+        mapping_preview.append(
+            f"{item.get('feature_name')}: required={item.get('required_value')} "
+            f"current={item.get('current_value')} applies={item.get('applies')}"
+        )
+
+    impact_preview = []
+    for score in impact_scores[:2]:
+        impact_preview.append(
+            f"{score.get('impact_level')}/score={score.get('weighted_score')} "
+            f"reason={score.get('reasoning', '')[:60]}"
+        )
+
+    lines = [
+        f"Preprocess status={preprocess_summary.get('status', 'unknown')} "
+        f"(processed={preprocess_summary.get('processed_count', 0)}, "
+        f"succeeded={preprocess_summary.get('succeeded', 0)}, "
+        f"failed={preprocess_summary.get('failed', 0)})",
+        f"Mapping items={len(mapping_items)} preview={'; '.join(mapping_preview) or '없음'}",
+        f"Strategies count={len(strategies)} preview={'; '.join(strategies[:3]) or '없음'}",
+        f"Impact entries={len(impact_scores)} preview={'; '.join(impact_preview) or '없음'}",
+    ]
+    return "\n".join(lines)
+
+
+def _call_llm_for_report(facts: str) -> Optional[str]:
+    """LLM을 호출해 한국어 보고서 문구를 생성한다."""
+    if not strategy_llm:
+        return None
+
+    prompt = f"""
+다음 파이프라인 실행 결과를 바탕으로 한국어 요약 보고서를 작성해 주세요.
+- 각 노드별 성공/실패 여부와 핵심 결과를 한 문단으로 정리해 주세요.
+- 너무 길게 쓰지 말고, 실행 상태를 한눈에 볼 수 있도록 간결하게 작성하세요.
+- 숫자나 개수는 사실 그대로만 사용하세요. 새로운 수치는 만들지 마세요.
+
+[실행 결과]
+{facts}
+"""
+    try:
+        return strategy_llm.invoke(prompt)
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("LLM 보고서 생성 실패: %s", exc)
+        return None
+
 
 def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str, Any]]:
     meta = state.get("product_info", {})
