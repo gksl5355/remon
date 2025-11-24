@@ -3,21 +3,23 @@ app/ai_pipeline/nodes/report.py
 ReportAgent – 구조화 JSON 보고서 생성 & RDB 연동 가능 버전
 """
 
+import logging
 import os
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from dotenv import load_dotenv
 
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from app.ai_pipeline.state import AppState
 
-# DB 연동 예시 (각 환경에 맞게 주석 해제/구현)
-# from app.core.repositories.report_repository import ReportRepository
-# from app.core.database import get_db_session
+# DB 연동
+from app.core.repositories.report_repository import ReportRepository
+from app.core.database import AsyncSessionLocal
 
 load_dotenv()
 os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "")
+logger = logging.getLogger(__name__)
 
 # 전략 LLM 재사용 (실패 시 None으로 두고 fallback 사용)
 try:  # pragma: no cover - import guard
@@ -89,13 +91,13 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
     strategy_items = strategy.get("items", [])
     impact_score = (state.get("impact_scores", []) or [{}])[0]
 
-    # 제품 표 추출
-    product_table = [
-        {
-            "제품명": item.get("feature_name", ""),
-            "브랜드": item.get("product_id", ""),
-            "조치": f"현재: {item.get('current_value', '-')}, 필요: {item.get('required_value','-')}"
-        } for item in mapping_items
+    # 제품 표 추출 (rows 형식)
+    product_rows = [
+        [
+            item.get("feature_name", ""),
+            item.get("product_id", ""),
+            f"현재: {item.get('current_value', '-')}, 필요: {item.get('required_value','-')}"
+        ] for item in mapping_items
     ]
 
     # 참고 링크 추출
@@ -124,38 +126,45 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
             "법적 컨설팅 및 관계 부처와 협의 시작"
         ]
 
+    # 규제 변경 요약 content 생성
+    summary_content = [
+        f"국가 / 지역: {meta.get('country', '')} ({meta.get('region', '')})",
+        f"규제 카테고리: {mapping_items[0].get('parsed',{}).get('category','') if mapping_items else ''}",
+        f"변경 요약: {mapping_items[0].get('regulation_summary','') if mapping_items else ''}",
+        f"영향도: {impact_score.get('impact_level','N/A')} (점수: {impact_score.get('weighted_score', 0.0)})"
+    ]
+
     return [
         {
-            "key": "regulation_summary",
+            "id": "summary",
             "title": "1. 규제 변경 요약",
-            "content": {
-                "country": meta.get("country", ""),
-                "region": meta.get("region", ""),
-                "category": mapping_items[0].get("parsed",{}).get("category","") if mapping_items else "",
-                "summary": mapping_items[0].get("regulation_summary","") if mapping_items else "",
-                "impact_level": impact_score.get("impact_level","N/A"),
-                "impact_score": impact_score.get("weighted_score", 0.0),
-            }
+            "type": "paragraph",
+            "content": summary_content
         },
         {
-            "key": "product_table",
+            "id": "products",
             "title": "2. 영향받는 제품 목록",
-            "table": product_table
+            "type": "table",
+            "headers": ["제품명", "브랜드", "조치"],
+            "rows": product_rows
         },
         {
-            "key": "major_analysis",
+            "id": "changes",
             "title": "3. 주요 변경 사항 해석",
-            "bullets": major_analysis
+            "type": "list",
+            "content": major_analysis
         },
         {
-            "key": "strategy",
+            "id": "strategy",
             "title": "4. 대응 전략 제안",
-            "steps": strategy_steps
+            "type": "list",
+            "content": strategy_steps
         },
         {
-            "key": "references",
+            "id": "references",
             "title": "5. 참고 및 원문 링크",
-            "links": references
+            "type": "links",
+            "content": references
         }
     ]
 
@@ -217,13 +226,37 @@ async def report_node(state: AppState) -> Dict[str, Any]:
         "sections": sections
     }
 
-    # RDB 저장 주석 예시 (프로젝트 환경에 맞게 구현)
-    # db_session = get_db_session()
-    # repo = ReportRepository(db_session)
-    # report_id = await repo.create_report_json(report_json)
-    # await db_session.commit()
-    # await db_session.close()
-    # report_json["report_id"] = report_id
+    # RDB 저장
+    async with AsyncSessionLocal() as db_session:
+        repo = ReportRepository()
+        
+        # product_id는 product_info에서 추출 (문자열이면 정수로 변환)
+        product_id = state.get("product_info", {}).get("product_id", 1)
+        if isinstance(product_id, str):
+            product_id = int(product_id) if product_id.isdigit() else 1
+        
+        report_data = {
+            "created_reason": "AI pipeline auto-generated",
+            "translation_id": state.get("translation_id", 1),
+            "change_id": state.get("change_id", 1),
+            "product_id": product_id,
+            "country_code": meta.get("country", "US")[:2]
+        }
+        
+        items_data = []
+
+        summaries_data = [{
+            "impact_score_id": impact_score.get("impact_score_id", 1),
+            "summary_text": sections  # JSONB로 저장
+        }]
+        
+        try:
+            report_record = await repo.create_with_items(db_session, report_data, items_data, summaries_data)
+            await db_session.commit()
+            report_json["report_id"] = report_record.report_id
+        except Exception as e:
+            await db_session.rollback()
+            logger.error(f"DB 저장 실패: {e}")
 
     return report_json
 
