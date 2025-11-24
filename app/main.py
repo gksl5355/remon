@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api import regulation_api, report_api, auth_api
-from api.admin import admin_regulation_api, admin_summary_api, admin_websearch_api
+from app.api import regulation_api, report_api, auth_api
+from app.api.admin import admin_regulation_api, admin_summary_api, admin_websearch_api
 
 app = FastAPI(
     title="REMON Regulatory Monitoring API",

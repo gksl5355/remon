@@ -12,7 +12,7 @@ from typing import List, Optional, Dict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, joinedload
-from core.models.regulation_model import Regulation, RegulationVersion, RegulationTranslation
+from app.core.models.regulation_model import Regulation, RegulationVersion, RegulationTranslation
 from .base_repository import BaseRepository
 
 class RegulationRepository(BaseRepository[Regulation]):

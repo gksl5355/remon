@@ -11,7 +11,7 @@ dependencies:
 
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
-from core.repositories.report_repository import ReportRepository
+from app.core.repositories.report_repository import ReportRepository
 
 logger = logging.getLogger(__name__)
 
