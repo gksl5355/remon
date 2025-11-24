@@ -21,15 +21,6 @@ import os
 from dotenv import load_dotenv
 
 
-# app/core/database.py
-# 실제 DB 연동을 위해 추가
-# DB_URL = "postgresql+asyncpg://postgres:1234@localhost/remon_db"
-# engine = create_async_engine(DB_URL)
-# SessionLocal = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
-
-# def get_db_session():
-#     return SessionLocal()
-
 
 
 
@@ -72,3 +63,11 @@ async def get_db():
             raise
         finally:
             await session.close()
+
+# database.py에 아래 함수 추가 (동일 파일 내에 넣기)
+def get_db_session():
+    """
+    report.py 등 외부 코드에서 직접 비동기 세션 객체를 반환(생성)하는 함수.
+    비동기 환경에서 await와 호환(예: await session.execute(...))
+    """
+    return AsyncSessionLocal()

@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, Enum, Boolean, Numeric, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
+from datetime import datetime
 from .enums import ProductCategoryEnum
 from . import Base
 
