@@ -4,6 +4,8 @@ ReportAgent – 구조화 JSON 보고서 생성 & RDB 연동 가능 버전
 """
 
 import logging
+import json
+import re
 import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -114,16 +116,13 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
     major_analysis = llm_struct.get("major_analysis")
     if not major_analysis:
         major_analysis = [
-            "규제 적용 제품의 포장/성분 변경 필요",
-            "해당 규제 미준수 시 벌금 및 회수 위험",
-            "법적 요건 충족 위해 함량 조정 필수"
+            "(빈값 대응)규제 적용 제품의 포장/성분 변경 필요"
+
         ]
     strategy_steps = llm_struct.get("strategy")
     if not strategy_steps:
         strategy_steps = [
-            "즉시 제품 성분 조정 계획 수립",
-            "포장 및 라벨링 변경 스케쥴 준비",
-            "법적 컨설팅 및 관계 부처와 협의 시작"
+            "(빈값 대응)즉시 제품 성분 조정 계획 수립"
         ]
 
     # 규제 변경 요약 content 생성
@@ -169,34 +168,45 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
     ]
 
 def get_llm_brief_chain():
+    # [수정됨] 키 이름을 'major_analysis', 'strategy'로 강제하는 지시 추가
     prompt = ChatPromptTemplate.from_messages([
         ("system",
-         "아래 데이터를 참고해 '주요 변경 사항 해석(bullet 3개)', '대응 전략 steps(3개)' JSON만 생성하세요. 입력이 부족해도 빈 bullet/step 없이 임의의 합리적 예시 반환하세요."),
+         "당신은 규제 분석 전문가입니다. 아래 데이터를 참고해 JSON 형식으로만 응답하세요. "
+         "JSON의 최상위 키는 반드시 다음 두 가지여야 합니다:\n"
+         "1. \"major_analysis\": 주요 변경 사항 해석을 담은 문자열 리스트 (3개)\n"
+         "2. \"strategy\": 대응 전략을 담은 문자열 리스트 (3개)\n"
+         "마크다운 태그(```json) 없이 순수 JSON 문자열만 반환하세요."),
         ("human", "{input}")
     ])
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
+    # Temperature 0.0으로 설정하여 일관된 포맷 유지
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.0) 
     return prompt | llm
 
 async def get_llm_structured_summary(context: str) -> Dict[str, Any]:
     chain = get_llm_brief_chain()
-    response = await chain.ainvoke({"input": context})
     try:
-        result = eval(response.content)
+        response = await chain.ainvoke({"input": context})
+        content = response.content.strip()
+
+        # 정규표현식으로 마크다운 코드 블록 제거 (혹시 모를 대비)
+        if "```" in content:
+            content = re.sub(r"```json|```", "", content).strip()
+        
+        result = json.loads(content)
+
+        # [디버깅용 로그] LLM이 반환한 키 확인
+        print(f">>> LLM 반환 키 목록: {list(result.keys())}") 
+        
         if not isinstance(result, dict):
-            raise ValueError
-    except Exception:
-        result = {
-            "major_analysis": [
-                "규제 적용 제품의 포장/성분 변경 필요",
-                "해당 규제 미준수 시 벌금 및 회수 위험",
-                "법적 요건 충족 위해 함량 조정 필수"
-            ],
-            "strategy": [
-                "즉시 제품 성분 조정 계획 수립",
-                "포장 및 라벨링 변경 스케쥴 준비",
-                "법적 컨설팅 및 관계 부처와 협의 시작"
-            ]
-        }
+            raise ValueError("Parsed result is not a dictionary")
+            
+    except Exception as e:
+        logger.error(f"LLM JSON Parsing Error: {e}")
+        print(f">>> 에러 발생 원문: {response.content if 'response' in locals() else 'No response'}")
+        
+        # 에러 발생 시 빈 딕셔너리 반환하여 build_sections에서 Fallback 타도록 유도
+        result = {} 
+        
     return result
 
 async def report_node(state: AppState) -> Dict[str, Any]:
