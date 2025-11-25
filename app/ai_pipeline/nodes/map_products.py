@@ -5,6 +5,7 @@ map_products.py
 
 import json
 import logging
+from decimal import Decimal
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -461,7 +462,19 @@ def _persist_mapping_snapshot(
     }
 
     snapshot_path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+        json.dumps(
+            payload,
+            ensure_ascii=False,
+            indent=2,
+            default=_json_safe_encoder,
+        ),
+        encoding="utf-8",
     )
     logger.info("📝 Mapping snapshot saved: %s", snapshot_path)
     return str(snapshot_path)
+
+
+def _json_safe_encoder(value: Any):
+    if isinstance(value, Decimal):
+        return float(value)
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
