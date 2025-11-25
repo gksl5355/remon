@@ -25,7 +25,6 @@ service = RegulationService()
 
 @router.get("/regulations")
 async def get_regulations(
-    country: str | None = Query(None, description="국가 필터 (예: EU, US)"),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -34,8 +33,8 @@ async def get_regulations(
     Returns:
         dict: {"today_count": int, "regulations": list}
     """
-    logger.info(f"GET /regulations - country={country}")
-    return await service.get_regulations(db, country)
+    logger.info(f"GET /regulations - ")
+    return await service.get_regulations(db)
 
 
 @router.get("/regulations/{regulation_id}")
