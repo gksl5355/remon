@@ -47,3 +47,6 @@ data/
 data/*
 app/data/
 .uv-cache/
+
+
+alembic.ini
