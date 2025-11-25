@@ -27,9 +27,13 @@ dependencies = [
   # --- Document Processing ---
   "pdfplumber>=0.9.0",
   "pypdf>=4.0.0",
+  "pypdfium2>=4.30.0",
   "pytesseract>=0.3.13",
   "pillow>=10.0.0",
   "python-multipart>=0.0.20",
+  "langchain-text-splitters>=0.3.0",
+  "tiktoken>=0.8.0",
+  "networkx>=3.0",
   # --- VectorDB ---
   "qdrant-client>=1.15.1",
   # --- Database ---
@@ -54,6 +58,7 @@ dependencies = [
   "rank-bm25>=0.2.2",
   "pymupdf>=1.26.6",
   "psycopg2-binary>=2.9.11",
+  "FlagEmbedding>=1.2.0",
 ]
 
 

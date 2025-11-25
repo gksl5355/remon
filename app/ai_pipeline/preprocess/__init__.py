@@ -30,8 +30,20 @@ def _get_orchestrator() -> PreprocessOrchestrator:
 
 
 async def _run_orchestrator(pdf_path: str) -> Dict[str, Any]:
-    """Blocking 전처리 작업을 별도 스레드에서 실행."""
+    """Blocking 전처리 작업을 별도 스레드에서 실행 (기존 방식)."""
     orchestrator = _get_orchestrator()
+    return await asyncio.to_thread(orchestrator.process_pdf, pdf_path)
+
+
+async def _run_vision_orchestrator(pdf_path: str) -> Dict[str, Any]:
+    """Vision Pipeline 실행."""
+    from app.ai_pipeline.preprocess.vision_orchestrator import VisionOrchestrator
+    from app.ai_pipeline.preprocess.config import PreprocessConfig
+    
+    # LangSmith 초기화
+    PreprocessConfig.setup_langsmith()
+    
+    orchestrator = VisionOrchestrator()
     return await asyncio.to_thread(orchestrator.process_pdf, pdf_path)
 
 
@@ -42,11 +54,15 @@ async def preprocess_node(state: AppState) -> AppState:
     기대 입력:
         state["preprocess_request"] = {
             "pdf_paths": ["/path/a.pdf", ...],
-            "product_info": {...}  # 선택 사항
+            "product_info": {...},  # 선택 사항
+            "use_vision_pipeline": bool  # True면 Vision Pipeline 사용
         }
     출력:
         state["preprocess_results"]  # 각 PDF 처리 결과 리스트
         state["preprocess_summary"]  # 진행 상태 메타데이터
+        state["vision_extraction_result"]  # Vision Pipeline 사용 시
+        state["graph_data"]  # Vision Pipeline 사용 시
+        state["dual_index_summary"]  # Vision Pipeline 사용 시
     """
 
     request: PreprocessRequest | None = state.get("preprocess_request")
@@ -76,19 +92,41 @@ async def preprocess_node(state: AppState) -> AppState:
         state["preprocess_summary"] = summary
         return state
 
-    logger.info("preprocess_node 시작: %d개 PDF", len(pdf_paths))
+    # Vision Pipeline 사용 여부 확인
+    use_vision = request.get("use_vision_pipeline", False)
+
+    logger.info("preprocess_node 시작: %d개 PDF (Vision: %s)", len(pdf_paths), use_vision)
 
     processed_results: List[Dict[str, Any]] = []
     success_count = 0
+    all_vision_results = []
+    all_graph_data = {"nodes": [], "edges": []}
+    all_index_summaries = []
 
     for pdf_path in pdf_paths:
         try:
-            result = await _run_orchestrator(pdf_path)
-            # process_pdf 결과에는 pdf_path가 없으므로 추적용으로 추가
+            if use_vision:
+                result = await _run_vision_orchestrator(pdf_path)
+            else:
+                result = await _run_orchestrator(pdf_path)
+            
             result.setdefault("pdf_path", pdf_path)
             processed_results.append(result)
+            
             if result.get("status") == "success":
                 success_count += 1
+                
+                # Vision Pipeline 결과 수집
+                if use_vision:
+                    all_vision_results.extend(result.get("vision_extraction_result", []))
+                    
+                    graph_data = result.get("graph_data", {})
+                    all_graph_data["nodes"].extend(graph_data.get("nodes", []))
+                    all_graph_data["edges"].extend(graph_data.get("edges", []))
+                    
+                    if result.get("dual_index_summary"):
+                        all_index_summaries.append(result["dual_index_summary"])
+                        
         except Exception as exc:  # pragma: no cover - defensive guard
             logger.exception("PDF 전처리 실패: %s", pdf_path)
             processed_results.append(
@@ -117,6 +155,17 @@ async def preprocess_node(state: AppState) -> AppState:
         "reason": None,
     }
     state["preprocess_summary"] = summary
+
+    # Vision Pipeline 결과 저장
+    if use_vision and all_vision_results:
+        state["vision_extraction_result"] = all_vision_results
+        state["graph_data"] = all_graph_data
+        state["dual_index_summary"] = {
+            "total_chunks": sum(s.get("qdrant_chunks", 0) for s in all_index_summaries),
+            "total_nodes": len(all_graph_data["nodes"]),
+            "total_edges": len(all_graph_data["edges"]),
+            "summaries": all_index_summaries
+        }
 
     # product_info가 Preprocess 단계에서 전달되는 경우 상태에 반영
     if request.get("product_info"):
