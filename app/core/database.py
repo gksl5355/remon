@@ -20,8 +20,8 @@ from sqlalchemy.pool import NullPool
 import os
 from dotenv import load_dotenv
 
-
-
+# 모델들이 상속받을 Base 클래스 정의
+Base = declarative_base()
 
 
 load_dotenv()

@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
-from core.database import Base
+from app.core.database import Base
 
 class Report(Base):
     __tablename__ = "reports"

@@ -1,8 +1,8 @@
 from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, Text, Enum, func
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
-from core.database import Base
-from core.models.enums import ChangeTypeEnum  # 프로젝트 구조에 맞게 import 경로 확인 필요
+from app.core.database import Base
+from app.core.models.enums import ChangeTypeEnum  # 프로젝트 구조에 맞게 import 경로 확인 필요
 
 class Regulation(Base):
     __tablename__ = "regulations"
@@ -61,7 +61,7 @@ class RegulationTranslation(Base):
     regulation_version_id = Column(Integer, ForeignKey("regulation_versions.regulation_version_id"), nullable=False)
     language_code = Column(String(10))
     translated_text = Column(Text)
-    glossary_term_id = Column(String, ForeignKey("glossary_terms.glossary_term_id")) # UUID 타입이면 DB에 맞게 조정
+    glossary_term_id = Column(Integer, ForeignKey("glossary_terms.glossary_term_id")) # UUID 타입이면 DB에 맞게 조정
     translation_status = Column(String(20))
     created_at = Column(DateTime, server_default=func.now())
 
