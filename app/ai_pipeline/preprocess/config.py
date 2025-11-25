@@ -36,15 +36,9 @@ class PreprocessConfig:
     환경 변수 또는 기본값에서 설정값을 로드합니다.
     """
 
-    # ==================== PDF Processing ====================
-    MAX_CHUNK_SIZE: int = 1500
-    """청크 최대 크기 (문자 단위). 기본값: 1500"""
-    
-    TABLE_BBOX_THRESHOLD: float = 0.5
-    """테이블 겹침 감지 임계값 (0-1). 기본값: 0.5"""
-    
-    PRESERVE_TABLE_INTEGRITY: bool = True
-    """테이블 분할 금지 여부. 기본값: True"""
+    # ==================== Chunking ====================
+    MAX_CHUNK_SIZE: int = 1024
+    """청크 최대 토큰 크기. 기본값: 1024"""
     
     # ==================== Embedding ====================
     EMBEDDING_MODEL: str = "BAAI/bge-m3"
@@ -62,48 +56,13 @@ class PreprocessConfig:
     EMBEDDING_BATCH_SIZE: int = 32
     """배치 임베딩 크기. 기본값: 32"""
     
-    # ==================== Chunking Strategy ====================
-    SEMANTIC_CHUNK_STRATEGY: str = "hierarchy"
-    """청킹 전략. 옵션: hierarchy, fixed. 기본값: hierarchy"""
+
     
-    FORCE_SECTION_BREAK: bool = True
-    """섹션 경계에서 강제 분리. 기본값: True"""
+
     
-    # ==================== Hybrid Search ====================
-    HYBRID_ALPHA: float = 0.5
-    """하이브리드 검색 가중치. 0.5 = 50% 의미검색 + 50% BM25. 범위: 0-1"""
+
     
-    TABLE_BOOST: float = 1.3
-    """테이블 포함 청크 점수 부스트. 기본값: 1.3"""
-    
-    CATEGORY_BOOST: float = 1.3
-    """카테고리 매칭 점수 부스트. 기본값: 1.3"""
-    
-    SEARCH_TOP_K: int = 5
-    """검색 결과 상위 K개. 기본값: 5"""
-    
-    # ==================== Proposition Extraction ====================
-    PROPOSITION_BATCH_SIZE: int = 3
-    """명제 추출 병렬 워커 수. 기본값: 3"""
-    
-    PROPOSITION_MODEL: str = "gpt-4o-mini"
-    """명제 추출용 LLM 모델. 기본값: gpt-4o-mini"""
-    
-    MAX_PROPOSITIONS_PER_CHUNK: int = 5
-    """청크당 최대 명제 수. 기본값: 5"""
-    
-    PROPOSITION_TEMPERATURE: float = 0.3
-    """명제 추출 LLM 온도 (일관성). 기본값: 0.3"""
-    
-    PROPOSITION_MAX_TOKENS: int = 500
-    """명제 추출 LLM 최대 토큰. 기본값: 500"""
-    
-    # ==================== Metadata ====================
-    EXTRACT_LEGAL_HIERARCHY: bool = True
-    """법률 계층 구조 추출 여부. 기본값: True"""
-    
-    DETECT_CATEGORY: bool = True
-    """규제 카테고리 감지 여부. 기본값: True"""
+
     
     # ==================== VectorDB (Qdrant) ====================
     QDRANT_HOST: str = os.getenv("QDRANT_HOST", "localhost")
@@ -141,6 +100,31 @@ class PreprocessConfig:
     OPENAI_TIMEOUT: int = int(os.getenv("OPENAI_TIMEOUT", "30"))
     """OpenAI 요청 타임아웃 (초). 기본값: 30"""
     
+    # ==================== Vision Pipeline ====================
+    VISION_MODEL_COMPLEX: str = os.getenv("VISION_MODEL_COMPLEX", "gpt-4o")
+    """복잡한 표 처리용 Vision 모델. 기본값: gpt-4o"""
+    
+    VISION_MODEL_SIMPLE: str = os.getenv("VISION_MODEL_SIMPLE", "gpt-4o-mini")
+    """단순 텍스트 처리용 Vision 모델. 기본값: gpt-4o-mini"""
+    
+    VISION_DPI: int = int(os.getenv("VISION_DPI", "300"))
+    """PDF 이미지 렌더링 DPI. 기본값: 300"""
+    
+    COMPLEXITY_THRESHOLD: float = float(os.getenv("COMPLEXITY_THRESHOLD", "0.3"))
+    """표 복잡도 임계값 (0-1). 이상이면 GPT-4o 사용. 기본값: 0.3"""
+    
+    VISION_MAX_TOKENS: int = int(os.getenv("VISION_MAX_TOKENS", "4096"))
+    """Vision LLM 최대 출력 토큰. 기본값: 4096"""
+    
+    VISION_TEMPERATURE: float = float(os.getenv("VISION_TEMPERATURE", "0.1"))
+    """Vision LLM 온도 (구조 추출용 낮게). 기본값: 0.1"""
+    
+    ENABLE_GRAPH_EXTRACTION: bool = os.getenv("ENABLE_GRAPH_EXTRACTION", "true").lower() == "true"
+    """지식 그래프 추출 활성화. 기본값: True"""
+    
+    DOCUMENT_ANALYSIS_PAGES: int = int(os.getenv("DOCUMENT_ANALYSIS_PAGES", "3"))
+    """문서 규칙 파악용 초기 분석 페이지 수. 기본값: 3"""
+    
     # ==================== LangSmith (추적) ====================
     ENABLE_LANGSMITH: bool = os.getenv("LANGCHAIN_TRACING_V2", "false").lower() == "true"
     """LangSmith 추적 활성화 여부"""
@@ -148,8 +132,19 @@ class PreprocessConfig:
     LANGCHAIN_API_KEY: Optional[str] = os.getenv("LANGCHAIN_API_KEY")
     """LangSmith API 키 (.env에서 로드)"""
     
-    LANGCHAIN_PROJECT: str = os.getenv("LANGCHAIN_PROJECT", "remon-advanced-rag")
-    """LangSmith 프로젝트명 (.env에서 로드). 기본값: remon-advanced-rag"""
+    LANGCHAIN_PROJECT: str = os.getenv("LANGCHAIN_PROJECT", "remon-vision-pipeline")
+    """LangSmith 프로젝트명 (.env에서 로드). 기본값: remon-vision-pipeline"""
+    
+    @classmethod
+    def setup_langsmith(cls) -> None:
+        """LangSmith 환경변수 설정."""
+        if cls.ENABLE_LANGSMITH and cls.LANGCHAIN_API_KEY:
+            os.environ["LANGCHAIN_TRACING_V2"] = "true"
+            os.environ["LANGCHAIN_API_KEY"] = cls.LANGCHAIN_API_KEY
+            os.environ["LANGCHAIN_PROJECT"] = cls.LANGCHAIN_PROJECT
+            logger.info(f"✅ LangSmith 활성화: {cls.LANGCHAIN_PROJECT}")
+        else:
+            logger.info("⚠️ LangSmith 비활성화")
     
     # ==================== Redis (비동기 선택사항) ====================
     REDIS_URL: Optional[str] = os.getenv("REDIS_URL")
@@ -175,29 +170,14 @@ class PreprocessConfig:
     @classmethod
     def validate(cls) -> None:
         """설정값 유효성 검증."""
-        # Alpha 범위 검증
-        if not (0 <= cls.HYBRID_ALPHA <= 1):
-            raise ValueError(f"HYBRID_ALPHA must be between 0 and 1, got {cls.HYBRID_ALPHA}")
-        
-        # 청크 크기 검증
         if cls.MAX_CHUNK_SIZE < 100:
             raise ValueError(f"MAX_CHUNK_SIZE must be >= 100, got {cls.MAX_CHUNK_SIZE}")
         
-        # 임베딩 차원 검증 (BGE-M3 고정)
         if cls.EMBEDDING_DIMENSION != 1024:
             raise ValueError(f"BGE-M3 requires EMBEDDING_DIMENSION=1024, got {cls.EMBEDDING_DIMENSION}")
         
-        # 로그 레벨 검증
-        valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
-        if cls.LOG_LEVEL not in valid_levels:
-            raise ValueError(f"LOG_LEVEL must be one of {valid_levels}, got {cls.LOG_LEVEL}")
-        
-        # Qdrant 경로 검증
-        if not cls.QDRANT_PATH:
-            raise ValueError("QDRANT_PATH is not set. Check .env file")
-        
-        if not cls.QDRANT_COLLECTION:
-            raise ValueError("QDRANT_COLLECTION is not set. Check .env file")
+        if not cls.QDRANT_PATH or not cls.QDRANT_COLLECTION:
+            raise ValueError("QDRANT_PATH and QDRANT_COLLECTION must be set")
     
     @classmethod
     def get_embedding_config(cls) -> dict:
@@ -210,25 +190,9 @@ class PreprocessConfig:
             "batch_size": cls.EMBEDDING_BATCH_SIZE,
         }
     
-    @classmethod
-    def get_chunking_config(cls) -> dict:
-        """청킹 설정 딕셔너리 반환."""
-        return {
-            "max_size": cls.MAX_CHUNK_SIZE,
-            "strategy": cls.SEMANTIC_CHUNK_STRATEGY,
-            "preserve_table": cls.PRESERVE_TABLE_INTEGRITY,
-            "force_section_break": cls.FORCE_SECTION_BREAK,
-        }
+
     
-    @classmethod
-    def get_search_config(cls) -> dict:
-        """검색 설정 딕셔너리 반환."""
-        return {
-            "alpha": cls.HYBRID_ALPHA,
-            "table_boost": cls.TABLE_BOOST,
-            "category_boost": cls.CATEGORY_BOOST,
-            "top_k": cls.SEARCH_TOP_K,
-        }
+
     
     @classmethod
     def get_openai_config(cls) -> dict:
@@ -240,6 +204,23 @@ class PreprocessConfig:
             "model_proposition": cls.OPENAI_MODEL_PROPOSITION,
             "model_answer": cls.OPENAI_MODEL_ANSWER,
             "timeout": cls.OPENAI_TIMEOUT,
+        }
+    
+    @classmethod
+    def get_vision_config(cls) -> dict:
+        """Vision Pipeline 설정 딕셔너리 반환."""
+        if not cls.OPENAI_API_KEY:
+            raise ValueError("OPENAI_API_KEY not set in environment")
+        return {
+            "api_key": cls.OPENAI_API_KEY,
+            "model_complex": cls.VISION_MODEL_COMPLEX,
+            "model_simple": cls.VISION_MODEL_SIMPLE,
+            "dpi": cls.VISION_DPI,
+            "complexity_threshold": cls.COMPLEXITY_THRESHOLD,
+            "max_tokens": cls.VISION_MAX_TOKENS,
+            "temperature": cls.VISION_TEMPERATURE,
+            "enable_graph": cls.ENABLE_GRAPH_EXTRACTION,
+            "analysis_pages": cls.DOCUMENT_ANALYSIS_PAGES,
         }
     
     @classmethod
