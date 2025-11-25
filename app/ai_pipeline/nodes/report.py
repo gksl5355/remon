@@ -16,7 +16,6 @@ from langchain_core.prompts import ChatPromptTemplate
 from app.ai_pipeline.state import AppState
 
 # DB 연동
-from app.core.repositories.report_repository import ReportRepository
 from app.core.database import AsyncSessionLocal
 
 load_dotenv()
@@ -236,34 +235,17 @@ async def report_node(state: AppState) -> Dict[str, Any]:
         "sections": sections
     }
 
-    # RDB 저장
+    # RDB 저장 (ReportSummary만 저장)
     async with AsyncSessionLocal() as db_session:
-        repo = ReportRepository()
+        from app.core.repositories.report_repository import ReportSummaryRepository
         
-        # product_id는 product_info에서 추출 (문자열이면 정수로 변환)
-        product_id = state.get("product_info", {}).get("product_id", 1)
-        if isinstance(product_id, str):
-            product_id = int(product_id) if product_id.isdigit() else 1
-        
-        report_data = {
-            "created_reason": "AI pipeline auto-generated",
-            "translation_id": state.get("translation_id", 1),
-            "change_id": state.get("change_id", 1),
-            "product_id": product_id,
-            "country_code": meta.get("country", "US")[:2]
-        }
-        
-        items_data = []
-
-        summaries_data = [{
-            "impact_score_id": impact_score.get("impact_score_id", 1),
-            "summary_text": sections  # JSONB로 저장
-        }]
+        summary_repo = ReportSummaryRepository()
         
         try:
-            report_record = await repo.create_with_items(db_session, report_data, items_data, summaries_data)
+            summary_record = await summary_repo.create_report_summary(db_session, sections)
             await db_session.commit()
-            report_json["report_id"] = report_record.report_id
+            report_json["report_id"] = summary_record.summary_id
+            logger.info(f"ReportSummary 저장 완료: summary_id={summary_record.summary_id}")
         except Exception as e:
             await db_session.rollback()
             logger.error(f"DB 저장 실패: {e}")
@@ -278,17 +260,16 @@ if __name__ == "__main__":
 
     dummy_state: AppState = {
         "product_info": {
-            "product_id": "VAP-002",
+            "product_id": "1",
             "country": "EU",
-            "region": "유럽연합(EU)",
             "features": {"nicotine_concentration": 15},
             "feature_units": {"nicotine_concentration": "mg"}
         },
         "mapping": {
-            "product_id": "VAP-002",
+            "product_id": "1",
             "items": [
                 {
-                    "product_id": "VAP-002",
+                    "product_id": "1",
                     "feature_name": "nicotine_concentration",
                     "applies": True,
                     "required_value": 10,
@@ -305,23 +286,17 @@ if __name__ == "__main__":
                 }
             ]
         },
-        "strategy": {
-            "product_id": "VAP-002",
-            "items": [
-                {
-                    "feature_name": "nicotine_concentration",
-                    "regulation_chunk_id": "EU-TPD-01",
-                    "impact_level": "High",
-                    "summary": "니코틴 제한 초과",
-                    "recommendation": "니코틴 함량 조정 및 신규 라벨 디자인 필요"
-                }
-            ]
-        },
+        "strategies": [
+            "니코틴 함량을 10mg 이하로 조정",
+            "신규 라벨 디자인 및 인증 절차 진행",
+            "규제 준수 일정 수립 및 모니터링"
+        ],
         "impact_scores": [
             {
-                "impact_level": "High",
+                "raw_scores": {"severity": 5, "urgency": 4, "scope": 3},
+                "reasoning": "니코틴 함량이 규제 기준을 초과하여 즉시 교정이 필요하며, 벌금 및 시장 퇴출 위험 존재",
                 "weighted_score": 4.8,
-                "reasoning": "니코틴 함량이 규제 기준을 초과하여 즉시 교정이 필요하며, 벌금 및 시장 퇴출 위험 존재"
+                "impact_level": "High"
             }
         ]
     }

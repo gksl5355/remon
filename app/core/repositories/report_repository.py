@@ -119,55 +119,37 @@ class ReportSummaryRepository(BaseRepository[ReportSummary]):
     def __init__(self):
         super().__init__(ReportSummary)
     
-    async def get_by_report_id(
+    async def create_report_summary(
         self,
         db: AsyncSession,
-        report_id: int
-    ) -> List[ReportSummary]:
+        summary_data: dict
+    ) -> ReportSummary:
         """
-        리포트 ID로 서머리 목록 조회
+        ReportSummary만 단독 생성
+        
+        Args:
+            db: 데이터베이스 세션
+            summary_data: sections JSON (배열)
+        
+        Returns:
+            생성된 ReportSummary 객체
+        """
+        summary = ReportSummary(summary_text=summary_data)
+        db.add(summary)
+        await db.flush()
+        await db.refresh(summary)
+        return summary
+    
+    async def get_by_summary_id(
+        self,
+        db: AsyncSession,
+        summary_id: int
+    ) -> Optional[ReportSummary]:
+        """
+        summary_id로 서머리 조회
         """
         result = await db.execute(
             select(ReportSummary)
-            .where(ReportSummary.report_id == report_id)
+            .where(ReportSummary.summary_id == summary_id)
         )
-        return list(result.scalars().all())
-
-
-# from typing import List, Optional
-# from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy import select
-# from sqlalchemy.orm import selectinload
-# from core.models import Report, ReportItem, ReportSummary
-# from .base_repository import BaseRepository
-
-# class ReportRepository(BaseRepository[Report]):
-#     def __init__(self):
-#         super().__init__(Report)
-    
-#     async def get_with_items(
-#         self, db: AsyncSession, report_id: int
-#     ) -> Optional[Report]:
-#         """리포트 항목을 포함한 조회"""
-#         result = await db.execute(
-#             select(Report)
-#             .options(
-#                 selectinload(Report.items),
-#                 selectinload(Report.summaries)
-#             )
-#             .where(Report.report_id == report_id)
-#         )
-#         return result.scalar_one_or_none()
-    
-    
-#     async def get_by_country_and_product(
-#         self, db: AsyncSession, country_code: str, product_id: int
-#     ) -> List[Report]:
-#         """국가 및 제품별 리포트 조회"""
-#         result = await db.execute(
-#             select(Report).where(
-#                 Report.country_code == country_code,
-#                 Report.product_id == product_id
-#             )
-#         )
-#         return result.scalars().all()
+        return result.scalar_one_or_none()

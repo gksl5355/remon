@@ -1,8 +1,8 @@
 from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, Text, Enum, func
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
-from core.database import Base
-from core.models.enums import ChangeTypeEnum  # 프로젝트 구조에 맞게 import 경로 확인 필요
+from . import Base
+from app.core.models.enums import ChangeTypeEnum  # 프로젝트 구조에 맞게 import 경로 확인 필요
 
 class Regulation(Base):
     __tablename__ = "regulations"
