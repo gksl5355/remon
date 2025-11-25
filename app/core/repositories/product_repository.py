@@ -3,6 +3,7 @@
 제품 Repository
 """
 from typing import Optional, Dict, Any, Set
+from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
@@ -126,6 +127,11 @@ class ProductRepository(BaseRepository[Product]):
             value = row.get(field)
             if value in (None, ""):
                 continue
+
+            # Decimal 등 JSON 직렬화가 어려운 값은 미리 float로 변환한다.
+            if isinstance(value, Decimal):
+                value = float(value)
+
             features[field] = value
             feature_units[field] = unit
         
