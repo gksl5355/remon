@@ -1,46 +1,54 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func
 from sqlalchemy.orm import relationship
-from datetime import datetime
-from . import Base
+from sqlalchemy.dialects.postgresql import JSONB
+from core.database import Base
 
 class Report(Base):
     __tablename__ = "reports"
+
+    report_id = Column(Integer, primary_key=True, index=True)
+    created_reason = Column(String(30))
+    created_at = Column(DateTime, server_default=func.now())
+    file_path = Column(String(500))
     
-    report_id = Column(Integer, primary_key=True, autoincrement=True)
-    created_reason = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    file_path = Column(String(500), nullable=True)
     translation_id = Column(Integer, ForeignKey("regulation_translations.translation_id"), nullable=False)
-    change_id = Column(Integer, ForeignKey("regulation_change_history.change_id"), nullable=False)
-    product_id = Column(Integer, ForeignKey("products.product_id"), nullable=False)
+    change_id = Column(Integer, ForeignKey("regulation_change_history.change_id"))
+    product_id = Column(Integer, ForeignKey("products.product_id"))
     country_code = Column(String(2), ForeignKey("countries.country_code"), nullable=False)
-    
+
     # Relationships
+    translation = relationship("RegulationTranslation", back_populates="reports")
+    change = relationship("RegulationChangeHistory", back_populates="reports")
+    product = relationship("Product", back_populates="reports")
+    country = relationship("Country", back_populates="reports")
+    
     items = relationship("ReportItem", back_populates="report", cascade="all, delete-orphan")
-    summaries = relationship("ReportSummary", back_populates="report", cascade="all, delete-orphan")
+    # [삭제됨] ReportSummary와의 관계 제거 (1:1 or 1:N 관계가 FK 삭제로 끊어짐)
+
 
 class ReportItem(Base):
     __tablename__ = "report_items"
-    
-    item_id = Column(Integer, primary_key=True, autoincrement=True)
+
+    item_id = Column(Integer, primary_key=True, index=True)
     report_id = Column(Integer, ForeignKey("reports.report_id"), nullable=False)
-    regulation_version_id = Column(Integer, ForeignKey("regulation_versions.regulation_version_id"), nullable=False)
-    impact_score_id = Column(Integer, ForeignKey("impact_scores.impact_score_id"), nullable=False)
-    order_no = Column(Integer, nullable=False)
-    
+    regulation_version_id = Column(Integer, ForeignKey("regulation_versions.regulation_version_id"))
+    impact_score_id = Column(Integer, ForeignKey("impact_scores.impact_score_id"))
+    order_no = Column(Integer)
+
     # Relationships
     report = relationship("Report", back_populates="items")
-    regulation_version = relationship("RegulationVersion", back_populates="report_items")
+    version = relationship("RegulationVersion")
+    impact_score = relationship("ImpactScore")
+
 
 class ReportSummary(Base):
     __tablename__ = "report_summaries"
+
+    summary_id = Column(Integer, primary_key=True, index=True)
     
-    summary_id = Column(Integer, primary_key=True, autoincrement=True)
-    report_id = Column(Integer, ForeignKey("reports.report_id"), nullable=False)
-    impact_score_id = Column(Integer, ForeignKey("impact_scores.impact_score_id"), nullable=False)
-    summary_text = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    # [변경] report_id, impact_score_id 제거 및 JSONB 컬럼으로 변경
+    summary_text = Column(JSONB)
     
-    # Relationships
-    report = relationship("Report", back_populates="summaries")
-    impact_score = relationship("ImpactScore", back_populates="report_summaries")
+    created_at = Column(DateTime, server_default=func.now())
+
+    # [변경] FK 제거로 인해 모든 Relationship 삭제됨
