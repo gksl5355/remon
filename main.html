@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>REMON AI - SOTA Core Technology (Corrected)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400&display=swap');
+        
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background-color: #050505;
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+
+        /* Glassmorphism */
+        .tech-card {
+            background: linear-gradient(145deg, rgba(30, 41, 59, 0.4), rgba(15, 23, 42, 0.6));
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .tech-card:hover {
+            transform: translateY(-5px) scale(1.01);
+            border-color: rgba(59, 130, 246, 0.5);
+            box-shadow: 0 0 30px rgba(59, 130, 246, 0.2);
+        }
+
+        /* Code Window */
+        .code-window {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            overflow: hidden;
+        }
+        .code-header {
+            background: #161b22;
+            padding: 8px 16px;
+            border-bottom: 1px solid #30363d;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .dot { width: 10px; height: 10px; border-radius: 50%; }
+        .dot-red { background: #ff5f56; }
+        .dot-yellow { background: #ffbd2e; }
+        .dot-green { background: #27c93f; }
+
+        /* Highlights */
+        .highlight-ddh { color: #60a5fa; font-weight: bold; }
+        .highlight-rag { color: #c084fc; font-weight: bold; }
+        .highlight-emb { color: #4ade80; font-weight: bold; }
+
+        /* Animation */
+        @keyframes pulse-border {
+            0% { border-color: rgba(244, 63, 94, 0.1); }
+            50% { border-color: rgba(244, 63, 94, 0.5); }
+            100% { border-color: rgba(244, 63, 94, 0.1); }
+        }
+        .sota-badge {
+            animation: pulse-border 2s infinite;
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen flex flex-col items-center">
+
+    <!-- 1. Hero Section -->
+    <section class="w-full max-w-7xl px-6 py-20 flex flex-col items-center text-center">
+        <div class="mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-rose-900/20 border border-rose-500/30 sota-badge">
+            <span class="w-2 h-2 bg-rose-500 rounded-full animate-pulse"></span>
+            <span class="text-rose-400 text-sm font-bold tracking-wider">SOTA ARCHITECTURE REVEAL</span>
+        </div>
+        
+        <h1 class="text-5xl md:text-7xl font-extrabold mb-8 leading-tight">
+            What is <span class="text-white">SOTA</span><br>
+            <span class="text-slate-500 text-3xl md:text-5xl">in Regulatory AI?</span>
+        </h1>
+
+        <div class="max-w-4xl text-lg md:text-xl text-slate-400 leading-relaxed mb-12 text-left md:text-center bg-slate-900/50 p-8 rounded-xl border border-slate-800">
+            <p class="mb-4">
+                <strong class="text-white">State-of-the-Art (SOTA)</strong>란 "현재 기술 수준에서 달성 가능한 <strong>최고의 성능과 방법론</strong>"을 의미합니다.
+            </p>
+            <p>
+                우리의 시스템은 단순히 최신 AI 모델을 쓰는 것을 넘어,<br>
+                <span class="highlight-ddh">1. 법적 표준 준수(Compliance)</span>, 
+                <span class="highlight-rag">2. 문맥 무결성(Context)</span>, 
+                <span class="highlight-emb">3. 의미론적 정확성(Semantics)</span>을<br>
+                동시에 해결하는 <strong>Engineered SOTA Architecture</strong>입니다.
+            </p>
+        </div>
+
+        <!-- 3 Core Pillars -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+            <!-- Card 1: DDH -->
+            <div class="tech-card p-8 rounded-2xl text-left relative overflow-hidden group border-t-4 border-blue-500">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl -mr-16 -mt-16 transition group-hover:bg-blue-500/20"></div>
+                <i class="fa-solid fa-book-bookmark text-4xl text-blue-500 mb-6"></i>
+                <h3 class="text-xl font-bold text-white mb-2">DDH Compliance</h3>
+                <p class="text-blue-400 text-xs font-mono mb-4">Document Drafting Handbook</p>
+                <p class="text-slate-300 text-sm">미국 연방 규정 작성 표준(HandBook)을 완벽히 구현한 정규표현식 엔진으로 법적 구조를 파싱합니다.</p>
+            </div>
+            <!-- Card 2: Parent-Child -->
+            <div class="tech-card p-8 rounded-2xl text-left relative overflow-hidden group border-t-4 border-purple-500">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl -mr-16 -mt-16 transition group-hover:bg-purple-500/20"></div>
+                <i class="fa-solid fa-network-wired text-4xl text-purple-500 mb-6"></i>
+                <h3 class="text-xl font-bold text-white mb-2">Parent-Child RAG</h3>
+                <p class="text-purple-400 text-xs font-mono mb-4">Contextual Decoupling</p>
+                <p class="text-slate-300 text-sm">검색은 '미세 조항(Child)'으로 정밀하게, 답변은 '전체 섹션(Parent)'으로 풍부하게 생성하여 할루시네이션을 차단합니다.</p>
+            </div>
+            <!-- Card 3: Hybrid Embedding -->
+            <div class="tech-card p-8 rounded-2xl text-left relative overflow-hidden group border-t-4 border-green-500">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-green-500/10 rounded-full blur-2xl -mr-16 -mt-16 transition group-hover:bg-green-500/20"></div>
+                <i class="fa-solid fa-dna text-4xl text-green-500 mb-6"></i>
+                <h3 class="text-xl font-bold text-white mb-2">Hybrid Embedding</h3>
+                <p class="text-green-400 text-xs font-mono mb-4">BGE-M3 SOTA Model</p>
+                <p class="text-slate-300 text-sm">단어의 의미(Dense)와 키워드 일치(Sparse)를 동시에 처리하는 최신 SOTA 모델을 적용했습니다.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 2. Deep Dive: DDH -->
+    <section class="w-full max-w-7xl px-6 py-16 border-t border-slate-800/50">
+        <div class="flex flex-col md:flex-row gap-12 items-center">
+            <div class="w-full md:w-1/2">
+                <span class="text-blue-500 font-bold tracking-widest text-sm">STANDARD PARSING</span>
+                <h2 class="text-3xl font-bold mt-2 mb-6">Document Drafting Handbook <span class="text-blue-400">(DDH)</span></h2>
+                <p class="text-slate-300 text-lg mb-6 leading-relaxed">
+                    법률 문서는 아무렇게나 쓰여지지 않습니다. 미국 NARA의 <span class="text-white font-semibold">Document Drafting Handbook</span>이라는 엄격한 표준에 따라 작성됩니다.<br><br>
+                    우리의 <strong>Hierarchy Extractor</strong>는 이 핸드북의 규칙(Section 2-15)을 코드로 옮겨, 
+                    <span class="text-white bg-blue-900/30 px-2 py-1 rounded text-sm border border-blue-500/30">Section > Paragraph(a) > Paragraph(1)</span>의 
+                    구조를 정확하게 인식합니다. 이는 AI 모델보다 더 정확한 <strong>Rule-based SOTA</strong> 접근 방식입니다.
+                </p>
+            </div>
+            <div class="w-full md:w-1/2">
+                <div class="code-window shadow-2xl shadow-blue-900/20">
+                    <div class="code-header">
+                        <div class="flex gap-1.5">
+                            <div class="dot dot-red"></div>
+                            <div class="dot dot-yellow"></div>
+                            <div class="dot dot-green"></div>
+                        </div>
+                        <span class="text-slate-500 ml-3 text-xs">hierarchy_extractor.py</span>
+                    </div>
+                    <div class="p-4 text-slate-300 overflow-x-auto">
+<pre><code class="language-python"><span class="text-purple-400">class</span> <span class="text-yellow-300">HierarchyExtractor</span>:
+    <span class="text-slate-500"># DDH (Document Drafting Handbook) 표준 패턴 정의</span>
+    HIERARCHY_LEVELS = {
+        <span class="text-blue-400">1</span>: {
+            <span class="text-green-400">"name"</span>: <span class="text-green-400">"chapter"</span>, 
+            <span class="text-green-400">"pattern"</span>: r<span class="text-green-400">"^(Chapter\s+[IVX]+)"</span>
+        },
+        <span class="text-blue-400">2</span>: {
+            <span class="text-green-400">"name"</span>: <span class="text-green-400">"section"</span>, 
+            <span class="text-green-400">"pattern"</span>: r<span class="text-green-400">"^\d+\.\d+"</span>  <span class="text-slate-500"># 예: 101.1 (CFR 표준)</span>
+        },
+        <span class="text-blue-400">3</span>: {
+            <span class="text-green-400">"name"</span>: <span class="text-green-400">"paragraph"</span>, 
+            <span class="text-green-400">"pattern"</span>: r<span class="text-green-400">"^\([a-z]\)"</span>   <span class="text-slate-500"># 예: (a) (DDH 규격)</span>
+        }
+    }</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. Deep Dive: Parent-Child -->
+    <section class="w-full max-w-7xl px-6 py-16 border-t border-slate-800/50">
+        <div class="flex flex-col md:flex-row-reverse gap-12 items-center">
+            <div class="w-full md:w-1/2">
+                <span class="text-purple-500 font-bold tracking-widest text-sm">RETRIEVAL STRATEGY SOTA</span>
+                <h2 class="text-3xl font-bold mt-2 mb-6">Parent-Child <span class="text-purple-400">RAG</span></h2>
+                <p class="text-slate-300 text-lg mb-6 leading-relaxed">
+                    검색의 딜레마(정밀도 vs 문맥)를 해결하는 <strong>State-of-the-Art 전략</strong>입니다.<br><br>
+                    우리의 코드는 문서를 쪼갤 때, 검색용 <strong>Child Chunk</strong>와 답변용 <strong>Parent Chunk</strong>를 동시에 생성하고 연결합니다. 
+                    AI는 작은 조각을 찾아내지만, 사용자에게는 전체 조항(Section)을 보여주어 <span class="text-white font-bold">문맥 왜곡 없는 답변</span>을 제공합니다.
+                </p>
+            </div>
+            <div class="w-full md:w-1/2">
+                <div class="code-window shadow-2xl shadow-purple-900/20">
+                    <div class="code-header">
+                        <div class="flex gap-1.5">
+                            <div class="dot dot-red"></div>
+                            <div class="dot dot-yellow"></div>
+                            <div class="dot dot-green"></div>
+                        </div>
+                        <span class="text-slate-500 ml-3 text-xs">semantic_chunker.py</span>
+                    </div>
+                    <div class="p-4 text-slate-300 overflow-x-auto">
+<pre><code class="language-python"><span class="text-purple-400">def</span> <span class="text-blue-300">create_chunks</span>(<span class="text-blue-300">self</span>, section):
+    <span class="text-slate-500"># [Parent] 전체 문맥 보존 (LLM 답변용)</span>
+    parent = ProcessedChunk(
+        chunk_id=f<span class="text-green-400">"parent_{section['id']}"</span>,
+        context_text=section[<span class="text-green-400">'full_text'</span>],
+        chunk_type=<span class="text-green-400">"parent"</span>
+    )
+    
+    <span class="text-slate-500"># [Child] DDH 구조 기반 세분화 (검색용)</span>
+    <span class="text-purple-400">for</span> para <span class="text-purple-400">in</span> section[<span class="text-green-400">'paragraphs'</span>]:
+        <span class="text-purple-400">yield</span> ProcessedChunk(
+            text=para, 
+            parent_id=parent.chunk_id,  <span class="text-slate-500"># 부모 연결</span>
+            chunk_type=<span class="text-green-400">"child"</span>
+        )</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 4. Deep Dive: Hybrid Embedding -->
+    <section class="w-full max-w-7xl px-6 py-16 border-t border-slate-800/50 mb-20">
+        <div class="flex flex-col md:flex-row gap-12 items-center">
+            <div class="w-full md:w-1/2">
+                <span class="text-green-500 font-bold tracking-widest text-sm">MODEL SOTA</span>
+                <h2 class="text-3xl font-bold mt-2 mb-6">BGE-M3 <span class="text-green-400">Hybrid Embedding</span></h2>
+                <p class="text-slate-300 text-lg mb-6 leading-relaxed">
+                    "전자담배"와 "ENDS"가 같은 의미임을 아는 것(Dense)과, "0.7mg"이라는 수치를 정확히 찾는 것(Sparse)은 다릅니다.<br><br>
+                    본 시스템은 이 두 가지를 동시에 수행하는 <strong>SOTA 모델(BGE-M3)</strong>을 탑재하여, 
+                    <span class="text-white bg-green-900/30 px-2 py-1 rounded text-sm border border-green-500/30">Dense Vector</span>와 
+                    <span class="text-white bg-green-900/30 px-2 py-1 rounded text-sm border border-green-500/30">Sparse Vector</span>를 
+                    결합한 하이브리드 검색을 수행합니다.
+                </p>
+            </div>
+            <div class="w-full md:w-1/2">
+                <div class="code-window shadow-2xl shadow-green-900/20">
+                    <div class="code-header">
+                        <div class="flex gap-1.5">
+                            <div class="dot dot-red"></div>
+                            <div class="dot dot-yellow"></div>
+                            <div class="dot dot-green"></div>
+                        </div>
+                        <span class="text-slate-500 ml-3 text-xs">embedding_pipeline.py</span>
+                    </div>
+                    <div class="p-4 text-slate-300 overflow-x-auto">
+<pre><code class="language-python"><span class="text-purple-400">class</span> <span class="text-yellow-300">EmbeddingPipeline</span>:
+    <span class="text-purple-400">def</span> <span class="text-blue-300">__init__</span>(<span class="text-blue-300">self</span>):
+        <span class="text-slate-500"># Current SOTA Model: BGE-M3</span>
+        self.model = BGEM3FlagModel(<span class="text-green-400">'BAAI/bge-m3'</span>)
+
+    <span class="text-purple-400">def</span> <span class="text-blue-300">generate_vectors</span>(<span class="text-blue-300">self</span>, text):
+        output = self.model.encode(
+            text, 
+            return_dense=<span class="text-purple-400">True</span>,  <span class="text-slate-500"># 의미 검색 (Semantic)</span>
+            return_sparse=<span class="text-purple-400">True</span>  <span class="text-slate-500"># 키워드 매칭 (Lexical)</span>
+        )
+        <span class="text-purple-400">return</span> output</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="w-full py-8 border-t border-slate-800 bg-slate-950 text-center">
+        <p class="text-slate-500 text-sm mb-2">REMON AI - Regulatory Monitoring System Architecture v1.2</p>
+        <div class="flex justify-center gap-4 text-xs text-slate-600">
+            <span><i class="fa-solid fa-check mr-1"></i> DDH Compliant</span>
+            <span><i class="fa-solid fa-layer-group mr-1"></i> SOTA RAG</span>
+            <span><i class="fa-solid fa-code mr-1"></i> Python 3.10+</span>
+        </div>
+    </footer>
+
+</body>
+</html>
