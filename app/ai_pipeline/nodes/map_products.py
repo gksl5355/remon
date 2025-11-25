@@ -156,19 +156,6 @@ class MappingNode:
         self.search_tool = search_tool or get_retrieval_tool()
         self.top_k = top_k
         self.alpha = alpha  # 🔥 dynamic hybrid weight
-        # TODO(remon-rag): replace any ad-hoc StaticRetrievalTool usage with the real
-        # RegulationRetrievalTool wired to the production VectorDB/RDB once torch
-        # dependencies are restored. This entry point already accepts an injected
-        # search tool, so future wiring should happen in the caller (pipeline graph).
-        # TODO(remon-qdrant): VectorClient / RegulationRetrievalTool rework
-        # 현재 Qdrant SDK 호출과 호환되지 않아 search_tool 호출에서 연속적으로 실패 중.
-        # 새 하이브리드 검색 Tool 도입 시 아래 search_tool 인스턴스만 교체하면 됨.
-        
-    # 기존 코드
-        # self.product_repository = (
-        #     product_repository or ProductRepository(AsyncSessionLocal)
-        # )
-        # self.debug_enabled = settings.MAPPING_DEBUG_ENABLED
     
     # 수정: Repository 생성 (클래스만 변경)
         self.product_repository = product_repository or ProductRepository()
