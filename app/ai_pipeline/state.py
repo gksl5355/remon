@@ -6,21 +6,14 @@ LangGraph 전역 State 스키마 정의 – Production Minimal Version
 from typing import Any, Dict, List, Optional, TypedDict, Literal
 
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
-
 # ---------------------------------------------------------------------------
 # 1) 제품 정보 – 모든 노드가 참조하는 전역 정보
 # ---------------------------------------------------------------------------
 class ProductInfo(TypedDict):
     product_id: str
-    # TODO(remon-types): tighten Any → Union[float, str, bool, None] once product
-    # feature schema solidifies; currently heterogeneous values require Any.
     features: Dict[str, Any]  # 예: {"battery_capacity": 3000, "noise": 70}
     feature_units: Dict[str, str]  # 예: {"battery_capacity": "mAh", "noise": "dB"}
-
-# app/state/pipeline_state.py
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+    country: Optional[str]
 
 # ---------------------------------------------------------------------------
 # 2) 검색 결과 – 검색 TOOL → 매핑 노드로 전달되는 데이터 구조
