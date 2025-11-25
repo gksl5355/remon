@@ -49,10 +49,10 @@ class HierarchyExtractor:
     DDH_PATTERNS = {
         "HEADER": r"^(AGENCY|ACTION|SUMMARY|DATES|ADDRESSES):",
         "ISSUANCE": r"(amends|adds|revises).*?part.*?to read as follows:",
-        "SECTION": r"^(§|SEC\.)\s*(\d+\.\d+)\s*(.*)",
-        "LEVEL_1": r"^\((a|[a-z])\)",
-        "LEVEL_2": r"^\(([1-9]|[0-9]+)\)",
-        "LEVEL_3": r"^\((i|ii|iii|iv|v)\)",
+        "SECTION": r"^(§|SEC\.|SECTION)\s*(\d+(?:\.\d+)?)\s*(.*)",  # § 1160.3 또는 SEC. 101 지원
+        "LEVEL_1": r"^\((a|[a-z])\)\s*",
+        "LEVEL_2": r"^\(([1-9]|[0-9]+)\)\s*",
+        "LEVEL_3": r"^\((i|ii|iii|iv|v)\)\s*",
     }
     
     def __init__(self, max_depth: int = 5, use_ddh: bool = False):
@@ -326,8 +326,8 @@ class HierarchyExtractor:
                 
             # 3. 규제 본문(Regulatory Text) 파싱
             if self.current_zone == "regulatory_text":
-                # 섹션 감지 (§ 1160.10)
-                sec_match = re.match(self.DDH_PATTERNS["SECTION"], line)
+                # 섹션 감지 (§ 1160.10 또는 SEC. 101)
+                sec_match = re.match(self.DDH_PATTERNS["SECTION"], line, re.IGNORECASE)
                 if sec_match:
                     # 이전 섹션 저장
                     if current_section:
