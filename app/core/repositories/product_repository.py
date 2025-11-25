@@ -141,7 +141,7 @@ class ProductRepository(BaseRepository[Product]):
         return {
             "product_id": str(row["product_id"]),
             "name": row.get("product_name") or "Unknown Product",
-            "export_country": row.get("export_country") or DEFAULT_EXPORT_COUNTRY,
+            "country": row.get("export_country") or DEFAULT_EXPORT_COUNTRY,
             "category": row.get("product_category") or "Unknown",
             "features": features,
             "feature_units": feature_units,
