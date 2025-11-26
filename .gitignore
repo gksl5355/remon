@@ -50,3 +50,4 @@ app/data/
 
 
 alembic.ini
+test_insert.py

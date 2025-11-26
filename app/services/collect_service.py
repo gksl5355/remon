@@ -12,7 +12,7 @@ import json
 # from ... import ...
 
 # 언어 탐지 관련 임포트 추가
-from crawler.cleaner import get_language_detector, get_text_cleaner
+from app.crawler.cleaner import get_language_detector, get_text_cleaner
 from utils.text_utils import save_metadata
 
 logger = logging.getLogger(__name__)

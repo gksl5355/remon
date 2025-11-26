@@ -1,7 +1,7 @@
 from typing import Optional, List, Dict, Any
 from datetime import date, datetime
 from pydantic import BaseModel
-from core.models.enums import ChangeTypeEnum
+from app.core.models.enums import ChangeTypeEnum
 
 # --- Regulation Schemas ---
 
