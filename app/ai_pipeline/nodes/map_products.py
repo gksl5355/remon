@@ -8,7 +8,8 @@ import logging
 from decimal import Decimal
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Protocol, TYPE_CHECKING
+# Protocol, TYPE_CHECKING 추가
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -42,7 +43,100 @@ from app.core.database import AsyncSessionLocal
 from app.core.repositories.product_repository import ProductRepository
 
 
+if TYPE_CHECKING:
+    from app.ai_pipeline.tools.retrieval_tool import RetrievalOutput
+else:
+    class RetrievalOutput(Protocol):
+        results: List[Dict[str, Any]]
+        metadata: Dict[str, Any]
+
+
 logger = logging.getLogger(__name__)
+
+
+# repositories/product_repository.py로 이동
+
+# FEATURE_UNIT_MAP: Dict[str, str] = {
+#     "nicotin": "mg",
+#     "tarr": "mg",
+#     "battery": "mAh",
+#     "label_size": "mm^2",
+# }
+# BOOLEAN_FEATURES = {"menthol", "incense", "security_auth"}
+# DEFAULT_EXPORT_COUNTRY = "US"
+# PRODUCT_SELECT_BASE = """
+# SELECT
+#     p.product_id,
+#     p.product_name,
+#     p.product_category,
+#     p.nicotin,
+#     p.tarr,
+#     p.menthol,
+#     p.incense,
+#     p.battery,
+#     p.label_size,
+#     p.security_auth,
+#     COALESCE(pec.country_code, :default_country) AS export_country
+# FROM products p
+# LEFT JOIN product_export_countries pec
+#     ON pec.product_id = p.product_id
+# """
+
+
+# class ProductRepository:
+#     """RDB에서 제품 정보를 읽어 MappingNode가 소비하는 형태로 직렬화한다."""
+
+#     def __init__(self, session_factory: async_sessionmaker[AsyncSession]):
+#         self._session_factory = session_factory
+
+#     async def fetch_product(self, product_id: Optional[int]) -> ProductInfo:
+#         params = {"default_country": DEFAULT_EXPORT_COUNTRY}
+#         if product_id is not None:
+#             query = text(
+#                 PRODUCT_SELECT_BASE
+#                 + " WHERE p.product_id = :pid ORDER BY p.product_id LIMIT 1"
+#             )
+#             params["pid"] = product_id
+#         else:
+#             query = text(PRODUCT_SELECT_BASE + " ORDER BY p.product_id LIMIT 1")
+
+#         async with self._session_factory() as session:
+#             result = await session.execute(query, params)
+#             row = result.mappings().first()
+
+#         if not row:
+#             raise ValueError("제품 정보를 찾을 수 없습니다.")
+
+#         return self._serialize_product(dict(row))
+
+#     def _serialize_product(self, row: Dict[str, Any]) -> ProductInfo:
+#         features: Dict[str, Any] = {}
+#         feature_units: Dict[str, str] = {}
+
+#         for field, unit in FEATURE_UNIT_MAP.items():
+#             value = row.get(field)
+#             if value in (None, ""):
+#                 continue
+#             features[field] = value
+#             feature_units[field] = unit
+
+#         for field in BOOLEAN_FEATURES:
+#             value = row.get(field)
+#             if value is None:
+#                 continue
+#             features[field] = bool(value)
+#             feature_units[field] = "boolean"
+
+#         product: ProductInfo = {
+#             "product_id": str(row["product_id"]),
+#             "name": row.get("product_name"),
+#             "export_country": row.get("export_country") or DEFAULT_EXPORT_COUNTRY,
+#             "category": row.get("product_category"),
+#             "features": features,
+#             "feature_units": feature_units,
+#         }
+#         return product
+
 
 class MappingNode:
     """
@@ -186,7 +280,8 @@ class MappingNode:
         product: Optional[ProductInfo] = state.get("product_info")
         mapping_filters: Dict[str, Any] = state.get("mapping_filters") or {}
         if not product:
-            product_id = mapping_filters.get("product_id")
+            filters = state.get("mapping_filters") or {}
+            product_id = filters.get("product_id")
            
     # 기존 호출 방식    
             # product = await self.product_repository.fetch_product(
