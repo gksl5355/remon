@@ -145,3 +145,5 @@ class AppState(TypedDict, total=False):
     mapping_context: MappingContext
     impact_scores: List[ImpactScoreItem]
     report: ReportDraft
+    translation_id: Optional[int]
+    change_id: Optional[int]
