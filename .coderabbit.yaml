@@ -1,8 +1,6 @@
 language: "ko-KR"
 early_access: false
 
-report_checks: true   # ← 이 항목이 반드시 필요함
-
 reviews:
   profile: "chill"
   request_changes_workflow: true
