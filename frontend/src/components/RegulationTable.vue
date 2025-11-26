@@ -58,17 +58,27 @@
 </template>
 
 <script setup>
-import api from "@/services/api"; // ✅ axios 인스턴스 import
-import { onMounted, ref } from "vue";
+import api from "@/services/api";
+import { onBeforeUnmount, onMounted, ref } from "vue";
+
+// 🔹 badgeClass를 맨 위에서 정의 (Vue가 정상적으로 가져감)
+const badgeClass = (level) => {
+  return {
+    높음: "bg-[#D94C3D]",
+    보통: "bg-[#D4AF37]/90 text-black font-bold",
+    낮음: "bg-[#444]/80 text-gray-200",
+  }[level] || "bg-[#444]/60 text-gray-300";
+};
 
 const regulations = ref([]);
 const todayCount = ref(0);
 const loading = ref(false);
+let intervalId = null;
 
 const fetchRegulations = async () => {
   loading.value = true;
   try {
-    const res = await api.get("/regulations"); // ✅ baseURL 자동 적용
+    const res = await api.get("/regulations");
     regulations.value = res.data.regulations || [];
     todayCount.value = res.data.today_count || regulations.value.length;
   } catch (err) {
@@ -78,15 +88,15 @@ const fetchRegulations = async () => {
   }
 };
 
-onMounted(fetchRegulations);
+// 🔹 페이지 처음 로드 + 10초마다 리프레시
+onMounted(() => {
+  fetchRegulations();
+  intervalId = setInterval(fetchRegulations, 10000);
+});
 
-function badgeClass(level) {
-  return {
-    긴급: "bg-[#D94C3D]",
-    높음: "bg-[#D4AF37]/90 text-black font-bold",
-    보통: "bg-[#444]/80 text-gray-200",
-  }[level];
-}
+onBeforeUnmount(() => {
+  if (intervalId) clearInterval(intervalId);
+});
 </script>
 
 <style scoped>

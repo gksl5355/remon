@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, Enum, Boolean, Numeric, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
+from datetime import datetime
 from .enums import ProductCategoryEnum
 from . import Base
 
@@ -22,7 +23,7 @@ class Product(Base):
     # Relationships
     export_countries = relationship("ProductExportCountry", back_populates="product")
     impact_scores = relationship("ImpactScore", back_populates="product")
-    keynotes = relationship("RegulationChangeKeynote", back_populates="product")
+    
 
 class ProductExportCountry(Base):
     __tablename__ = "product_export_countries"
