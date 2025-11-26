@@ -19,9 +19,6 @@ class Report(Base):
     # Relationships
     translation = relationship("RegulationTranslation", back_populates="reports")
     change = relationship("RegulationChangeHistory", back_populates="reports")
-    product = relationship("Product", back_populates="reports")
-    country = relationship("Country", back_populates="reports")
-    
     items = relationship("ReportItem", back_populates="report", cascade="all, delete-orphan")
     # [삭제됨] ReportSummary와의 관계 제거 (1:1 or 1:N 관계가 FK 삭제로 끊어짐)
 

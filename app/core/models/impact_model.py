@@ -18,5 +18,3 @@ class ImpactScore(Base):
     # Relationships
     translation = relationship("RegulationTranslation", back_populates="impact_scores")
     product = relationship("Product", back_populates="impact_scores")
-    report_summaries = relationship("ReportSummary", back_populates="impact_score")
-    keynotes = relationship("RegulationChangeKeynote", back_populates="impact_score")

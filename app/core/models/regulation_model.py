@@ -19,7 +19,7 @@ class Regulation(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     # Relationships
-    source = relationship("DataSource", back_populates="regulations")
+    data_source = relationship("DataSource", back_populates="regulations")
     country = relationship("Country", back_populates="regulations")
     versions = relationship("RegulationVersion", back_populates="regulation", cascade="all, delete-orphan")
 

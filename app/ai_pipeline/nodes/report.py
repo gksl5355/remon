@@ -235,10 +235,30 @@ async def report_node(state: AppState) -> Dict[str, Any]:
         "sections": sections
     }
 
-    # RDB 저장 (ReportSummary만 저장)
+    keynote_content=[
+        f"country: {meta.get('country', '')}",
+        f"category: {mapping_items[0].get('parsed',{}).get('category','') if mapping_items else ''}",
+        f"summary: {mapping_items[0].get('regulation_summary','') if mapping_items else ''}",
+        f"impact: {impact_score.get('impact_level','N/A')}" 
+    ]
+
+    # RDB 저장 (RegulationChangeKeynote+ReportSummary만 저장)
+    # TODO RegulationChangeKeynote에 json 저장시키기  
     async with AsyncSessionLocal() as db_session:
+        from app.core.repositories.regulation_keynote_repository import RegulationKeynoteRepository
         from app.core.repositories.report_repository import ReportSummaryRepository
-        
+        keynote_repo = RegulationKeynoteRepository()
+
+        try:
+            keynote_record = await keynote_repo.create_keynote(db_session, keynote_content)
+            logger.info(f"Keynote 저장 완료: keynote_id={keynote_record.keynote_id}")
+
+        except Exception as e:
+            await db_session.rollback()
+            logger.error(f"DB 저장 실패(keynote): {e}")
+            return report_json
+
+        #RDB에 ReportSummary저장
         summary_repo = ReportSummaryRepository()
         
         try:
@@ -248,7 +268,7 @@ async def report_node(state: AppState) -> Dict[str, Any]:
             logger.info(f"ReportSummary 저장 완료: summary_id={summary_record.summary_id}")
         except Exception as e:
             await db_session.rollback()
-            logger.error(f"DB 저장 실패: {e}")
+            logger.error(f"DB 저장 실패(Summary): {e}")
 
     return report_json
 

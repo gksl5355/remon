@@ -11,7 +11,7 @@ dependencies:
 
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.repositories.report_repository import ReportRepository
+from app.core.repositories.report_repository import ReportSummaryRepository
 
 logger = logging.getLogger(__name__)
 
@@ -20,44 +20,40 @@ class ReportService:
     """리포트 관련 비즈니스 로직을 처리하는 서비스 클래스"""
     
     def __init__(self):
-        self.repo = ReportRepository()
+        self.repo = ReportSummaryRepository()
 
     
-    async def get_report_detail(self, db: AsyncSession, regulation_id: int) -> dict | None:
+    async def get_report_detail(self, db: AsyncSession, summary_id: int) -> dict | None:
         """
         리포트 상세 정보를 조회한다 (프론트 형식).
 
         Args:
             db (AsyncSession): 데이터베이스 세션.
-            regulation_id (int): 규제 문서 ID.
+            summary_id (int): 규제 문서 ID.
 
         Returns:
             dict | None: 리포트 상세 정보 또는 None.
         """
-        logger.info(f"Fetching report detail: regulation_id={regulation_id}")
+        logger.info(f"Fetching report detail: summary_id={summary_id}")
         
         try:
-            report = await self.repo.get_by_regulation_id(db, regulation_id)
+            summary = await self.repo.get_by_summary_id(db, summary_id)
             
-            if not report:
-                logger.warning(f"Report not found: regulation_id={regulation_id}")
+            if not summary:
+                logger.warning(f"Report not found: summary_id={summary_id}")
                 return None
             
-            # JSONB에서 직접 가져오기
-            if report.summaries and len(report.summaries) > 0:
-                summary_data = report.summaries[0].summary_text
-                
-                if summary_data:
-                    # JSONB 데이터 그대로 반환 (배열 형식)
-                    return {
-                        "regulation_id": regulation_id,
-                        "title": "리포트 제목",
-                        "last_updated": report.created_at.isoformat() if report.created_at else None,
-                        "sections": summary_data  # 이미 배열 형식으로 순서 보장
-                    }
+            # summary_text는 JSONB (sections 배열)
+            if summary.summary_text:
+                return {
+                    "regulation_id": summary_id,
+                    "title": "",
+                    "last_updated": summary.created_at.isoformat() if summary.created_at else None,
+                    "sections": summary.summary_text  # 이미 배열 형식
+                }
             
             # JSONB 데이터가 없으면 None 반환
-            logger.warning(f"No summary data found for regulation_id={regulation_id}")
+            logger.warning(f"No summary data found for regulation_id={summary_id}")
             return None
             
         except Exception as e:

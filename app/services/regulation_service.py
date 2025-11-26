@@ -11,7 +11,7 @@ dependencies:
 
 from app.config.logger import logger
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.repositories.regulation_repository import RegulationRepository
+from app.core.repositories.regulation_keynote_repository import RegulationKeynoteRepository
 
 # logger = logging.getLogger(__name__)
 
@@ -20,15 +20,14 @@ class RegulationService:
     """규제 문서 관련 비즈니스 로직을 처리하는 서비스 클래스"""
 
     def __init__(self):
-        self.repo = RegulationRepository()
+        self.repo = RegulationKeynoteRepository()
 
-    async def get_regulations(self, db: AsyncSession, country: str | None = None) -> dict:
+    async def get_regulations(self, db: AsyncSession) -> dict:
         """
         규제 문서 목록을 조회한다.
 
         Args:
             db (AsyncSession): 데이터베이스 세션.
-            country (str | None): 국가 필터.
 
         Returns:
             dict: 규제 문서 목록 (프론트 형식).
@@ -36,47 +35,36 @@ class RegulationService:
         
         # risk_level 한글 변환 맵
         RISK_LEVEL_MAP = {
-            "L": "낮음",
-            "M": "보통",
-            "H": "높음"
+            "Low": "낮음",
+            "Medium": "보통",
+            "High": "높음"
         }
         
         try:
             # keynote와 impact_score를 포함하여 조회
-            regulations = await self.repo.get_with_keynotes_and_impact(db, country)
-            
-            # 프론트 형식으로 변환
+            regulations = await self.repo.get_all_keynotes(db)
             result = []
-            for reg in regulations:
-                # 최신 버전의 첫 번째 keynote 가져오기
-                keynote = None
-                if reg.versions:
-                    latest_version = reg.versions[-1]
-                    if latest_version.keynotes:
-                        keynote = latest_version.keynotes[0]
+            for keynote in regulations:
+                # keynote_text는 ["country: US", "category: demo", ...] 형태
+                keynote_data = {}
+                for item in keynote.keynote_text:
+                    if ": " in item:
+                        key, value = item.split(": ", 1)
+                        keynote_data[key] = value
                 
-                # keynote에서 impact, category, title 모두 추출
-                if keynote and keynote.impact_score:
-                    impact = RISK_LEVEL_MAP.get(keynote.impact_score.risk_level, "보통")
-                    category = keynote.regulation_type 
-                    title = keynote.title 
-                else:
-                    impact = "보통"
-                    category = "기타"
-                    title = reg.title or ""
-                
+                # 프론트 형식으로 변환
                 result.append({
-                    "id": reg.regulation_id,
-                    "country": reg.country_code,
-                    "impact": impact,
-                    "category": category,
-                    "summary": title
+                    "id": keynote.keynote_id,
+                    "country": keynote_data.get("country", ""),
+                    "category": keynote_data.get("category", ""),
+                    "summary": keynote_data.get("summary", ""),
+                    "impact": RISK_LEVEL_MAP.get(keynote_data.get("impact", ""), keynote_data.get("impact", ""))
                 })
             
             logger.info(f"Found {len(result)} regulations")
             return {
                 "today_count": len(result),
-                "regulations": result
+                "regulations": result #db에서 가져온 json 구조?
             }
             
         except Exception as e:
