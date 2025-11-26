@@ -145,3 +145,6 @@ class AppState(TypedDict, total=False):
     mapping_context: MappingContext
     impact_scores: List[ImpactScoreItem]
     report: ReportDraft
+    # change detection
+    change_context: Dict[str, Any]
+    change_detection: Dict[str, Any]
