@@ -110,7 +110,9 @@ def _build_state(
     state: AppState = {
         "preprocess_request": {
             "pdf_paths": [str(pdf_path)],
-        }
+        },
+        "translation_id": 1,  # 초기값 설정 (DB에서 조회 또는 인자로 받을 수 있음)
+        "change_id": 1,       # 초기값 설정
     }
 
     if use_db:

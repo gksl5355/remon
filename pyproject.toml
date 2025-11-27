@@ -18,6 +18,8 @@ dependencies = [
   "numpy==2.1.2",
   "pandas==2.2.3",
   "openai==1.43.0",
+  "alembic>=1.17.2",
+  "python-dotenv>=1.2.1",
   # --- Crawler ---
   "requests==2.32.3",
   "beautifulsoup4==4.12.3",

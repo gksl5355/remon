@@ -7,6 +7,8 @@ from typing import Any, Dict, List, Optional, TypedDict, Literal
 from pydantic import Field
 
 from typing import Optional, List, Dict, Any
+
+
 # ---------------------------------------------------------------------------
 # 1) 제품 정보 – 모든 노드가 참조하는 전역 정보
 # ---------------------------------------------------------------------------
@@ -15,6 +17,7 @@ class ProductInfo(TypedDict):
     features: Dict[str, Any]  # 예: {"battery_capacity": 3000, "noise": 70}
     feature_units: Dict[str, str]  # 예: {"battery_capacity": "mAh", "noise": "dB"}
     country: Optional[str]
+
 
 # ---------------------------------------------------------------------------
 # 2) 검색 결과 – 검색 TOOL → 매핑 노드로 전달되는 데이터 구조
@@ -123,6 +126,7 @@ class StrategyItem(TypedDict):
     summary: str
     recommendation: str
 
+
 class StrategyResults(TypedDict):
     product_id: str
     items: List[StrategyItem]
@@ -133,14 +137,16 @@ class ReportDraft(TypedDict, total=False):
     status: str
     sections: List[Dict[str, Any]]
 
+
 # ---------------------------------------------------------------------------
-# 6) 영향도 평가 결과 타입 정의 
+# 6) 영향도 평가 결과 타입 정의
 # ---------------------------------------------------------------------------
 class ImpactScoreItem(TypedDict):
-    raw_scores: Dict[str, Any]         
-    reasoning: str         
-    weighted_score: float         
-    impact_level: str 
+    raw_scores: Dict[str, Any]
+    reasoning: str
+    weighted_score: float
+    impact_level: str
+
 
 # ---------------------------------------------------------------------------
 # 7) LangGraph 전체 전역 State (AppState)
@@ -160,8 +166,10 @@ class AppState(TypedDict, total=False):
     mapping_context: MappingContext
     impact_scores: List[ImpactScoreItem]
     report: ReportDraft
-    
+    translation_id: Optional[int]
+    change_id: Optional[int]
+
     # Vision-Centric Preprocessing Pipeline 필드
     vision_extraction_result: List[Dict[str, Any]]  # 페이지별 Vision LLM 추출 결과
-    graph_data: Dict[str, Any]                      # 지식 그래프 (엔티티 + 관계)
-    dual_index_summary: Dict[str, Any]              # Qdrant + Graph 저장 요약
+    graph_data: Dict[str, Any]  # 지식 그래프 (엔티티 + 관계)
+    dual_index_summary: Dict[str, Any]  # Qdrant + Graph 저장 요약
