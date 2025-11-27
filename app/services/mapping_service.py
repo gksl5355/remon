@@ -3,19 +3,31 @@ module: mapping_service.py
 description: 규제-제품 매핑 및 영향도 평가 비즈니스 로직
 author: 조영우
 created: 2025-11-10
-updated: 2025-11-10
+updated: 2025-11-17
 dependencies:
     - sqlalchemy.ext.asyncio
 """
 
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
+from core.models.enums import RiskLevelEnum
 
 logger = logging.getLogger(__name__)
 
 
 class MappingService:
     """규제-제품 매핑 관련 비즈니스 로직을 처리하는 서비스 클래스"""
+    
+    #TODO utils/risk_calculator.py에 일반함수로 구현 할지 고려
+    @staticmethod
+    def calculate_risk_level(impact_score: float) -> RiskLevelEnum:
+        """영향도 점수로 위험 수준 계산"""
+        if impact_score >= 0.7:
+            return RiskLevelEnum.HIGH
+        elif impact_score >= 0.4:
+            return RiskLevelEnum.MEDIUM
+        else:
+            return RiskLevelEnum.LOW
 
     async def get_mapping_results(
         self, db: AsyncSession, regulation_id: int
@@ -34,7 +46,6 @@ class MappingService:
 
         # TODO: BE2(남지수) - MappingRepository.get_by_regulation_id() 구현 후 연동
         # TODO: AI2(조태환) - Qdrant 벡터 검색 결과 연동
-        # TODO: SQL: SELECT * FROM impact_scores WHERE translation_id IN (SELECT translation_id FROM regulation_translations WHERE regulation_version_id IN (SELECT regulation_version_id FROM regulation_versions WHERE regulation_id=?))
 
         return None
 
@@ -54,7 +65,6 @@ class MappingService:
         async with db.begin():
             # TODO: AI1(고서아) - ai_service.start_mapping() 호출
             # TODO: AI2(조태환) - Qdrant 하이브리드 벡터 검색 및 유사도 계산
-            # TODO: 매핑 결과를 DB에 저장
             pass
 
         return {"job_id": None, "status": "pending"}
