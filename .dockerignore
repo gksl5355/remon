@@ -1,0 +1,37 @@
+# Git
+.git
+.gitignore
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual env
+.venv/
+env/
+venv/
+
+# Data / samples / artifacts
+logs/
+data/
+tests/
+scripts/.ipynb_checkpoints
+
+# K8s / infra
+deploy/
+k8s/
+*.yaml
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# Node / frontend build cache
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# MacOS / Windows
+.DS_Store
+Thumbs.db
