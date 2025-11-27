@@ -14,6 +14,7 @@ from app.ai_pipeline.state import AppState
 # 실제 프로젝트 구조에 맞게 경로 조정 필요
 from app.ai_pipeline.preprocess import preprocess_node
 from app.ai_pipeline.nodes.map_products import map_products_node      # def map_products_node(state: AppState) -> dict
+from app.ai_pipeline.nodes.change_detection import change_detection_node
 from app.ai_pipeline.nodes.generate_strategy import generate_strategy_node
 from app.ai_pipeline.nodes.validator import validator
 from app.ai_pipeline.nodes.score_impact import score_impact_node      # def score_impact_node(state: AppState) -> dict
@@ -36,6 +37,7 @@ def build_graph():
 
     # 노드 등록
     graph.add_node("preprocess",          preprocess_node)
+    graph.add_node("change_detection",    change_detection_node)
     graph.add_node("map_products",        map_products_node)
     graph.add_node("generate_strategy",   generate_strategy_node)
     graph.add_node("score_impact",        score_impact_node)
@@ -46,7 +48,7 @@ def build_graph():
     graph.set_entry_point("preprocess")
 
     # 전처리 → 제품 매핑 → 대응전략 생성
-    graph.add_edge("preprocess",        "map_products")
+    graph.add_edge("preprocess",        "change_detection")
     graph.add_edge("map_products",      "generate_strategy")
     graph.add_edge("generate_strategy", "score_impact")
     graph.add_edge("score_impact",      "validator")
@@ -59,6 +61,12 @@ def build_graph():
     )
 
     # 영향도 → 리포트 → 종료
+    graph.add_conditional_edges(
+        "change_detection",
+        lambda state: "terminate" if state.get("change_detection", {}).get("terminated") else "proceed",
+        {"terminate": END, "proceed": "map_products"},
+    )
+
     graph.add_edge("report", END)
 
     return graph.compile()
