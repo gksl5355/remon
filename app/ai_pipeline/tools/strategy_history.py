@@ -117,10 +117,12 @@ class StrategyHistoryTool:
         """
         규제 요약 + 매핑된 제품 리스트를 합쳐서
         임베딩에 사용할 기준 텍스트를 생성한다.
+        - mapped_products 는 map_products 가 넘기는 product_id 리스트를 그대로 사용한다.
         """
+        normalized_products = [str(p) for p in mapped_products if p is not None]
         products_block = (
-            ", ".join(mapped_products)
-            if mapped_products
+            ", ".join(normalized_products)
+            if normalized_products
             else "(no mapped products)"
         )
 
@@ -138,7 +140,7 @@ class StrategyHistoryTool:
         strategies: List[str],
     ) -> None:
         """
-        규제 요약 + 매핑된 제품 + 새로 생성된 전략 리스트를
+        규제 요약 + 매핑된 제품(product_id) + 새로 생성된 전략 리스트를
         하나의 포인트로 Qdrant 컬렉션에 저장한다.
 
         Parameters
@@ -146,7 +148,7 @@ class StrategyHistoryTool:
         regulation_summary : str
             현재 규제 요약 텍스트
         mapped_products : List[str]
-            규제와 매핑된 제품명 리스트
+            규제와 매핑된 제품 ID 리스트 (map_products 결과의 product_id)
         strategies : List[str]
             generate_strategy_node 에서 생성된 대응 전략 문자열 리스트
         """
@@ -158,9 +160,10 @@ class StrategyHistoryTool:
         self.ensure_collection()
 
         # 1) 임베딩 텍스트 생성
+        normalized_products = [str(p) for p in mapped_products if p is not None]
         embed_text = self._build_embedding_text(
             regulation_summary=regulation_summary,
-            mapped_products=mapped_products,
+            mapped_products=normalized_products,
         )
 
         # 2) Dense + Sparse 임베딩 생성
@@ -172,8 +175,8 @@ class StrategyHistoryTool:
         payload: Dict[str, Any] = {
             "meta_collection": self.collection,
             "meta_regulation_summary": regulation_summary,
-            "meta_products": mapped_products,
-            "meta_product_count": len(mapped_products),
+            "meta_products": normalized_products,
+            "meta_product_count": len(normalized_products),
             "meta_strategies": strategies,
             "meta_has_strategy": bool(strategies),
             "meta_chunk_type": "regulation_product_strategy",
