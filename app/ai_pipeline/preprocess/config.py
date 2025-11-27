@@ -112,8 +112,8 @@ class PreprocessConfig:
     COMPLEXITY_THRESHOLD: float = float(os.getenv("COMPLEXITY_THRESHOLD", "0.3"))
     """표 복잡도 임계값 (0-1). 이상이면 GPT-4o 사용. 기본값: 0.3"""
     
-    VISION_MAX_TOKENS: int = int(os.getenv("VISION_MAX_TOKENS", "4096"))
-    """Vision LLM 최대 출력 토큰. 기본값: 4096"""
+    VISION_MAX_TOKENS: int = int(os.getenv("VISION_MAX_TOKENS", "16384"))
+    """Vision LLM 최대 출력 토큰. 기본값: 16384 (Prompt Caching 효율화)"""
     
     VISION_TEMPERATURE: float = float(os.getenv("VISION_TEMPERATURE", "0.1"))
     """Vision LLM 온도 (구조 추출용 낮게). 기본값: 0.1"""
