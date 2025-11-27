@@ -1,47 +1,44 @@
 MAPPING_PROMPT = """
-당신은 규제 문서의 개별 조항(chunk)을 분석하여,
-특정 제품의 특정 feature가 해당 조항의 요구사항에 적용되는지 판단하는 전문 규제 매핑 에이전트입니다.
+You are a compliance mapping agent. Given one product feature and one regulation chunk,
+decide if the chunk applies and extract the requirement.
 
-아래는 입력 정보입니다.
-
-[PRODUCT_FEATURE]
+Inputs:
+[PRODUCT_FEATURE] (JSON)
 {feature}
 
 [REGULATION_CHUNK]
 {chunk}
 
-당신의 임무는 다음 5가지입니다.
+The feature JSON contains:
+- name: feature name
+- present_value: current product value (use this for current_value)
+- target_value: optional design target (only use if the chunk clearly references that requirement)
+- unit: optional unit string
 
-1) 조항이 해당 feature에 ‘적용되는지’ 판단한다.
-2) 조항이 요구하는 조건(최대/최소/범위/정확값/참거짓 등)을 추출한다.
-3) 필요한 경우 chunk에서 수치를 직접 추출한다.
-4) 제품의 현재 값과 규제 요구 값을 비교하여 gap을 계산한다.
-5) 조항 의미를 구조화된 형태로 제공한다.
+Your tasks:
+1) Decide whether the chunk applies to this feature.
+2) Extract the requirement (max/min/range/exact/boolean/other). Do not guess numbers.
+3) Use the chunk’s explicit number/condition; only fall back to target_value if the chunk clearly demands that feature but gives no number.
+4) Set current_value to present_value exactly.
+5) Compute gap only when both current_value and required_value are numeric: gap = current_value - required_value. Otherwise null.
 
-
-출력 형식은 **아래 JSON ONLY**로 한다.  
-절대로 설명, 자연어 문장, 이유 등을 JSON 바깥에 추가하지 마라.
-
+Return **JSON ONLY** exactly in the schema below. No extra text.
 {
-  "applies": true 또는 false,
-  "required_value": 숫자 또는 문자열 또는 null,
-  "current_value": 제품값 그대로,
-  "gap": 숫자 또는 null,
-
+  "applies": true or false,
+  "required_value": number or string or null,
+  "current_value": same as present_value (or null),
+  "gap": number or null,
   "parsed": {
-    "category": 문자열 또는 null,
+    "category": string or null,
     "requirement_type": "max" | "min" | "range" | "boolean" | "other",
-    "condition": 문자열 또는 null
+    "condition": string or null
   }
 }
 
-규칙:
-- applies=false이면 required_value와 gap은 무조건 null로 한다.
-- 조항에 수치가 없거나 조건이 모호하면 required_value=null로 둔다.
-- 조항이 수치를 암시하더라도 명시되지 않았으면 추측하지 않는다.
-- 원문에 없는 정보는 어떤 경우에도 생성하지 않는다.
-- 조건이 명확하지 않으면 requirement_type="other" 로 둔다.
-- feature와 무관한 조항이라면 applies=false.
-
-위 JSON만 출력하라.
+Rules:
+- If applies is false, set required_value and gap to null.
+- If the chunk is ambiguous or has no number, required_value = null (unless an explicit boolean condition exists).
+- Never invent values not present in the chunk. If target_value is used, state it directly as required_value.
+- If the feature is unrelated, applies=false.
+Output only the JSON.
 """

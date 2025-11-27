@@ -38,7 +38,8 @@ tmp/
 *.bak
 *.swp
 .github/
-
+alembic/
+alembic.ini
 # ============ AI Generated Files 작업용 ============
 app/ai_pipeline/preprocess/demo
 .amazonq/
@@ -50,4 +51,5 @@ data/
 data/*
 app/data/
 .uv-cache/
-
+Dockerfile*
+deploy/
