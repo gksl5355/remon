@@ -4,14 +4,7 @@ LangGraph 전역 State 스키마 정의 – Production Minimal Version
 """
 
 from typing import Any, Dict, List, Optional, TypedDict, Literal
-from pydantic import Field
 
-<<<<<<< HEAD
-from typing import Optional, List, Dict, Any
-
-
-=======
->>>>>>> d6240fec9bdce64a07d274752bd9f309741b84e0
 # ---------------------------------------------------------------------------
 # 1) 제품 정보 – 모든 노드가 참조하는 전역 정보
 # ---------------------------------------------------------------------------
@@ -31,7 +24,6 @@ class ProductInfo(TypedDict):
     feature_units: Dict[str, str]
     country: Optional[str]
     category: Optional[str]
-
 
 # ---------------------------------------------------------------------------
 # 2) 검색 결과 – 검색 TOOL → 매핑 노드로 전달되는 데이터 구조
@@ -58,20 +50,6 @@ class MappingParsed(TypedDict):
     category: Optional[str]
     requirement_type: Optional[str]  # "max" | "min" | "range" | "boolean" | "other"
     condition: Optional[str]
-
-    # 7️⃣ RAG Retrieval 결과 (🆕)
-    retrieved_contexts: Optional[List[Dict[str, Any]]] = Field(
-        None, description="RAG 검색 결과 (벡터 제외, 메타데이터 + 텍스트 + 점수)"
-    )
-    retrieval_metadata: Optional[Dict[str, Any]] = Field(
-        None, description="검색 메타정보 (전략, 소요시간, 필터 등)"
-    )
-
-    # 8️⃣ 내부 관리용
-    error_log: Optional[List[str]] = Field(
-        default_factory=list, description="에러/경고 로그"
-    )
-    run_id: Optional[str] = Field(None, description="실행 식별용 UUID")
 
 
 class MappingItem(TypedDict):
@@ -142,7 +120,6 @@ class StrategyItem(TypedDict):
     summary: str
     recommendation: str
 
-
 class StrategyResults(TypedDict):
     product_id: str
     items: List[StrategyItem]
@@ -153,16 +130,14 @@ class ReportDraft(TypedDict, total=False):
     status: str
     sections: List[Dict[str, Any]]
 
-
 # ---------------------------------------------------------------------------
-# 6) 영향도 평가 결과 타입 정의
+# 6) 영향도 평가 결과 타입 정의 
 # ---------------------------------------------------------------------------
 class ImpactScoreItem(TypedDict):
-    raw_scores: Dict[str, Any]
-    reasoning: str
-    weighted_score: float
-    impact_level: str
-
+    raw_scores: Dict[str, Any]         
+    reasoning: str         
+    weighted_score: float         
+    impact_level: str 
 
 # ---------------------------------------------------------------------------
 # 7) LangGraph 전체 전역 State (AppState)
