@@ -13,8 +13,8 @@ dependencies:
 import logging
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.database import get_db
-from app.services.collect_service import CollectService
+from core.database import get_db
+from services.collect_service import CollectService
 
 logger = logging.getLogger(__name__)
 

@@ -8,11 +8,11 @@ Usage example:
         --product-json tests/data/sample_products.json
 
 Options:
-    --use-db           Fetch product via ProductRepository (requires DB)
-    --product-id ID    Target product_id when using DB or JSON fixtures
-    --real-llm         Use real LLMs instead of the lightweight stubs
-    --top-k N          Override mapping retrieval top_k
-    --alpha F          Override mapping retrieval alpha
+    --use-db            Fetch product via ProductRepository (requires DB)
+    --product-id ID     Target product_id when using DB or JSON fixtures
+    --stub-llm          Use lightweight stubs (default: real LLMs)
+    --top-k N           Override mapping retrieval top_k
+    --alpha F           Override mapping retrieval alpha
 """
 
 from __future__ import annotations
@@ -110,7 +110,9 @@ def _build_state(
     state: AppState = {
         "preprocess_request": {
             "pdf_paths": [str(pdf_path)],
-        }
+        },
+        "translation_id": 1,  # 초기값 설정 (DB에서 조회 또는 인자로 받을 수 있음)
+        "change_id": 1,       # 초기값 설정
     }
 
     if use_db:
@@ -144,9 +146,9 @@ def parse_args() -> argparse.Namespace:
         help="Fetch product info via ProductRepository",
     )
     parser.add_argument(
-        "--real-llm",
+        "--stub-llm",
         action="store_true",
-        help="Use real LLM clients instead of stubs",
+        help="Use stub LLM clients instead of real ones",
     )
     parser.add_argument("--top-k", type=int, help="Override mapping top_k")
     parser.add_argument("--alpha", type=float, help="Override mapping alpha")
@@ -174,7 +176,7 @@ async def main() -> None:
     )
 
     mapping_context: Dict[str, Any] = {}
-    if not args.real_llm:
+    if args.stub_llm:
         mapping_context["llm_client"] = MappingLLMStub()
         logger.info("Using stub LLM for mapping_node")
     if args.top_k:
@@ -184,7 +186,7 @@ async def main() -> None:
     if mapping_context:
         state["mapping_context"] = mapping_context
 
-    if not args.real_llm:
+    if args.stub_llm:
         # Replace the synchronous strategy LLM with a stub for deterministic output.
         strategy_module.llm = StrategyLLMStub()
         logger.info("Using stub LLM for generate_strategy")

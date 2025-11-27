@@ -3,7 +3,7 @@ module: report_service.py
 description: 리포트 생성, 조회 및 관련 비즈니스 로직을 처리하는 서비스 계층
 author: 조영우
 created: 2025-11-10
-updated: 2025-11-14
+updated: 2025-11-20
 dependencies:
     - sqlalchemy.ext.asyncio
     - core.repositories.report_repository
@@ -11,7 +11,7 @@ dependencies:
 
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.repositories.report_repository import ReportRepository
+from app.core.repositories.report_repository import ReportSummaryRepository
 
 logger = logging.getLogger(__name__)
 
@@ -20,65 +20,41 @@ class ReportService:
     """리포트 관련 비즈니스 로직을 처리하는 서비스 클래스"""
     
     def __init__(self):
-        self.repo = ReportRepository()
+        self.repo = ReportSummaryRepository()
 
     
-    async def get_report_detail(self, db: AsyncSession, regulation_id: int) -> dict | None:
+    async def get_report_detail(self, db: AsyncSession, summary_id: int) -> dict | None:
         """
         리포트 상세 정보를 조회한다 (프론트 형식).
 
         Args:
             db (AsyncSession): 데이터베이스 세션.
-            regulation_id (int): 규제 문서 ID.
+            summary_id (int): 규제 문서 ID.
 
         Returns:
             dict | None: 리포트 상세 정보 또는 None.
         """
-        logger.info(f"Fetching report detail: regulation_id={regulation_id}")
+        logger.info(f"Fetching report detail: summary_id={summary_id}")
         
         try:
-            # TODO: 실제로는 regulation_id로 report를 찾아야 함
-            # 임시: regulation_id를 report_id로 사용
-            report = await self.repo.get_with_items(db, regulation_id)
+            summary = await self.repo.get_by_summary_id(db, summary_id)
             
-            if not report:
-                logger.warning(f"Report not found: regulation_id={regulation_id}")
+            if not summary:
+                logger.warning(f"Report not found: summary_id={summary_id}")
                 return None
             
-            # 프론트 형식으로 변환 (더미 데이터 구조 유지)
-            return {
-                "regulation_id": regulation_id,
-                "title": "리포트 제목",  # TODO: 실제 데이터
-                "last_updated": report.created_at.isoformat() if report.created_at else None,
-                "sections": {
-                    "summary": {
-                        "title": "1. 규제 변경 요약",
-                        "type": "paragraph",
-                        "content": [report.created_reason]
-                    },
-                    "products": {
-                        "title": "2. 영향받는 제품 목록",
-                        "type": "table",
-                        "headers": ["제품명", "브랜드", "조치"],
-                        "rows": []
-                    },
-                    "changes": {
-                        "title": "3. 주요 변경 사항 해석",
-                        "type": "list",
-                        "content": []
-                    },
-                    "strategy": {
-                        "title": "4. 대응 전략 제안",
-                        "type": "paragraph",
-                        "content": []
-                    },
-                    "references": {
-                        "title": "5. 참고 및 원문 링크",
-                        "type": "links",
-                        "content": []
-                    }
+            # summary_text는 JSONB (sections 배열)
+            if summary.summary_text:
+                return {
+                    "regulation_id": summary_id,
+                    "title": "",
+                    "last_updated": summary.created_at.isoformat() if summary.created_at else None,
+                    "sections": summary.summary_text  # 이미 배열 형식
                 }
-            }
+            
+            # JSONB 데이터가 없으면 None 반환
+            logger.warning(f"No summary data found for regulation_id={summary_id}")
+            return None
             
         except Exception as e:
             logger.error(f"Error fetching report detail: {e}", exc_info=True)
@@ -105,7 +81,6 @@ class ReportService:
         
         async with db.begin():
             # TODO: AI1(고서아) - ai_service.generate_report() 호출
-            # TODO: 생성된 리포트를 DB에 저장
             pass
         
         return {"report_id": None, "status": "pending"}

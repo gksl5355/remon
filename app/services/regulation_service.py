@@ -11,7 +11,7 @@ dependencies:
 
 from app.config.logger import logger
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.repositories.regulation_repository import RegulationRepository
+from app.core.repositories.regulation_keynote_repository import RegulationKeynoteRepository
 
 # logger = logging.getLogger(__name__)
 

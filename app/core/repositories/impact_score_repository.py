@@ -32,13 +32,3 @@ class ImpactScoreRepository(BaseRepository[ImpactScore]):
             )
         )
         return result.scalars().all()
-    
-    @staticmethod
-    def calculate_risk_level(impact_score: float) -> RiskLevelEnum:
-        """영향도 점수로 위험 수준 계산"""
-        if impact_score >= 0.7:
-            return RiskLevelEnum.HIGH
-        elif impact_score >= 0.4:
-            return RiskLevelEnum.MEDIUM
-        else:
-            return RiskLevelEnum.LOW

@@ -162,7 +162,7 @@ const renderSection = (section) => {
     return section.content
       .map(
         (link) =>
-          `<a href="${link.url}" target="_blank" class="text-[#9ecbff] underline hover:text-[#cbe4ff] transition">${link.text}</a><br/>`
+          `<a href="${link.url}" target="_blank" class="text-[#9ecbff] underline hover:text-[#cbe4ff] transition">${link.title}</a><br/>`
       )
       .join("");
   }
