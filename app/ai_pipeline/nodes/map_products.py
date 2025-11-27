@@ -8,7 +8,9 @@ import logging
 from decimal import Decimal
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Protocol, TYPE_CHECKING
+from collections import defaultdict
+# Protocol, TYPE_CHECKING 추가
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -58,6 +60,7 @@ class MappingNode:
         top_k: int = 5,
         alpha: float = 0.7,  # 🔥 hybrid dense/sparse 비율
         product_repository: Optional[ProductRepository] = None,
+        max_candidates_per_doc: int = 2,
     ):
         self.llm = llm_client
         self.search_tool = search_tool or get_retrieval_tool()
@@ -67,6 +70,7 @@ class MappingNode:
     # 수정: Repository 생성 (클래스만 변경)
         self.product_repository = product_repository or ProductRepository()
         self.debug_enabled = settings.MAPPING_DEBUG_ENABLED
+        self.max_candidates_per_doc = max_candidates_per_doc
 
     # ----------------------------------------------------------------------
     # 1) 검색 TOOL 호출 wrapper (search_tool 인터페이스 확정되면 이 부분만 수정)
@@ -132,15 +136,23 @@ class MappingNode:
     # ----------------------------------------------------------------------
     # 2) 매핑 프롬프트 생성 (local 처리)
     # ----------------------------------------------------------------------
-    def _build_prompt(self, feature_name, feature_value, feature_unit, chunk_text):
+    def _build_prompt(
+        self,
+        feature_name,
+        present_value,
+        target_value,
+        feature_unit,
+        chunk_text,
+    ):
         feature = {
             "name": feature_name,
-            "value": feature_value,
+            "present_value": present_value,
+            "target_value": target_value,
             "unit": feature_unit,
         }
         feature_json = json.dumps(feature, ensure_ascii=False)
-        return (
-            MAPPING_PROMPT.replace("{feature}", feature_json).replace("{chunk}", chunk_text)
+        return MAPPING_PROMPT.replace("{feature}", feature_json).replace(
+            "{chunk}", chunk_text
         )
 
     def _build_search_query(self, feature_name, feature_value, feature_unit):
@@ -155,13 +167,41 @@ class MappingNode:
 
         return " ".join(parts)
 
+    def _prune_candidates(
+        self, candidates: List[RetrievedChunk]
+    ) -> List[RetrievedChunk]:
+        """
+        중복 chunk와 동일 문서 과잉 후보를 제거한다.
+        - 동일 chunk_id 중복 제거
+        - 같은 문서(meta_doc_id 기준)에서는 상위 N개까지만 유지
+        """
+        seen_chunks = set()
+        doc_counts = defaultdict(int)
+        pruned: List[RetrievedChunk] = []
+
+        for cand in candidates:
+            chunk_id = cand.get("chunk_id")
+            if chunk_id in seen_chunks:
+                continue
+            meta = cand.get("metadata", {}) or {}
+            doc_id = meta.get("meta_doc_id") or meta.get("doc_id")
+            if doc_id:
+                if doc_counts[doc_id] >= self.max_candidates_per_doc:
+                    continue
+                doc_counts[doc_id] += 1
+
+            seen_chunks.add(chunk_id)
+            pruned.append(cand)
+
+        return pruned
+
     # ----------------------------------------------------------------------
     # 3) LLM 매핑 호출
     # ----------------------------------------------------------------------
     async def _call_llm(self, prompt: str) -> Dict:
         try:
             res = await self.llm.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-5-nano",
                 messages=[{"role": "user", "content": prompt}],
             )
             return json.loads(res.choices[0].message.content)
@@ -203,10 +243,16 @@ class MappingNode:
 
 
         product_id = product["product_id"]
-        features = product["features"]
+        product_name = product.get("product_name", product.get("name", "unknown"))
+        mapping_spec = product.get("mapping") or {}
+        target_state = mapping_spec.get("target") or {}
+        present_state = mapping_spec.get("present_state") or {}
+        # present_state가 비어있으면 target 혹은 구 버전 features를 활용해 최소한의 매핑을 진행한다.
+        features = present_state or target_state or product.get("features", {}) or {}
         units = product.get("feature_units", {})
 
         mapping_results: List[MappingItem] = []
+        mapping_targets: Dict[str, Dict[str, Any]] = {}
 
         extra_search_filters = {
             key: value
@@ -220,15 +266,18 @@ class MappingNode:
             logger.info(
                 "🧭 Mapping start: product=%s name=%s features=%d top_k=%d alpha=%.2f",
                 product_id,
-                product.get("name", "unknown"),
+                product_name,
                 len(features),
                 self.top_k,
                 self.alpha,
             )
+            if not features:
+                logger.info("💤 매핑 대상 특성이 없습니다. mapping.present_state나 target을 확인하세요.")
 
         # 🔥 feature별로 검색 TOOL → 매핑
         for feature_name, value in features.items():
             unit = units.get(feature_name)
+            target_value = target_state.get(feature_name)
 
             # -----------------------------------------
             # a) 검색 TOOL 호출
@@ -243,10 +292,14 @@ class MappingNode:
             retrieval: RetrievalResult = await self._run_search(
                 product, feature_name, value, unit, extra_search_filters
             )
+            original_count = len(retrieval["candidates"])
+            retrieval["candidates"] = self._prune_candidates(retrieval["candidates"])
+            pruned_count = len(retrieval["candidates"])
             if self.debug_enabled:
                 logger.info(
-                    "   ↳ candidates=%d",
-                    len(retrieval["candidates"]),
+                    "   ↳ candidates=%d (pruned to %d)",
+                    original_count,
+                    pruned_count,
                 )
 
             # -----------------------------------------
@@ -254,18 +307,32 @@ class MappingNode:
             # -----------------------------------------
             for cand in retrieval["candidates"]:
                 prompt = self._build_prompt(
-                    feature_name, value, unit, cand["chunk_text"]
+                    feature_name,
+                    value,
+                    target_value,
+                    unit,
+                    cand["chunk_text"],
                 )
                 llm_out = await self._call_llm(prompt)
 
                 parsed: MappingParsed = llm_out.get("parsed", {})
+                required_value = llm_out.get("required_value")
+                current_value = llm_out.get("current_value")
+                if (
+                    llm_out.get("applies")
+                    and required_value is None
+                    and target_value is not None
+                ):
+                    required_value = target_value
+                if current_value is None and value is not None:
+                    current_value = value
 
                 item = MappingItem(
                     product_id=product_id,
                     feature_name=feature_name,
                     applies=llm_out["applies"],
-                    required_value=llm_out["required_value"],
-                    current_value=llm_out["current_value"],
+                    required_value=required_value,
+                    current_value=current_value,
                     gap=llm_out["gap"],
                     regulation_chunk_id=cand["chunk_id"],
                     regulation_summary=cand["chunk_text"][:120],
@@ -273,6 +340,21 @@ class MappingNode:
                     parsed=parsed,
                 )
                 mapping_results.append(item)
+                # feature별 대표 target 요약: required_value가 있는 applies 항목을 우선 저장
+                if item["applies"]:
+                    existing = mapping_targets.get(feature_name)
+                    has_req = item.get("required_value") is not None
+                    replace = False
+                    if existing is None:
+                        replace = True
+                    elif existing.get("required_value") is None and has_req:
+                        replace = True
+                    if replace:
+                        mapping_targets[feature_name] = {
+                            "required_value": item.get("required_value"),
+                            "chunk_id": item.get("regulation_chunk_id"),
+                            "doc_id": item.get("regulation_meta", {}).get("meta_doc_id"),
+                        }
 
                 if self.debug_enabled:
                     logger.info(
@@ -290,9 +372,11 @@ class MappingNode:
         mapping_payload = MappingResults(
             product_id=product_id,
             items=mapping_results,
+            targets=mapping_targets,
         )
         state["mapping"] = mapping_payload
         state["mapping_results"] = mapping_payload
+        state["mapping_targets"] = mapping_targets
         if self.debug_enabled:
             _log_mapping_preview(product_id, mapping_results)
             snapshot_path = _persist_mapping_snapshot(
@@ -350,6 +434,7 @@ def _build_mapping_node(
     top_k: Optional[int] = None,
     alpha: Optional[float] = None,
     product_repository: Optional[ProductRepository] = None,
+    max_candidates_per_doc: int = 2,
 ) -> MappingNode:
     """MappingNode 인스턴스를 생성한다."""
     resolved_llm = llm_client or _get_default_llm_client()
@@ -362,6 +447,7 @@ def _build_mapping_node(
         top_k=resolved_top_k,
         alpha=resolved_alpha,
         product_repository=resolved_repo,
+        max_candidates_per_doc=max_candidates_per_doc,
     )
 
 
@@ -382,7 +468,8 @@ async def map_products_node(state: AppState) -> AppState:
 
     context: MappingContext = state.get("mapping_context", {}) or {}
     has_override = any(
-        key in context for key in ("llm_client", "search_tool", "top_k", "alpha")
+        key in context
+        for key in ("llm_client", "search_tool", "top_k", "alpha", "max_candidates_per_doc")
     )
     if has_override:
         node = _build_mapping_node(
@@ -390,6 +477,7 @@ async def map_products_node(state: AppState) -> AppState:
             search_tool=context.get("search_tool"),
             top_k=context.get("top_k"),
             alpha=context.get("alpha"),
+            max_candidates_per_doc=context.get("max_candidates_per_doc", 2),
         )
     else:
         node = _get_default_mapping_node()
