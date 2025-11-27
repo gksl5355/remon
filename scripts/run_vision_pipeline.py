@@ -6,14 +6,14 @@ Usage:
     uv run python scripts/run_vision_pipeline.py
     uv run python scripts/run_vision_pipeline.py --pdf demo/1.pdf --enable-graph
 """
-
+import os
 import asyncio
 import logging
 import argparse
 from pathlib import Path
 import sys
 from datetime import datetime
-import os
+
 
 # 프로젝트 루트를 sys.path에 추가
 project_root = Path(__file__).parent.parent
