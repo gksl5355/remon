@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: skala-practice
+
+resources:
+  - ../../base
+
+patchesStrategicMerge:
+  - ingress-host.yaml
+
+images:
+  - name: amdp-registry.skala-ai.com/skala25a/remon-frontend
+    newTag: front-0.1.0
+  - name: amdp-registry.skala-ai.com/skala25a/remon-api
+    newTag: api-0.1.0
+  - name: amdp-registry.skala-ai.com/skala25a/remon-api
+    newTag: ai-0.1.0
+
+configMapGenerator:
+  - name: remon-config
+    env: .env
+
+commonAnnotations:
+  environment: dev
+
+generatorOptions:
+  disableNameSuffixHash: true
+

@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: remon-ingress
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: public-nginx
+  rules:
+  - host: ingress.skala25a.project.skala-ai.com
+    http:
+      paths:
+      - path: /skala2-4-17/api(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: remon-api
+            port:
+              number: 8000
+      - path: /skala2-4-17(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: remon-frontend
+            port:
+              number: 80
+  tls:
+  - hosts:
+    - ingress.skala25a.project.skala-ai.com
+    secretName: skala25-project-tls-cert

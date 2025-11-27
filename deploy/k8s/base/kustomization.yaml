@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: skala-practice
+namePrefix: skala2-4-17-
+resources:
+  - frontend/configmap.yaml
+  - frontend/deployment.yaml
+  - frontend/service.yaml
+  - api/configmap.yaml
+  - api/deployment.yaml
+  - api/service.yaml
+  - ai-pipeline/cronjob.yaml
+  - db/postgres-external.yaml
+  - ingress/ingress.yaml
+commonLabels:
+  app.kubernetes.io/part-of: remon
+generatorOptions:
+  disableNameSuffixHash: true
