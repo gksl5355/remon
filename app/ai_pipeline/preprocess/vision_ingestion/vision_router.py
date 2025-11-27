@@ -96,7 +96,16 @@ class VisionRouter:
                 response = client.chat.completions.create(
                     model=model,
                     messages=[
-                        {"role": "system", "content": system_prompt},
+                        {
+                            "role": "system",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": system_prompt,
+                                    "cache_control": {"type": "ephemeral"}  # Prompt Caching
+                                }
+                            ]
+                        },
                         {
                             "role": "user",
                             "content": [
@@ -183,7 +192,16 @@ class VisionRouter:
                 response = await self.async_client.chat.completions.create(
                     model=model,
                     messages=[
-                        {"role": "system", "content": system_prompt},
+                        {
+                            "role": "system",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": system_prompt,
+                                    "cache_control": {"type": "ephemeral"}  # Prompt Caching
+                                }
+                            ]
+                        },
                         {
                             "role": "user",
                             "content": [

@@ -102,6 +102,12 @@ def parse_args():
         action="store_true",
         help="Qdrant 저장 건너뛰기 (콘솔 출력만)",
     )
+    parser.add_argument(
+        "--collection",
+        type=str,
+        default=None,
+        help="Qdrant 컬렉션명 (기본값: .env의 QDRANT_COLLECTION)",
+    )
     return parser.parse_args()
 
 
@@ -274,6 +280,14 @@ async def main():
         retry_backoff_seconds=args.retry_backoff_seconds,
         enable_graph=args.enable_graph,
     )
+    
+    # 컬렉션명 설정
+    if args.collection:
+        from app.ai_pipeline.preprocess.semantic_processing import DualIndexer
+        orchestrator.dual_indexer = DualIndexer(collection_name=args.collection)
+        logger.info(f"🗄️  Qdrant 컬렉션: {args.collection}")
+    else:
+        logger.info(f"🗄️  Qdrant 컬렉션: {os.getenv('QDRANT_COLLECTION', 'remon_regulations')}")
     
     # 테스트 모드: Qdrant 저장 건너뛰기 (스크립트 레벨에서만 처리)
     if args.skip_indexing:

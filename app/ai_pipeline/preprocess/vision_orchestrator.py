@@ -207,34 +207,40 @@ class VisionOrchestrator:
     
     def _phase1_vision_ingestion(self, pdf_path: str) -> List[Dict[str, Any]]:
         """
-        Phase 1: PDF → 이미지 → Vision LLM → 구조화 (동기, 기존 호환성 유지).
+        Phase 1: PDF → 이미지 → Vision LLM → 구조화 (동기, 동적 DPI).
         
         병렬 처리를 원하면 _phase1_vision_ingestion_parallel() 사용.
         """
-        logger.info("Phase 1: Vision Ingestion 시작 (순차 처리)")
+        logger.info("Phase 1: Vision Ingestion 시작 (순차 처리, 동적 DPI)")
         
-        # 1. PDF 렌더링
-        rendered_pages = self.renderer.render_pages(pdf_path)
-        
-        # 0. 문서 분석 (첫 페이지들로 전략 수립)
-        if self.analysis_pages > 0 and len(rendered_pages) >= self.analysis_pages:
-            first_images = [p["image_base64"] for p in rendered_pages[:self.analysis_pages]]
-            doc_analysis = self.document_analyzer.analyze(first_images)
-            logger.info(f"문서 분석: {doc_analysis.get('document_type')} - {doc_analysis.get('recommended_strategy')}")
-        else:
-            doc_analysis = None
+        # PDF 페이지 수 확인
+        import pypdfium2 as pdfium
+        pdf = pdfium.PdfDocument(pdf_path)
+        total_pages = len(pdf)
+        pdf.close()
         
         vision_results = []
         token_tracker = TokenTracker()
         
-        for page_data in rendered_pages:
-            page_num = page_data["page_num"]
+        for page_idx in range(total_pages):
+            page_num = page_idx + 1
             
             try:
-                # 2. 복잡도 분석
+                # 1. 복잡도 분석
                 complexity = self.complexity_analyzer.analyze_page(pdf_path, page_num)
                 
-                # 3. Vision 추출
+                # 2. DPI 결정 (복잡도 기반)
+                if complexity["has_table"] or complexity["complexity_score"] >= 0.3:
+                    dpi = 300  # 표 있음 → 고해상도
+                    logger.info(f"페이지 {page_num}: 복잡도 {complexity['complexity_score']:.2f} → 300 DPI")
+                else:
+                    dpi = 150  # 단순 텍스트 → 저해상도
+                    logger.info(f"페이지 {page_num}: 복잡도 {complexity['complexity_score']:.2f} → 150 DPI")
+                
+                # 3. 동적 렌더링
+                page_data = self.renderer.render_page_with_dpi(pdf_path, page_idx, dpi)
+                
+                # 4. Vision 추출
                 extraction = self.vision_router.route_and_extract(
                     image_base64=page_data["image_base64"],
                     page_num=page_num,
@@ -254,7 +260,7 @@ class VisionOrchestrator:
                     )
                     break
                 
-                # 4. 구조화
+                # 5. 구조화
                 structure = self.structure_extractor.extract(
                     extraction["content"],
                     page_num
@@ -265,66 +271,74 @@ class VisionOrchestrator:
                     "model_used": extraction["model_used"],
                     "complexity_score": complexity["complexity_score"],
                     "has_table": complexity["has_table"],
+                    "dpi": dpi,  # DPI 기록
                     "structure": structure.dict(),
                     "tokens_used": tokens_used
                 })
                 
-                logger.debug(f"페이지 {page_num} 처리 완료: {tokens_used} 토큰 사용")
+                logger.debug(f"페이지 {page_num} 완료: {dpi} DPI, {tokens_used} 토큰")
                 
             except Exception as e:
-                logger.error(f"페이지 {page_num} 처리 실패: {e}", exc_info=True)
-                # 실패한 페이지는 건너뛰고 계속 진행
+                logger.error(f"페이지 {page_num} 실패: {e}", exc_info=True)
                 continue
         
         logger.info(
-            f"Phase 1 완료: {len(vision_results)}/{len(rendered_pages)}개 페이지 처리. "
+            f"Phase 1 완료: {len(vision_results)}/{total_pages}개 페이지. "
             f"총 토큰: {token_tracker.total_tokens}"
         )
         return vision_results
     
     async def _phase1_vision_ingestion_parallel(self, pdf_path: str) -> List[Dict[str, Any]]:
         """
-        Phase 1: PDF → 이미지 → Vision LLM → 구조화 (병렬 처리).
+        Phase 1: PDF → 이미지 → Vision LLM → 구조화 (병렬 처리, 동적 DPI).
         
         페이지별 Vision LLM 호출을 병렬로 처리하여 처리 시간 단축.
         """
-        logger.info(f"Phase 1: Vision Ingestion 시작 (병렬 처리, max_concurrency={self.max_concurrency})")
+        logger.info(f"Phase 1: Vision Ingestion 시작 (병렬 처리, 동적 DPI, max_concurrency={self.max_concurrency})")
         
-        # 1. PDF 렌더링
-        rendered_pages = self.renderer.render_pages(pdf_path)
-        total_pages = len(rendered_pages)
+        # PDF 페이지 수 확인
+        import pypdfium2 as pdfium
+        pdf = pdfium.PdfDocument(pdf_path)
+        total_pages = len(pdf)
+        pdf.close()
         
-        # 0. 문서 분석 (첫 페이지들로 전략 수립)
-        if self.analysis_pages > 0 and total_pages >= self.analysis_pages:
-            first_images = [p["image_base64"] for p in rendered_pages[:self.analysis_pages]]
-            doc_analysis = self.document_analyzer.analyze(first_images)
-            logger.info(f"문서 분석: {doc_analysis.get('document_type')} - {doc_analysis.get('recommended_strategy')}")
-        else:
-            doc_analysis = None
-        
-        # 2. 복잡도 분석 (모든 페이지, 병렬 처리 가능하지만 PDF 파일 접근 제약으로 순차)
+        # 1. 복잡도 분석 및 DPI 결정 (모든 페이지)
         complexity_results = {}
-        for page_data in rendered_pages:
-            page_num = page_data["page_num"]
+        dpi_map = {}
+        
+        for page_idx in range(total_pages):
+            page_num = page_idx + 1
             try:
                 complexity = self.complexity_analyzer.analyze_page(pdf_path, page_num)
                 complexity_results[page_num] = complexity
+                
+                # DPI 결정
+                if complexity["has_table"] or complexity["complexity_score"] >= 0.3:
+                    dpi_map[page_num] = 300
+                else:
+                    dpi_map[page_num] = 150
+                    
             except Exception as e:
                 logger.error(f"페이지 {page_num} 복잡도 분석 실패: {e}")
                 complexity_results[page_num] = {"complexity_score": 0.1, "has_table": False}
+                dpi_map[page_num] = 150
         
-        # 3. Vision LLM 호출 병렬 처리
+        # 2. Vision LLM 호출 병렬 처리
         semaphore = asyncio.Semaphore(self.max_concurrency)
         token_tracker = TokenTracker()
         token_tracker_lock = asyncio.Lock()
         
-        async def process_page(page_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-            """단일 페이지 처리 (비동기)."""
-            page_num = page_data["page_num"]
+        async def process_page(page_idx: int) -> Optional[Dict[str, Any]]:
+            """단일 페이지 처리 (비동기, 동적 DPI)."""
+            page_num = page_idx + 1
             
             async with semaphore:  # 동시 실행 수 제한
                 try:
-                    complexity = complexity_results.get(page_num, {"complexity_score": 0.1})
+                    complexity = complexity_results[page_num]
+                    dpi = dpi_map[page_num]
+                    
+                    # 동적 렌더링
+                    page_data = self.renderer.render_page_with_dpi(pdf_path, page_idx, dpi)
                     
                     # Vision 추출 (비동기)
                     extraction = await self.vision_router.route_and_extract_async(
@@ -358,20 +372,21 @@ class VisionOrchestrator:
                         "model_used": extraction["model_used"],
                         "complexity_score": complexity["complexity_score"],
                         "has_table": complexity.get("has_table", False),
+                        "dpi": dpi,  # DPI 기록
                         "structure": structure.dict(),
                         "tokens_used": tokens_used
                     }
                     
-                    logger.debug(f"페이지 {page_num} 처리 완료: {tokens_used} 토큰 사용 ({extraction['model_used']})")
+                    logger.debug(f"페이지 {page_num} 완료: {dpi} DPI, {tokens_used} 토큰 ({extraction['model_used']})")
                     
                     return result
                     
                 except Exception as e:
-                    logger.error(f"페이지 {page_num} 처리 실패: {e}", exc_info=True)
+                    logger.error(f"페이지 {page_num} 실패: {e}", exc_info=True)
                     return None
         
         # 모든 페이지 병렬 처리
-        tasks = [process_page(page_data) for page_data in rendered_pages]
+        tasks = [process_page(i) for i in range(total_pages)]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
         # 결과 정리 (None과 예외 제거, 페이지 번호 순 정렬)
