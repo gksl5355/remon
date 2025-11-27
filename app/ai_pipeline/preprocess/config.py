@@ -11,9 +11,8 @@ dependencies:
 주의: 프로젝트 루트(/home/minje/remon)에서 실행해야 .env가 제대로 로드됩니다.
 절대경로를 사용하지 않으므로 git clone 후 모든 개발자가 동일하게 작동합니다.
 """
-
-from typing import Optional
 import os
+from typing import Optional 
 import logging
 
 logger = logging.getLogger(__name__)
