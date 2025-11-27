@@ -61,6 +61,47 @@ def parse_args():
         default=True,
         help="LLM 출력을 .txt로 저장 (기본: True)",
     )
+    # 병렬 처리 설정
+    parser.add_argument(
+        "--max-concurrency",
+        type=int,
+        default=3,
+        help="최대 동시 실행 수 (기본값: 3)",
+    )
+    parser.add_argument(
+        "--token-budget",
+        type=int,
+        default=None,
+        help="토큰 예산 (기본값: None, 제한 없음)",
+    )
+    parser.add_argument(
+        "--request-timeout",
+        type=int,
+        default=120,
+        help="API 요청 타임아웃 초 (기본값: 120)",
+    )
+    parser.add_argument(
+        "--retry-max-attempts",
+        type=int,
+        default=2,
+        help="최대 재시도 횟수 (기본값: 2)",
+    )
+    parser.add_argument(
+        "--retry-backoff-seconds",
+        type=float,
+        default=1.0,
+        help="재시도 대기 시간 초 (기본값: 1.0)",
+    )
+    parser.add_argument(
+        "--no-parallel",
+        action="store_true",
+        help="병렬 처리 비활성화 (순차 처리)",
+    )
+    parser.add_argument(
+        "--skip-indexing",
+        action="store_true",
+        help="Qdrant 저장 건너뛰기 (콘솔 출력만)",
+    )
     return parser.parse_args()
 
 
@@ -111,7 +152,13 @@ async def process_single_pdf(pdf_path: Path, args, orchestrator) -> dict:
     logger.info(f"🚀 처리 시작: {pdf_path.name}")
     logger.info("=" * 60)
 
-    result = await asyncio.to_thread(orchestrator.process_pdf, str(pdf_path))
+    # 병렬 처리 여부 설정
+    use_parallel = not args.no_parallel
+    result = await asyncio.to_thread(orchestrator.process_pdf, str(pdf_path), use_parallel)
+
+    # 테스트 모드: 콘솔에 상세 결과 출력
+    if args.skip_indexing and result["status"] == "success":
+        _print_detailed_results(result)
 
     # LLM 출력 저장
     if args.save_outputs and result["status"] == "success":
@@ -125,11 +172,54 @@ async def process_single_pdf(pdf_path: Path, args, orchestrator) -> dict:
         gpt4o_count = sum(1 for p in vision_results if p.get("model_used") == "gpt-4o")
         total_tokens = sum(p.get("tokens_used", 0) for p in vision_results)
 
-        logger.info(f"✅ 완료: {len(vision_results)}페이지, {index_summary.get('qdrant_chunks', 0)}청크, {total_tokens:,}토큰")
+        if args.skip_indexing:
+            logger.info(f"✅ 완료: {len(vision_results)}페이지, {total_tokens:,}토큰 (Qdrant 저장 건너뜀)")
+        else:
+            logger.info(f"✅ 완료: {len(vision_results)}페이지, {index_summary.get('qdrant_chunks', 0)}청크, {total_tokens:,}토큰")
     else:
         logger.error(f"❌ 실패: {result.get('error')}")
     
     return result
+
+
+def _print_detailed_results(result: dict) -> None:
+    """테스트 모드: 콘솔에 상세 결과 출력."""
+    vision_results = result.get("vision_extraction_result", [])
+    processing_results = result.get("processing_results", {})
+    chunks = processing_results.get("chunks", [])
+    
+    logger.info("\n" + "=" * 60)
+    logger.info("📄 Vision 추출 결과 상세")
+    logger.info("=" * 60)
+    
+    for page_result in vision_results:
+        page_num = page_result["page_num"]
+        model = page_result["model_used"]
+        complexity = page_result["complexity_score"]
+        tokens = page_result.get("tokens_used", 0)
+        structure = page_result["structure"]
+        markdown = structure.get("markdown_content", "")
+        
+        logger.info(f"\n[페이지 {page_num}]")
+        logger.info(f"  모델: {model}")
+        logger.info(f"  복잡도: {complexity:.2f}")
+        logger.info(f"  토큰: {tokens:,}")
+        logger.info(f"  표 포함: {page_result.get('has_table', False)}")
+        logger.info(f"  내용:\n{markdown}")
+        logger.info("-" * 60)
+    
+    if chunks:
+        logger.info("\n" + "=" * 60)
+        logger.info("📦 청킹 결과 요약")
+        logger.info("=" * 60)
+        for i, chunk in enumerate(chunks[:10], 1):  # 처음 10개만
+            chunk_text = chunk.get("text", chunk.get("content", ""))
+            logger.info(f"\n[청크 {i}]")
+            logger.info(f"  페이지: {chunk.get('page_num', 'N/A')}")
+            logger.info(f"  섹션: {chunk.get('section', 'N/A')}")
+            logger.info(f"  내용: {chunk_text[:200]}...")
+        if len(chunks) > 10:
+            logger.info(f"\n... 외 {len(chunks) - 10}개 청크")
 
 
 async def main():
@@ -172,11 +262,33 @@ async def main():
     logger.info(f"📚 총 {len(pdf_files)}개 PDF 파일 발견")
     logger.info(f"🔍 지식 그래프: {'활성화' if args.enable_graph else '비활성화'}")
     logger.info(f"💾 출력 저장: {'활성화' if args.save_outputs else '비활성화'}")
+    logger.info(f"⚡ 병렬 처리: {'비활성화' if args.no_parallel else f'활성화 (max_concurrency={args.max_concurrency})'}")
+    logger.info(f"🗄️  Qdrant 저장: {'건너뛰기 (테스트 모드)' if args.skip_indexing else '활성화'}")
 
-    # Orchestrator 생성
-    orchestrator = VisionOrchestrator()
-    if args.enable_graph:
-        orchestrator.enable_graph = True
+    # Orchestrator 생성 (생성자 인자로 설정 전달)
+    orchestrator = VisionOrchestrator(
+        max_concurrency=args.max_concurrency,
+        token_budget=args.token_budget,
+        request_timeout=args.request_timeout,
+        retry_max_attempts=args.retry_max_attempts,
+        retry_backoff_seconds=args.retry_backoff_seconds,
+        enable_graph=args.enable_graph,
+    )
+    
+    # 테스트 모드: Qdrant 저장 건너뛰기 (스크립트 레벨에서만 처리)
+    if args.skip_indexing:
+        from unittest.mock import MagicMock
+        # DualIndexer를 Mock으로 교체
+        orchestrator.dual_indexer = MagicMock()
+        orchestrator.dual_indexer.index = lambda chunks, graph_data, source_file: {
+            "status": "skipped",
+            "qdrant_chunks": 0,
+            "graph_nodes": len(graph_data.get("nodes", [])),
+            "graph_edges": len(graph_data.get("edges", [])),
+            "collection_name": "test_mode",
+            "processed_at": "test_mode",
+            "message": "Indexing skipped for testing"
+        }
 
     # 순차 처리
     results = []

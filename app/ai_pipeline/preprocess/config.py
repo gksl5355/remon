@@ -125,6 +125,24 @@ class PreprocessConfig:
     DOCUMENT_ANALYSIS_PAGES: int = int(os.getenv("DOCUMENT_ANALYSIS_PAGES", "3"))
     """문서 규칙 파악용 초기 분석 페이지 수. 기본값: 3"""
     
+    # ==================== 병렬 처리 설정 ====================
+    VISION_MAX_CONCURRENCY: int = int(os.getenv("VISION_MAX_CONCURRENCY", "3"))
+    """페이지별 Vision LLM 호출 최대 동시 실행 수. 기본값: 3"""
+    
+    VISION_TOKEN_BUDGET: Optional[int] = (
+        int(os.getenv("VISION_TOKEN_BUDGET")) if os.getenv("VISION_TOKEN_BUDGET") else None
+    )
+    """문서 단위 토큰 예산 (None이면 제한 없음). 기본값: None"""
+    
+    VISION_REQUEST_TIMEOUT: int = int(os.getenv("VISION_REQUEST_TIMEOUT", "120"))
+    """Vision API 요청 타임아웃 (초). 기본값: 120"""
+    
+    VISION_RETRY_MAX_ATTEMPTS: int = int(os.getenv("VISION_RETRY_MAX_ATTEMPTS", "2"))
+    """Vision API 실패 시 최대 재시도 횟수. 기본값: 2"""
+    
+    VISION_RETRY_BACKOFF_SECONDS: float = float(os.getenv("VISION_RETRY_BACKOFF_SECONDS", "1.0"))
+    """재시도 간 대기 시간 (초). 기본값: 1.0"""
+    
     # ==================== LangSmith (추적) ====================
     ENABLE_LANGSMITH: bool = os.getenv("LANGCHAIN_TRACING_V2", "false").lower() == "true"
     """LangSmith 추적 활성화 여부"""
@@ -221,6 +239,11 @@ class PreprocessConfig:
             "temperature": cls.VISION_TEMPERATURE,
             "enable_graph": cls.ENABLE_GRAPH_EXTRACTION,
             "analysis_pages": cls.DOCUMENT_ANALYSIS_PAGES,
+            "max_concurrency": cls.VISION_MAX_CONCURRENCY,
+            "token_budget": cls.VISION_TOKEN_BUDGET,
+            "request_timeout": cls.VISION_REQUEST_TIMEOUT,
+            "retry_max_attempts": cls.VISION_RETRY_MAX_ATTEMPTS,
+            "retry_backoff_seconds": cls.VISION_RETRY_BACKOFF_SECONDS,
         }
     
     @classmethod
