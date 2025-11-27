@@ -45,7 +45,10 @@ class VisionRouter:
     def async_client(self) -> AsyncOpenAI:
         """비동기 OpenAI 클라이언트 (lazy 초기화)."""
         if self._async_client is None:
-            self._async_client = AsyncOpenAI(api_key=self.api_key, timeout=self.request_timeout)
+            from ..config import PreprocessConfig
+            
+            client = AsyncOpenAI(api_key=self.api_key, timeout=self.request_timeout)
+            self._async_client = PreprocessConfig.wrap_openai_client(client)
         return self._async_client
 
     def route_and_extract(
@@ -78,6 +81,8 @@ class VisionRouter:
         except ImportError:
             raise ImportError("openai가 설치되지 않았습니다: pip install openai")
 
+        from ..config import PreprocessConfig
+
         # 모델 선택
         if complexity_score >= self.complexity_threshold:
             model = self.model_complex
@@ -89,6 +94,7 @@ class VisionRouter:
         logger.info(f"페이지 {page_num}: 복잡도 {complexity_score:.2f} → {model_label} ({model}) 사용")
 
         client = OpenAI(api_key=self.api_key, timeout=self.request_timeout)
+        client = PreprocessConfig.wrap_openai_client(client)
 
         # Vision API 호출 (재시도 로직 포함)
         for attempt in range(1, self.retry_max_attempts + 1):

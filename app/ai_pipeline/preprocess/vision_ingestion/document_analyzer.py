@@ -53,7 +53,10 @@ Return ONLY valid JSON:
         except ImportError:
             raise ImportError("openai가 설치되지 않았습니다")
         
+        from ..config import PreprocessConfig
+        
         client = OpenAI(api_key=self.api_key)
+        client = PreprocessConfig.wrap_openai_client(client)
         
         # 첫 페이지만 분석 (비용 절감)
         content = [
