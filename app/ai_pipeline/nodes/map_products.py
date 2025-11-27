@@ -329,6 +329,7 @@ class MappingNode:
 
                 item = MappingItem(
                     product_id=product_id,
+                    product_name=product_name,
                     feature_name=feature_name,
                     applies=llm_out["applies"],
                     required_value=required_value,

@@ -95,7 +95,8 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
     product_rows = [
         [
             item.get("feature_name", ""),
-            item.get("product_id", ""),
+            # item.get("product_id", ""), #TODO map_products 에서 items에 코드 한줄 추가한다고 말해야함
+            item.get("product_name", ""),
             f"현재: {item.get('current_value', '-')}, 필요: {item.get('required_value','-')}"
         ] for item in mapping_items
     ]
