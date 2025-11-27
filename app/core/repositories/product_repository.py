@@ -19,6 +19,7 @@ FEATURE_UNIT_MAP: Dict[str, str] = {
     "tarr": "mg",
     "battery": "mAh",
     "label_size": "mm^2",
+    "image": "text",
 }
 
 BOOLEAN_FEATURES: Set[str] = {"menthol", "incense", "security_auth"}
@@ -38,6 +39,7 @@ SELECT
     p.battery,
     p.label_size,
     p.security_auth,
+    p.image,
     COALESCE(pec.country_code, :default_country) AS export_country
 FROM products p
 LEFT JOIN product_export_countries pec
@@ -75,10 +77,11 @@ class ProductRepository(BaseRepository[Product]):
             State.ProductInfo 형식 딕셔너리
             {
                 "product_id": "123",
-                "name": "제품명",
-                "export_country": "US",
-                "category": "전자담배",
-                "features": {"nicotin": 3.0, "battery": 3000},
+                "product_name": "제품명",
+                "mapping": {
+                    "target": {...},
+                    "present_state": {"nicotin": 3.0, "battery": 3000},
+                },
                 "feature_units": {"nicotin": "mg", "battery": "mAh"}
             }
         
@@ -146,9 +149,12 @@ class ProductRepository(BaseRepository[Product]):
         # 3. State.ProductInfo 형식 반환
         return {
             "product_id": str(row["product_id"]),
-            "name": row.get("product_name") or "Unknown Product",
+            "product_name": row.get("product_name") or "Unknown Product",
             "country": row.get("export_country") or DEFAULT_EXPORT_COUNTRY,
             "category": row.get("product_category") or "Unknown",
-            "features": features,
+            "mapping": {
+                "target": {},
+                "present_state": features,
+            },
             "feature_units": feature_units,
         }
