@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol, TYPE_CHECKING
 from collections import defaultdict
+
 # Protocol, TYPE_CHECKING 추가
 
 from sqlalchemy import text
@@ -47,6 +48,7 @@ from app.core.repositories.product_repository import ProductRepository
 if TYPE_CHECKING:
     from app.ai_pipeline.tools.retrieval_tool import RetrievalOutput
 else:
+
     class RetrievalOutput(Protocol):
         results: List[Dict[str, Any]]
         metadata: Dict[str, Any]
@@ -159,8 +161,8 @@ class MappingNode:
         self.search_tool = search_tool or get_retrieval_tool()
         self.top_k = top_k
         self.alpha = alpha  # 🔥 dynamic hybrid weight
-    
-    # 수정: Repository 생성 (클래스만 변경)
+
+        # 수정: Repository 생성 (클래스만 변경)
         self.product_repository = product_repository or ProductRepository()
         self.debug_enabled = settings.MAPPING_DEBUG_ENABLED
         self.max_candidates_per_doc = max_candidates_per_doc
@@ -321,20 +323,18 @@ class MappingNode:
         if not product:
             filters = state.get("mapping_filters") or {}
             product_id = filters.get("product_id")
-           
-    # 기존 호출 방식    
+
+            # 기존 호출 방식
             # product = await self.product_repository.fetch_product(
             #     int(product_id) if product_id is not None else None
             # )
             # state["product_info"] = product
-    # 수정: Repository 호출 방식 변경 (session 전달)
+            # 수정: Repository 호출 방식 변경 (session 전달)
             async with AsyncSessionLocal() as session:
                 product = await self.product_repository.fetch_product_for_mapping(
-                    session,
-                    int(product_id) if product_id is not None else None
+                    session, int(product_id) if product_id is not None else None
                 )
             state["product_info"] = product
-
 
         product_id = product["product_id"]
         product_name = product.get("product_name", product.get("name", "unknown"))
@@ -366,7 +366,9 @@ class MappingNode:
                 self.alpha,
             )
             if not features:
-                logger.info("💤 매핑 대상 특성이 없습니다. mapping.present_state나 target을 확인하세요.")
+                logger.info(
+                    "💤 매핑 대상 특성이 없습니다. mapping.present_state나 target을 확인하세요."
+                )
 
         # 🔥 feature별로 검색 TOOL → 매핑
         for feature_name, value in features.items():
@@ -447,7 +449,9 @@ class MappingNode:
                         mapping_targets[feature_name] = {
                             "required_value": item.get("required_value"),
                             "chunk_id": item.get("regulation_chunk_id"),
-                            "doc_id": item.get("regulation_meta", {}).get("meta_doc_id"),
+                            "doc_id": item.get("regulation_meta", {}).get(
+                                "meta_doc_id"
+                            ),
                         }
 
                 if self.debug_enabled:
@@ -514,7 +518,7 @@ def _get_default_product_repository() -> ProductRepository:
     # if _DEFAULT_PRODUCT_REPOSITORY is None:
     #     _DEFAULT_PRODUCT_REPOSITORY = ProductRepository(AsyncSessionLocal)
     # return _DEFAULT_PRODUCT_REPOSITORY
-    """ 수정: Repository 생성 방식 간소화"""
+    """수정: Repository 생성 방식 간소화"""
     global _DEFAULT_PRODUCT_REPOSITORY
     if _DEFAULT_PRODUCT_REPOSITORY is None:
         _DEFAULT_PRODUCT_REPOSITORY = ProductRepository()
@@ -563,7 +567,13 @@ async def map_products_node(state: AppState) -> AppState:
     context: MappingContext = state.get("mapping_context", {}) or {}
     has_override = any(
         key in context
-        for key in ("llm_client", "search_tool", "top_k", "alpha", "max_candidates_per_doc")
+        for key in (
+            "llm_client",
+            "search_tool",
+            "top_k",
+            "alpha",
+            "max_candidates_per_doc",
+        )
     )
     if has_override:
         node = _build_mapping_node(
@@ -589,107 +599,8 @@ def _log_mapping_preview(product_id: str, items: List[MappingItem]) -> None:
         logger.info("📭 Mapping produced no items for product=%s", product_id)
         return
 
-<<<<<<< HEAD
-
-# -----------------------------------------------------------------------------
-# Core mapping logic
-# -----------------------------------------------------------------------------
-
-
-@dataclass
-class MapProductsDependencies:
-    vector_client: VectorClient
-    product_repository: ProductRepository
-    mapping_sink: MappingSink
-    config: MappingConfig
-    # 🆕 Tools 추가
-    retrieval_tool: RetrievalTool
-    filter_builder: FilterBuilder
-
-    @classmethod
-    def default(cls) -> "MapProductsDependencies":
-        vector_client = VectorClient.from_settings()
-        session_maker = AsyncSessionLocal
-        product_repo = RDBProductRepository(session_maker)
-        
-        # 🆕 Tools 초기화
-        retrieval_tool = RetrievalTool(vector_client=vector_client)
-        filter_builder = FilterBuilder()
-        
-        sink: MappingSink
-        if settings.MAPPING_SINK_TYPE.lower() == "rdb":
-            sink = RDBMappingSink(session_maker)
-        else:
-            sink = NoOpMappingSink()
-
-        return cls(
-            vector_client=vector_client,
-            product_repository=product_repo,
-            mapping_sink=sink,
-            config=MappingConfig.from_settings().normalize(),
-            retrieval_tool=retrieval_tool,
-            filter_builder=filter_builder,
-        )
-
-
-class MapProductsNode:
-    """제품 ↔ 규제 매핑 노드 구현."""
-
-    def __init__(self, deps: MapProductsDependencies):
-        self.deps = deps
-
-    async def __call__(self, state: AppState) -> Dict[str, Any]:
-        return await self.run(state)
-
-    async def run(self, state: AppState) -> Dict[str, Any]:
-        metadata = state.metadata or {}
-        country = metadata.get("country")
-        category = metadata.get("category")
-
-        self._log_config_snapshot(state.run_id)
-
-        products = await self.deps.product_repository.fetch_for_mapping(
-            country=country, category=category
-        )
-        if not products:
-            logger.warning("map_products: no products fetched for filters {}", metadata)
-            return {"mapped_products": []}
-
-        # 🆕 FilterBuilder 사용
-        where_filters = self.deps.filter_builder.build_filters(
-            country=country,
-            category=category,
-            metadata=metadata
-        )
-        mapped: List[MappingResult] = []
-        query_tasks = []
-
-        start_ts = perf_counter()
-        for product in products:
-            query_text = _build_product_query_text(product)
-            query_tasks.append(
-                asyncio.create_task(
-                    self._query_and_score_product(
-                        product=product,
-                        query_text=query_text,
-                        where_filters=where_filters,
-                    )
-                )
-            )
-
-        results_per_product = await asyncio.gather(*query_tasks)
-        for product_results in results_per_product:
-            mapped.extend(product_results)
-
-        elapsed_ms = (perf_counter() - start_ts) * 1000
-        await self.deps.mapping_sink.save(mapped)
-
-=======
-    logger.info(
-        "📒 Mapping preview (showing %d/%d items):", len(preview), len(items)
-    )
+    logger.info("📒 Mapping preview (showing %d/%d items):", len(preview), len(items))
     for idx, item in enumerate(preview, 1):
->>>>>>> 9c8d2e5de60743a693e60af5e8d67ba0c3fc7bc2
         logger.info(
             "  %d) feature=%s applies=%s required=%s current=%s chunk=%s",
             idx,
@@ -701,211 +612,6 @@ class MapProductsNode:
         )
 
 
-<<<<<<< HEAD
-        return {"mapped_products": [result.model_dump() for result in mapped]}
-
-    def _log_config_snapshot(self, run_id: str | None) -> None:
-        cfg_dict = asdict(self.deps.config)
-        logger.info(
-            "map_products config snapshot run_id=%s cfg=%s sink=%s",
-            run_id,
-            cfg_dict,
-            settings.MAPPING_SINK_TYPE,
-        )
-
-    async def _query_and_score_product(
-        self,
-        *,
-        product: ProductSnapshot,
-        query_text: str,
-        where_filters: Dict[str, Any] | None,
-    ) -> List[MappingResult]:
-        # 🆕 RetrievalTool 사용 (고급 검색)
-        query_response = await self.deps.retrieval_tool.search(
-            query=query_text,
-            strategy="hybrid",  # 하이브리드 검색 전략
-            top_k=self.deps.config.top_k,
-            filters=where_filters,
-            alpha=self.deps.config.alpha,
-        )
-
-        return self._score_product(product, query_response)
-
-    def _score_product(
-        self, product: ProductSnapshot, matches: Sequence[VectorMatch]
-    ) -> List[MappingResult]:
-        if not matches:
-            return []
-
-        scored_results: List[MappingResult] = []
-        product_dict = product.as_dict()
-
-        for match in matches:
-            candidate_metadata = match.payload or {}
-            numeric_ratio, numeric_fields = _compute_numeric_ratio(
-                product_dict, candidate_metadata
-            )
-            condition_ratio, condition_fields = _compute_condition_ratio(
-                product_dict, candidate_metadata
-            )
-            semantic_score = match.score
-
-            final_score = (
-                self.deps.config.semantic_weight * semantic_score
-                + self.deps.config.numeric_weight * numeric_ratio
-                + self.deps.config.condition_weight * condition_ratio
-            )
-
-            if final_score < self.deps.config.threshold:
-                continue
-
-            matched_fields = numeric_fields + condition_fields
-            reason = (
-                f"{product.name or product.id} ↔ {match.id} "
-                f"semantic={semantic_score:.2f} numeric={numeric_ratio:.2f} "
-                f"condition={condition_ratio:.2f}"
-            )
-
-            scored_results.append(
-                MappingResult(
-                    product_id=str(product.id),
-                    regulation_id=str(match.id),
-                    final_score=final_score,
-                    hybrid_score=semantic_score,
-                    dense_score=match.dense_score,
-                    sparse_score=match.sparse_score,
-                    numeric_ratio=numeric_ratio,
-                    condition_ratio=condition_ratio,
-                    matched_fields=matched_fields,
-                    reason=reason,
-                    metadata={
-                        "product": product_dict,
-                        "regulation": candidate_metadata,
-                    },
-                )
-            )
-
-        scored_results.sort(key=lambda r: r.final_score, reverse=True)
-        return scored_results
-
-
-# -----------------------------------------------------------------------------
-# Helper data functions
-# -----------------------------------------------------------------------------
-
-
-def _compute_numeric_ratio(
-    product: Dict[str, Any], regulation_meta: Dict[str, Any]
-) -> tuple[float, List[str]]:
-    matches = 0
-    total = 0
-    matched_fields: List[str] = []
-
-    # TODO(remon-ai): 전처리 스키마 확정 후 `_limit/_direction` 가정 검증/보완.
-    for key, limit in regulation_meta.items():
-        if not key.endswith("_limit"):
-            continue
-        if not isinstance(limit, (int, float)):
-            continue
-
-        field = key[: -len("_limit")]
-        product_value = product.get(field)
-        if product_value is None:
-            continue
-
-        direction = regulation_meta.get(f"{field}_direction", "<=")
-        total += 1
-        if _compare_numeric(product_value, limit, direction):
-            matches += 1
-            matched_fields.append(field)
-
-    ratio = matches / total if total else 1.0
-    return ratio, matched_fields
-
-
-def _compare_numeric(value: float, limit: float, direction: str) -> bool:
-    if direction == ">=":
-        return value >= limit
-    return value <= limit
-
-
-def _compute_condition_ratio(
-    product: Dict[str, Any], regulation_meta: Dict[str, Any]
-) -> tuple[float, List[str]]:
-    evaluations = 0
-    matches = 0
-    matched_fields: List[str] = []
-
-    for key, expected in regulation_meta.items():
-        field, comparator = _parse_condition_field(key)
-        if not field:
-            continue
-
-        product_value = product.get(field)
-        if product_value is None:
-            continue
-
-        evaluations += 1
-        if _evaluate_condition(product_value, expected, comparator):
-            matches += 1
-            matched_fields.append(field)
-
-    ratio = matches / evaluations if evaluations else 1.0
-    return ratio, matched_fields
-
-
-def _parse_condition_field(key: str) -> tuple[str | None, str | None]:
-    # TODO(remon-ai): 전처리에서 제공하는 최종 접미사 규칙에 맞춰 suffix 리스트 보완.
-    for suffix in ("_required", "_allowed", "_prohibited"):
-        if key.endswith(suffix):
-            return key[: -len(suffix)], suffix
-    if key.endswith("_position_required"):
-        return key.replace("_position_required", "_position"), "_required"
-    if key.endswith("_visibility_required"):
-        return key.replace("_visibility_required", "_visibility"), "_required"
-    return None, None
-
-
-def _evaluate_condition(value: Any, expected: Any, comparator: str | None) -> bool:
-    if comparator == "_prohibited":
-        return value != expected
-    if comparator == "_allowed":
-        if isinstance(expected, list):
-            return value in expected
-        return value == expected
-    # `_required` 기본
-    return value == expected
-
-
-def _build_regulation_where(metadata: Dict[str, Any]) -> Dict[str, Any] | None:
-    """레거시 필터 빌더 (FilterBuilder로 대체됨)."""
-    filters = {}
-    if metadata.get("country"):
-        filters["country"] = metadata["country"]
-    if metadata.get("category"):
-        filters["category"] = metadata["category"]
-    return filters or None
-
-
-def _build_product_query_text(product: ProductSnapshot) -> str:
-    attrs = product.as_dict()
-    tokens: List[str] = []
-    for key in ("name", "category", "export_country"):
-        value = attrs.get(key)
-        if value:
-            # TODO(remon-ai): 기술용어사전 적용해서 이름/카테고리 등을 정규화한 토큰으로 확장.
-            tokens.append(str(value))
-
-    detail_tokens = [f"{k}:{v}" for k, v in attrs.items() if k not in ("id", "name")]
-    tokens.extend(detail_tokens)
-    return " ".join(tokens)
-
-
-def _to_int_or_none(value: Any) -> int | None:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-=======
 def _persist_mapping_snapshot(
     product: ProductInfo,
     items: List[MappingItem],
@@ -914,7 +620,6 @@ def _persist_mapping_snapshot(
     alpha: float,
 ) -> Optional[str]:
     if not settings.MAPPING_DEBUG_DIR:
->>>>>>> 9c8d2e5de60743a693e60af5e8d67ba0c3fc7bc2
         return None
 
     target_dir = Path(settings.MAPPING_DEBUG_DIR)
