@@ -49,3 +49,4 @@ data/*
 app/data/
 .uv-cache/
 Dockerfile*
+deploy/
