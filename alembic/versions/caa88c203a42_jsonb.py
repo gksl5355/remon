@@ -88,7 +88,8 @@ def upgrade() -> None:
     op.alter_column('report_summaries', 'summary_text',
                existing_type=sa.TEXT(),
                type_=postgresql.JSONB(astext_type=sa.Text()),
-               existing_nullable=True)
+               existing_nullable=True
+               )
     op.create_index(op.f('ix_report_summaries_summary_id'), 'report_summaries', ['summary_id'], unique=False)
     op.drop_constraint(op.f('report_summaries_impact_score_id_fkey'), 'report_summaries', type_='foreignkey')
     op.drop_constraint(op.f('report_summaries_report_id_fkey'), 'report_summaries', type_='foreignkey')

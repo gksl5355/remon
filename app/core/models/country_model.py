@@ -8,6 +8,7 @@ class Country(Base):
     country_code = Column(String(2), primary_key=True)
     country_name = Column(String(100), nullable=False)
     
-    # Relationships
+    # Relationships////////:100  varchar
     regulations = relationship("Regulation", back_populates="country")
     product_exports = relationship("ProductExportCountry", back_populates="country")
+    reports = relationship("Report", back_populates="country")

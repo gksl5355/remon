@@ -85,11 +85,27 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+
+# [수정된 부분] 설정 가져오기
+    section = config.get_section(config.config_ini_section)
+    url = section.get("sqlalchemy.url")
+    
+    # 주소에 asyncpg가 있으면 psycopg2로 잠시 바꿔치기
+    if url and "asyncpg" in url:
+        # asyncpg -> psycopg2 로 교체 (비동기 -> 동기)
+        section["sqlalchemy.url"] = url.replace("asyncpg", "psycopg2")
+
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        section,  # <--- ⭐ 중요: 여기에 방금 수정한 'section' 변수를 넣어야 합니다!
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
+
+    # connectable = engine_from_config(
+    #     config.get_section(config.config_ini_section, {}),
+    #     prefix="sqlalchemy.",
+    #     poolclass=pool.NullPool,
+    # )
 
     with connectable.connect() as connection:
         context.configure(

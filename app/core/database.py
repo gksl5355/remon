@@ -71,3 +71,4 @@ def get_db_session():
     비동기 환경에서 await와 호환(예: await session.execute(...))
     """
     return AsyncSessionLocal()
+    

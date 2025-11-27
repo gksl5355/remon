@@ -30,6 +30,15 @@ api = [
   "python-multipart>=0.0.20",
   "requests==2.32.3",
   "psycopg2-binary>=2.9.11",
+  "alembic>=1.17.2",
+  "python-dotenv>=1.2.1",
+  "greenlet>=3.2.4",
+  "fake-useragent>=2.2.0",
+  "curl-cffi>=0.13.0",
+  "aiofiles>=25.1.0",
+  "python-dateutil>=2.9.0.post0",
+  "selenium>=4.38.0",
+  "webdriver-manager>=4.0.2",
 ]
 
 # -----------------------------------
