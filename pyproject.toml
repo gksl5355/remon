@@ -47,7 +47,6 @@ api = [
   "pypdfium2>=4.30.0",
   "pytesseract>=0.3.13",
   "pillow>=10.0.0",
-  "python-multipart>=0.0.20",
   "langchain-text-splitters>=0.3.0",
   "tiktoken>=0.8.0",
   "networkx>=3.0",
@@ -74,6 +73,7 @@ api = [
   "asyncpg>=0.29.0",
   "rank-bm25>=0.2.2",
   "pymupdf>=1.26.6",
+  "python-multipart>=0.0.20",
   "requests==2.32.3",
   "psycopg2-binary>=2.9.11",
 ]

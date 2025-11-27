@@ -1,13 +1,16 @@
 """
 module: vision_orchestrator.py
-description: Vision-Centric Preprocessing Pipeline 전체 조율
+description: Vision-Centric Preprocessing Pipeline 전체 조율 (병렬 처리 지원)
 author: AI Agent
 created: 2025-01-14
+updated: 2025-01-14 (병렬 처리 리팩터링)
 """
 
+import asyncio
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from pathlib import Path
+from dataclasses import dataclass, field
 
 from .config import PreprocessConfig
 from .vision_ingestion import PDFRenderer, ComplexityAnalyzer, VisionRouter, StructureExtractor, DocumentAnalyzer
@@ -17,25 +20,114 @@ from .graph_builder import EntityExtractor, GraphManager
 logger = logging.getLogger(__name__)
 
 
-class VisionOrchestrator:
-    """Vision 기반 전처리 파이프라인 조율자."""
+@dataclass
+class TokenTracker:
+    """토큰 사용량 추적."""
+    total_tokens: int = 0
+    tokens_by_model: Dict[str, int] = field(default_factory=dict)
+    tokens_by_page: Dict[int, int] = field(default_factory=dict)
     
-    def __init__(self):
+    def add_usage(self, page_num: int, model: str, tokens: int) -> None:
+        """토큰 사용량 추가."""
+        self.total_tokens += tokens
+        self.tokens_by_model[model] = self.tokens_by_model.get(model, 0) + tokens
+        self.tokens_by_page[page_num] = tokens
+    
+    def check_budget(self, budget: Optional[int]) -> bool:
+        """예산 초과 여부 확인."""
+        if budget is None:
+            return True
+        return self.total_tokens <= budget
+    
+    def get_summary(self) -> Dict[str, Any]:
+        """사용량 요약 반환."""
+        return {
+            "total_tokens": self.total_tokens,
+            "tokens_by_model": self.tokens_by_model.copy(),
+            "page_count": len(self.tokens_by_page),
+        }
+
+
+class VisionOrchestrator:
+    """Vision 기반 전처리 파이프라인 조율자 (병렬 처리 지원)."""
+    
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model_complex: Optional[str] = None,
+        model_simple: Optional[str] = None,
+        dpi: Optional[int] = None,
+        complexity_threshold: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
+        enable_graph: Optional[bool] = None,
+        analysis_pages: Optional[int] = None,
+        max_concurrency: Optional[int] = None,
+        token_budget: Optional[int] = None,
+        request_timeout: Optional[int] = None,
+        retry_max_attempts: Optional[int] = None,
+        retry_backoff_seconds: Optional[float] = None,
+    ):
+        """
+        VisionOrchestrator 초기화.
+        
+        Args:
+            api_key: OpenAI API 키 (필수)
+            model_complex: 복잡한 표 처리용 모델 (기본값: gpt-4o)
+            model_simple: 단순 텍스트 처리용 모델 (기본값: gpt-4o-mini)
+            dpi: PDF 이미지 렌더링 DPI (기본값: 300)
+            complexity_threshold: 표 복잡도 임계값 (기본값: 0.3)
+            max_tokens: Vision LLM 최대 출력 토큰 (기본값: 4096)
+            temperature: Vision LLM 온도 (기본값: 0.1)
+            enable_graph: 지식 그래프 추출 활성화 (기본값: True)
+            analysis_pages: 문서 규칙 파악용 초기 분석 페이지 수 (기본값: 3)
+            max_concurrency: 페이지별 Vision LLM 호출 최대 동시 실행 수 (기본값: 3)
+            token_budget: 문서 단위 토큰 예산 (기본값: None, 제한 없음)
+            request_timeout: Vision API 요청 타임아웃 초 (기본값: 120)
+            retry_max_attempts: Vision API 실패 시 최대 재시도 횟수 (기본값: 2)
+            retry_backoff_seconds: 재시도 간 대기 시간 초 (기본값: 1.0)
+        
+        Note:
+            인자가 None이면 PreprocessConfig에서 기본값을 가져옵니다.
+        """
+        # 기본값 로드 (인자가 None인 경우)
         vision_config = PreprocessConfig.get_vision_config()
         
-        self.renderer = PDFRenderer(dpi=vision_config["dpi"])
+        # 인자로 넘어온 값이 있으면 우선 사용, 없으면 config 기본값 사용
+        self.api_key = api_key or vision_config["api_key"]
+        model_complex = model_complex or vision_config["model_complex"]
+        model_simple = model_simple or vision_config["model_simple"]
+        dpi = dpi or vision_config["dpi"]
+        complexity_threshold = complexity_threshold or vision_config["complexity_threshold"]
+        max_tokens = max_tokens or vision_config["max_tokens"]
+        temperature = temperature or vision_config["temperature"]
+        request_timeout = request_timeout or vision_config["request_timeout"]
+        retry_max_attempts = retry_max_attempts or vision_config["retry_max_attempts"]
+        retry_backoff_seconds = retry_backoff_seconds or vision_config["retry_backoff_seconds"]
+        self.enable_graph = enable_graph if enable_graph is not None else vision_config["enable_graph"]
+        self.analysis_pages = analysis_pages or vision_config["analysis_pages"]
+        self.max_concurrency = max_concurrency or vision_config["max_concurrency"]
+        self.token_budget = token_budget if token_budget is not None else vision_config["token_budget"]
+        
+        if not self.api_key:
+            raise ValueError("api_key는 필수입니다. 생성자 인자로 전달하거나 환경 변수 OPENAI_API_KEY를 설정하세요.")
+        
+        self.renderer = PDFRenderer(dpi=dpi)
         self.complexity_analyzer = ComplexityAnalyzer()
         self.document_analyzer = DocumentAnalyzer(
-            api_key=vision_config["api_key"],
+            api_key=self.api_key,
             model="gpt-4o-mini"
         )
         self.vision_router = VisionRouter(
-            api_key=vision_config["api_key"],
-            model_complex=vision_config["model_complex"],
-            model_simple=vision_config["model_simple"],
-            complexity_threshold=vision_config["complexity_threshold"],
-            max_tokens=vision_config["max_tokens"],
-            temperature=vision_config["temperature"]
+            api_key=self.api_key,
+            model_complex=model_complex,
+            model_simple=model_simple,
+            complexity_threshold=complexity_threshold,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            request_timeout=request_timeout,
+            retry_max_attempts=retry_max_attempts,
+            retry_backoff_seconds=retry_backoff_seconds,
         )
         self.structure_extractor = StructureExtractor()
         self.hierarchy_chunker = HierarchyChunker(max_tokens=1024)
@@ -44,15 +136,13 @@ class VisionOrchestrator:
         self.entity_extractor = EntityExtractor()
         self.graph_manager = GraphManager()
         
-        self.enable_graph = vision_config["enable_graph"]
-        self.analysis_pages = vision_config["analysis_pages"]
-        
-    def process_pdf(self, pdf_path: str) -> Dict[str, Any]:
+    def process_pdf(self, pdf_path: str, use_parallel: bool = True) -> Dict[str, Any]:
         """
         PDF 전체 처리 파이프라인.
         
         Args:
             pdf_path: PDF 파일 경로
+            use_parallel: 병렬 처리 사용 여부 (기본값: True)
             
         Returns:
             Dict: {
@@ -62,11 +152,23 @@ class VisionOrchestrator:
                 "dual_index_summary": {...}
             }
         """
-        logger.info(f"=== Vision Pipeline 시작: {Path(pdf_path).name} ===")
+        logger.info(f"=== Vision Pipeline 시작: {Path(pdf_path).name} (병렬: {use_parallel}) ===")
         
         try:
             # Phase 1: Vision Ingestion
-            vision_results = self._phase1_vision_ingestion(pdf_path)
+            if use_parallel and self.max_concurrency > 1:
+                # 비동기 병렬 처리
+                vision_results = asyncio.run(self._phase1_vision_ingestion_parallel(pdf_path))
+            else:
+                # 순차 처리 (기존 방식)
+                vision_results = self._phase1_vision_ingestion(pdf_path)
+            
+            if not vision_results:
+                logger.warning("처리된 페이지가 없습니다.")
+                return {
+                    "status": "error",
+                    "error": "No pages processed"
+                }
             
             # Phase 2: Semantic Processing
             processing_results = self._phase2_semantic_processing(vision_results, pdf_path)
@@ -88,7 +190,8 @@ class VisionOrchestrator:
                 "status": "success",
                 "vision_extraction_result": vision_results,
                 "graph_data": graph_data,
-                "dual_index_summary": index_summary
+                "dual_index_summary": index_summary,
+                "processing_results": processing_results  # 테스트용으로 추가
             }
             
             logger.info(f"✅ Vision Pipeline 완료: {len(vision_results)}개 페이지 처리")
@@ -103,8 +206,12 @@ class VisionOrchestrator:
             }
     
     def _phase1_vision_ingestion(self, pdf_path: str) -> List[Dict[str, Any]]:
-        """Phase 1: PDF → 이미지 → Vision LLM → 구조화."""
-        logger.info("Phase 1: Vision Ingestion 시작")
+        """
+        Phase 1: PDF → 이미지 → Vision LLM → 구조화 (동기, 기존 호환성 유지).
+        
+        병렬 처리를 원하면 _phase1_vision_ingestion_parallel() 사용.
+        """
+        logger.info("Phase 1: Vision Ingestion 시작 (순차 처리)")
         
         # 1. PDF 렌더링
         rendered_pages = self.renderer.render_pages(pdf_path)
@@ -118,37 +225,172 @@ class VisionOrchestrator:
             doc_analysis = None
         
         vision_results = []
+        token_tracker = TokenTracker()
         
         for page_data in rendered_pages:
             page_num = page_data["page_num"]
             
-            # 2. 복잡도 분석
-            complexity = self.complexity_analyzer.analyze_page(pdf_path, page_num)
-            
-            # 3. Vision 추출
-            extraction = self.vision_router.route_and_extract(
-                image_base64=page_data["image_base64"],
-                page_num=page_num,
-                complexity_score=complexity["complexity_score"],
-                system_prompt=StructureExtractor.SYSTEM_PROMPT
-            )
-            
-            # 4. 구조화
-            structure = self.structure_extractor.extract(
-                extraction["content"],
-                page_num
-            )
-            
-            vision_results.append({
-                "page_num": page_num,
-                "model_used": extraction["model_used"],
-                "complexity_score": complexity["complexity_score"],
-                "has_table": complexity["has_table"],
-                "structure": structure.dict(),
-                "tokens_used": extraction.get("tokens_used", 0)
-            })
+            try:
+                # 2. 복잡도 분석
+                complexity = self.complexity_analyzer.analyze_page(pdf_path, page_num)
+                
+                # 3. Vision 추출
+                extraction = self.vision_router.route_and_extract(
+                    image_base64=page_data["image_base64"],
+                    page_num=page_num,
+                    complexity_score=complexity["complexity_score"],
+                    system_prompt=StructureExtractor.SYSTEM_PROMPT
+                )
+                
+                # 토큰 사용량 추적
+                tokens_used = extraction.get("tokens_used", 0)
+                token_tracker.add_usage(page_num, extraction["model_used"], tokens_used)
+                
+                # 예산 확인
+                if not token_tracker.check_budget(self.token_budget):
+                    logger.warning(
+                        f"토큰 예산 초과: {token_tracker.total_tokens}/{self.token_budget}. "
+                        f"페이지 {page_num}부터 처리 중단."
+                    )
+                    break
+                
+                # 4. 구조화
+                structure = self.structure_extractor.extract(
+                    extraction["content"],
+                    page_num
+                )
+                
+                vision_results.append({
+                    "page_num": page_num,
+                    "model_used": extraction["model_used"],
+                    "complexity_score": complexity["complexity_score"],
+                    "has_table": complexity["has_table"],
+                    "structure": structure.dict(),
+                    "tokens_used": tokens_used
+                })
+                
+                logger.debug(f"페이지 {page_num} 처리 완료: {tokens_used} 토큰 사용")
+                
+            except Exception as e:
+                logger.error(f"페이지 {page_num} 처리 실패: {e}", exc_info=True)
+                # 실패한 페이지는 건너뛰고 계속 진행
+                continue
         
-        logger.info(f"Phase 1 완료: {len(vision_results)}개 페이지")
+        logger.info(
+            f"Phase 1 완료: {len(vision_results)}/{len(rendered_pages)}개 페이지 처리. "
+            f"총 토큰: {token_tracker.total_tokens}"
+        )
+        return vision_results
+    
+    async def _phase1_vision_ingestion_parallel(self, pdf_path: str) -> List[Dict[str, Any]]:
+        """
+        Phase 1: PDF → 이미지 → Vision LLM → 구조화 (병렬 처리).
+        
+        페이지별 Vision LLM 호출을 병렬로 처리하여 처리 시간 단축.
+        """
+        logger.info(f"Phase 1: Vision Ingestion 시작 (병렬 처리, max_concurrency={self.max_concurrency})")
+        
+        # 1. PDF 렌더링
+        rendered_pages = self.renderer.render_pages(pdf_path)
+        total_pages = len(rendered_pages)
+        
+        # 0. 문서 분석 (첫 페이지들로 전략 수립)
+        if self.analysis_pages > 0 and total_pages >= self.analysis_pages:
+            first_images = [p["image_base64"] for p in rendered_pages[:self.analysis_pages]]
+            doc_analysis = self.document_analyzer.analyze(first_images)
+            logger.info(f"문서 분석: {doc_analysis.get('document_type')} - {doc_analysis.get('recommended_strategy')}")
+        else:
+            doc_analysis = None
+        
+        # 2. 복잡도 분석 (모든 페이지, 병렬 처리 가능하지만 PDF 파일 접근 제약으로 순차)
+        complexity_results = {}
+        for page_data in rendered_pages:
+            page_num = page_data["page_num"]
+            try:
+                complexity = self.complexity_analyzer.analyze_page(pdf_path, page_num)
+                complexity_results[page_num] = complexity
+            except Exception as e:
+                logger.error(f"페이지 {page_num} 복잡도 분석 실패: {e}")
+                complexity_results[page_num] = {"complexity_score": 0.1, "has_table": False}
+        
+        # 3. Vision LLM 호출 병렬 처리
+        semaphore = asyncio.Semaphore(self.max_concurrency)
+        token_tracker = TokenTracker()
+        token_tracker_lock = asyncio.Lock()
+        
+        async def process_page(page_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+            """단일 페이지 처리 (비동기)."""
+            page_num = page_data["page_num"]
+            
+            async with semaphore:  # 동시 실행 수 제한
+                try:
+                    complexity = complexity_results.get(page_num, {"complexity_score": 0.1})
+                    
+                    # Vision 추출 (비동기)
+                    extraction = await self.vision_router.route_and_extract_async(
+                        image_base64=page_data["image_base64"],
+                        page_num=page_num,
+                        complexity_score=complexity["complexity_score"],
+                        system_prompt=StructureExtractor.SYSTEM_PROMPT
+                    )
+                    
+                    # 토큰 사용량 추적 (스레드 안전)
+                    tokens_used = extraction.get("tokens_used", 0)
+                    async with token_tracker_lock:
+                        token_tracker.add_usage(page_num, extraction["model_used"], tokens_used)
+                        
+                        # 예산 확인
+                        if not token_tracker.check_budget(self.token_budget):
+                            logger.warning(
+                                f"토큰 예산 초과: {token_tracker.total_tokens}/{self.token_budget}. "
+                                f"페이지 {page_num} 처리 중단."
+                            )
+                            return None
+                    
+                    # 구조화 (동기, 빠르므로 순차 처리)
+                    structure = self.structure_extractor.extract(
+                        extraction["content"],
+                        page_num
+                    )
+                    
+                    result = {
+                        "page_num": page_num,
+                        "model_used": extraction["model_used"],
+                        "complexity_score": complexity["complexity_score"],
+                        "has_table": complexity.get("has_table", False),
+                        "structure": structure.dict(),
+                        "tokens_used": tokens_used
+                    }
+                    
+                    logger.debug(f"페이지 {page_num} 처리 완료: {tokens_used} 토큰 사용 ({extraction['model_used']})")
+                    
+                    return result
+                    
+                except Exception as e:
+                    logger.error(f"페이지 {page_num} 처리 실패: {e}", exc_info=True)
+                    return None
+        
+        # 모든 페이지 병렬 처리
+        tasks = [process_page(page_data) for page_data in rendered_pages]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # 결과 정리 (None과 예외 제거, 페이지 번호 순 정렬)
+        vision_results = []
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error(f"페이지 처리 중 예외 발생: {result}")
+            elif result is not None:
+                vision_results.append(result)
+        
+        # 페이지 번호 순 정렬
+        vision_results.sort(key=lambda x: x["page_num"])
+        
+        logger.info(
+            f"Phase 1 완료: {len(vision_results)}/{total_pages}개 페이지 처리. "
+            f"총 토큰: {token_tracker.total_tokens} "
+            f"({token_tracker.get_summary()['tokens_by_model']})"
+        )
+        
         return vision_results
     
     def _phase2_semantic_processing(

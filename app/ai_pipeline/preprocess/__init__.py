@@ -35,15 +35,36 @@ async def _run_orchestrator(pdf_path: str) -> Dict[str, Any]:
     return await asyncio.to_thread(orchestrator.process_pdf, pdf_path)
 
 
-async def _run_vision_orchestrator(pdf_path: str) -> Dict[str, Any]:
-    """Vision Pipeline 실행."""
+async def _run_vision_orchestrator(
+    pdf_path: str,
+    vision_config: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Vision Pipeline 실행.
+    
+    Args:
+        pdf_path: PDF 파일 경로
+        vision_config: Vision 설정 딕셔너리 (None이면 기본값 사용)
+            - api_key: OpenAI API 키 (필수)
+            - max_concurrency: 최대 동시 실행 수 (기본값: 3)
+            - token_budget: 토큰 예산 (기본값: None)
+            - request_timeout: 요청 타임아웃 초 (기본값: 120)
+            - retry_max_attempts: 최대 재시도 횟수 (기본값: 2)
+            - retry_backoff_seconds: 재시도 대기 시간 초 (기본값: 1.0)
+            - 기타 설정들...
+    """
     from app.ai_pipeline.preprocess.vision_orchestrator import VisionOrchestrator
     from app.ai_pipeline.preprocess.config import PreprocessConfig
     
     # LangSmith 초기화
     PreprocessConfig.setup_langsmith()
     
-    orchestrator = VisionOrchestrator()
+    # vision_config가 제공되면 인자로 전달, 없으면 기본값 사용
+    if vision_config:
+        orchestrator = VisionOrchestrator(**vision_config)
+    else:
+        orchestrator = VisionOrchestrator()
+    
     return await asyncio.to_thread(orchestrator.process_pdf, pdf_path)
 
 
@@ -55,7 +76,16 @@ async def preprocess_node(state: AppState) -> AppState:
         state["preprocess_request"] = {
             "pdf_paths": ["/path/a.pdf", ...],
             "product_info": {...},  # 선택 사항
-            "use_vision_pipeline": bool  # True면 Vision Pipeline 사용
+            "use_vision_pipeline": bool,  # True면 Vision Pipeline 사용
+            "vision_config": {  # 선택 사항, Vision Pipeline 설정
+                "api_key": "sk-...",  # 필수
+                "max_concurrency": 3,
+                "token_budget": 100000,
+                "request_timeout": 120,
+                "retry_max_attempts": 2,
+                "retry_backoff_seconds": 1.0,
+                # 기타 설정들...
+            }
         }
     출력:
         state["preprocess_results"]  # 각 PDF 처리 결과 리스트
@@ -103,10 +133,13 @@ async def preprocess_node(state: AppState) -> AppState:
     all_graph_data = {"nodes": [], "edges": []}
     all_index_summaries = []
 
+    # Vision Pipeline 설정 (preprocess_request에서 가져오기)
+    vision_config = request.get("vision_config") if use_vision else None
+    
     for pdf_path in pdf_paths:
         try:
             if use_vision:
-                result = await _run_vision_orchestrator(pdf_path)
+                result = await _run_vision_orchestrator(pdf_path, vision_config=vision_config)
             else:
                 result = await _run_orchestrator(pdf_path)
             
