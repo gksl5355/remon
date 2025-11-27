@@ -600,6 +600,7 @@ def _log_mapping_preview(product_id: str, items: List[MappingItem]) -> None:
         return
 
     logger.info("📒 Mapping preview (showing %d/%d items):", len(preview), len(items))
+
     for idx, item in enumerate(preview, 1):
         logger.info(
             "  %d) feature=%s applies=%s required=%s current=%s chunk=%s",

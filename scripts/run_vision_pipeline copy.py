@@ -156,10 +156,6 @@ async def process_single_pdf(pdf_path: Path, args, orchestrator) -> dict:
     use_parallel = not args.no_parallel
     result = await asyncio.to_thread(orchestrator.process_pdf, str(pdf_path), use_parallel)
 
-    # 테스트 모드: 콘솔에 상세 결과 출력
-    if args.skip_indexing and result["status"] == "success":
-        _print_detailed_results(result)
-
     # LLM 출력 저장
     if args.save_outputs and result["status"] == "success":
         save_llm_outputs(result, pdf_name, timestamp)
@@ -180,46 +176,6 @@ async def process_single_pdf(pdf_path: Path, args, orchestrator) -> dict:
         logger.error(f"❌ 실패: {result.get('error')}")
     
     return result
-
-
-def _print_detailed_results(result: dict) -> None:
-    """테스트 모드: 콘솔에 상세 결과 출력."""
-    vision_results = result.get("vision_extraction_result", [])
-    processing_results = result.get("processing_results", {})
-    chunks = processing_results.get("chunks", [])
-    
-    logger.info("\n" + "=" * 60)
-    logger.info("📄 Vision 추출 결과 상세")
-    logger.info("=" * 60)
-    
-    for page_result in vision_results:
-        page_num = page_result["page_num"]
-        model = page_result["model_used"]
-        complexity = page_result["complexity_score"]
-        tokens = page_result.get("tokens_used", 0)
-        structure = page_result["structure"]
-        markdown = structure.get("markdown_content", "")
-        
-        logger.info(f"\n[페이지 {page_num}]")
-        logger.info(f"  모델: {model}")
-        logger.info(f"  복잡도: {complexity:.2f}")
-        logger.info(f"  토큰: {tokens:,}")
-        logger.info(f"  표 포함: {page_result.get('has_table', False)}")
-        logger.info(f"  내용:\n{markdown}")
-        logger.info("-" * 60)
-    
-    if chunks:
-        logger.info("\n" + "=" * 60)
-        logger.info("📦 청킹 결과 요약")
-        logger.info("=" * 60)
-        for i, chunk in enumerate(chunks[:10], 1):  # 처음 10개만
-            chunk_text = chunk.get("text", chunk.get("content", ""))
-            logger.info(f"\n[청크 {i}]")
-            logger.info(f"  페이지: {chunk.get('page_num', 'N/A')}")
-            logger.info(f"  섹션: {chunk.get('section', 'N/A')}")
-            logger.info(f"  내용: {chunk_text[:200]}...")
-        if len(chunks) > 10:
-            logger.info(f"\n... 외 {len(chunks) - 10}개 청크")
 
 
 async def main():
