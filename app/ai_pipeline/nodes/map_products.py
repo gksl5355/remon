@@ -342,7 +342,7 @@ class MappingNode:
         target_state = mapping_spec.get("target") or {}
         present_state = mapping_spec.get("present_state") or {}
         # present_state가 비어있으면 target 혹은 구 버전 features를 활용해 최소한의 매핑을 진행한다.
-        features = present_state or target_state or product.get("features", {}) or {}
+        present_features = present_state or target_state or product.get("features", {}) or {}
         units = product.get("feature_units", {})
 
         mapping_results: List[MappingItem] = []
@@ -361,15 +361,15 @@ class MappingNode:
                 "🧭 Mapping start: product=%s name=%s features=%d top_k=%d alpha=%.2f",
                 product_id,
                 product_name,
-                len(features),
+                len(present_features),
                 self.top_k,
                 self.alpha,
             )
-            if not features:
+            if not present_features:
                 logger.info("💤 매핑 대상 특성이 없습니다. mapping.present_state나 target을 확인하세요.")
 
         # 🔥 feature별로 검색 TOOL → 매핑
-        for feature_name, value in features.items():
+        for feature_name, present_value in present_features.items():
             unit = units.get(feature_name)
             target_value = target_state.get(feature_name)
 
@@ -384,7 +384,7 @@ class MappingNode:
                     unit or "-",
                 )
             retrieval: RetrievalResult = await self._run_search(
-                product, feature_name, value, unit, extra_search_filters
+                product, feature_name, present_value, unit, extra_search_filters
             )
             original_count = len(retrieval["candidates"])
             retrieval["candidates"] = self._prune_candidates(retrieval["candidates"])
@@ -402,7 +402,7 @@ class MappingNode:
             for cand in retrieval["candidates"]:
                 prompt = self._build_prompt(
                     feature_name,
-                    value,
+                    present_value,
                     target_value,
                     unit,
                     cand["chunk_text"],
@@ -418,8 +418,8 @@ class MappingNode:
                     and target_value is not None
                 ):
                     required_value = target_value
-                if current_value is None and value is not None:
-                    current_value = value
+                if current_value is None and present_value is not None:
+                    current_value = present_value
 
                 item = MappingItem(
                     product_id=product_id,
@@ -463,6 +463,17 @@ class MappingNode:
         # -----------------------------------------
         # c) 전역 State 업데이트
         # -----------------------------------------
+        # 매핑 결과(required_value)를 product_info.mapping.target에 반영해 이후 노드가 바로 비교할 수 있게 한다.
+        product_mapping = product.get("mapping") or {}
+        updated_target = dict(product_mapping.get("target") or {})
+        for fname, target_info in mapping_targets.items():
+            required_value = target_info.get("required_value")
+            if required_value is not None:
+                updated_target[fname] = required_value
+        product_mapping["target"] = updated_target
+        product["mapping"] = product_mapping
+        state["product_info"] = product
+
         mapping_payload = MappingResults(
             product_id=product_id,
             items=mapping_results,
