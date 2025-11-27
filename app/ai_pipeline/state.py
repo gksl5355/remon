@@ -157,7 +157,6 @@ class AppState(TypedDict, total=False):
     mapping_context: MappingContext
     impact_scores: List[ImpactScoreItem]
     report: ReportDraft
-<<<<<<< HEAD
     translation_id: Optional[int]
     change_id: Optional[int]
 
@@ -165,8 +164,7 @@ class AppState(TypedDict, total=False):
     vision_extraction_result: List[Dict[str, Any]]  # 페이지별 Vision LLM 추출 결과
     graph_data: Dict[str, Any]  # 지식 그래프 (엔티티 + 관계)
     dual_index_summary: Dict[str, Any]  # Qdrant + Graph 저장 요약
-=======
+    
     # change detection
     change_context: Dict[str, Any]
     change_detection: Dict[str, Any]
->>>>>>> d6240fec9bdce64a07d274752bd9f309741b84e0

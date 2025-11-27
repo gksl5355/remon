@@ -59,9 +59,9 @@ class DualIndexer:
             metadatas.append(metadata)
         
         # Qdrant 저장
+        logger.info(f"Qdrant 저장 중: {self.collection_name}")
         vector_client = VectorClient(collection_name=self.collection_name)
         
-        logger.info(f"Qdrant 저장 중: {self.collection_name}")
         vector_client.insert(
             texts=texts,
             dense_embeddings=embeddings_result["dense"],
