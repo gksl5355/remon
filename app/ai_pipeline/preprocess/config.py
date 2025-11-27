@@ -163,6 +163,20 @@ class PreprocessConfig:
         else:
             logger.info("⚠️ LangSmith 비활성화")
     
+    @classmethod
+    def wrap_openai_client(cls, client):
+        """OpenAI 클라이언트를 LangSmith wrapper로 감싸기."""
+        if cls.ENABLE_LANGSMITH and cls.LANGCHAIN_API_KEY:
+            try:
+                from langsmith.wrappers import wrap_openai
+                wrapped_client = wrap_openai(client)
+                logger.debug("OpenAI 클라이언트에 LangSmith wrapper 적용")
+                return wrapped_client
+            except ImportError:
+                logger.warning("langsmith 패키지가 설치되지 않음, wrapper 적용 건너뜀")
+                return client
+        return client
+    
     # ==================== Redis (비동기 선택사항) ====================
     REDIS_URL: Optional[str] = os.getenv("REDIS_URL")
     """Redis 연결 URL (.env에서 로드). 기본값: None (비동기 비활성화)"""
