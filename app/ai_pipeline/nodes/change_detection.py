@@ -42,10 +42,12 @@ class ChangeDetectionNode:
 
         # TODO: support batch regulations
         if regulation_id is None or new_version_id is None:
+            # 입력이 없으면 스킵하고 파이프라인을 계속 진행한다.
             state["change_detection"] = {
-                "status": "error",
-                "terminated": True,
+                "status": "skipped",
+                "terminated": False,
                 "error": "regulation_id/new_version_id missing",
+                "changes": [],
             }
             return state
 
