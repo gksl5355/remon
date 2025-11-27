@@ -20,6 +20,44 @@ class PDFRenderer:
     
     def __init__(self, dpi: int = 300):
         self.dpi = dpi
+    
+    def render_page_with_dpi(self, pdf_path: str, page_idx: int, dpi: int) -> Dict[str, Any]:
+        """
+        단일 페이지를 지정된 DPI로 렌더링.
+        
+        Args:
+            pdf_path: PDF 파일 경로
+            page_idx: 페이지 인덱스 (0-based)
+            dpi: 렌더링 DPI
+            
+        Returns:
+            Dict: {"page_num": 1, "image_base64": "...", "width": 2480, "height": 3508, "dpi": 300}
+        """
+        try:
+            import pypdfium2 as pdfium
+        except ImportError:
+            raise ImportError("pypdfium2가 설치되지 않았습니다: pip install pypdfium2")
+        
+        pdf = pdfium.PdfDocument(pdf_path)
+        page = pdf[page_idx]
+        
+        # 이미지 렌더링
+        pil_image = page.render(scale=dpi/72).to_pil()
+        
+        # Base64 인코딩
+        buffer = BytesIO()
+        pil_image.save(buffer, format="PNG")
+        image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        
+        pdf.close()
+        
+        return {
+            "page_num": page_idx + 1,
+            "image_base64": image_base64,
+            "width": pil_image.width,
+            "height": pil_image.height,
+            "dpi": dpi
+        }
         
     def render_pages(self, pdf_path: str, page_range: tuple[int, int] | None = None) -> List[Dict[str, Any]]:
         """
