@@ -44,100 +44,7 @@ from app.core.database import AsyncSessionLocal
 from app.core.repositories.product_repository import ProductRepository
 
 
-if TYPE_CHECKING:
-    from app.ai_pipeline.tools.retrieval_tool import RetrievalOutput
-else:
-    class RetrievalOutput(Protocol):
-        results: List[Dict[str, Any]]
-        metadata: Dict[str, Any]
-
-
 logger = logging.getLogger(__name__)
-
-
-# repositories/product_repository.py로 이동
-
-# FEATURE_UNIT_MAP: Dict[str, str] = {
-#     "nicotin": "mg",
-#     "tarr": "mg",
-#     "battery": "mAh",
-#     "label_size": "mm^2",
-# }
-# BOOLEAN_FEATURES = {"menthol", "incense", "security_auth"}
-# DEFAULT_EXPORT_COUNTRY = "US"
-# PRODUCT_SELECT_BASE = """
-# SELECT
-#     p.product_id,
-#     p.product_name,
-#     p.product_category,
-#     p.nicotin,
-#     p.tarr,
-#     p.menthol,
-#     p.incense,
-#     p.battery,
-#     p.label_size,
-#     p.security_auth,
-#     COALESCE(pec.country_code, :default_country) AS export_country
-# FROM products p
-# LEFT JOIN product_export_countries pec
-#     ON pec.product_id = p.product_id
-# """
-
-
-# class ProductRepository:
-#     """RDB에서 제품 정보를 읽어 MappingNode가 소비하는 형태로 직렬화한다."""
-
-#     def __init__(self, session_factory: async_sessionmaker[AsyncSession]):
-#         self._session_factory = session_factory
-
-#     async def fetch_product(self, product_id: Optional[int]) -> ProductInfo:
-#         params = {"default_country": DEFAULT_EXPORT_COUNTRY}
-#         if product_id is not None:
-#             query = text(
-#                 PRODUCT_SELECT_BASE
-#                 + " WHERE p.product_id = :pid ORDER BY p.product_id LIMIT 1"
-#             )
-#             params["pid"] = product_id
-#         else:
-#             query = text(PRODUCT_SELECT_BASE + " ORDER BY p.product_id LIMIT 1")
-
-#         async with self._session_factory() as session:
-#             result = await session.execute(query, params)
-#             row = result.mappings().first()
-
-#         if not row:
-#             raise ValueError("제품 정보를 찾을 수 없습니다.")
-
-#         return self._serialize_product(dict(row))
-
-#     def _serialize_product(self, row: Dict[str, Any]) -> ProductInfo:
-#         features: Dict[str, Any] = {}
-#         feature_units: Dict[str, str] = {}
-
-#         for field, unit in FEATURE_UNIT_MAP.items():
-#             value = row.get(field)
-#             if value in (None, ""):
-#                 continue
-#             features[field] = value
-#             feature_units[field] = unit
-
-#         for field in BOOLEAN_FEATURES:
-#             value = row.get(field)
-#             if value is None:
-#                 continue
-#             features[field] = bool(value)
-#             feature_units[field] = "boolean"
-
-#         product: ProductInfo = {
-#             "product_id": str(row["product_id"]),
-#             "name": row.get("product_name"),
-#             "export_country": row.get("export_country") or DEFAULT_EXPORT_COUNTRY,
-#             "category": row.get("product_category"),
-#             "features": features,
-#             "feature_units": feature_units,
-#         }
-#         return product
-
 
 class MappingNode:
     """
@@ -319,8 +226,7 @@ class MappingNode:
         product: Optional[ProductInfo] = state.get("product_info")
         mapping_filters: Dict[str, Any] = state.get("mapping_filters") or {}
         if not product:
-            filters = state.get("mapping_filters") or {}
-            product_id = filters.get("product_id")
+            product_id = mapping_filters.get("product_id")
            
     # 기존 호출 방식    
             # product = await self.product_repository.fetch_product(
@@ -342,7 +248,7 @@ class MappingNode:
         target_state = mapping_spec.get("target") or {}
         present_state = mapping_spec.get("present_state") or {}
         # present_state가 비어있으면 target 혹은 구 버전 features를 활용해 최소한의 매핑을 진행한다.
-        features = present_state or target_state or product.get("features", {}) or {}
+        present_features = present_state or target_state or product.get("features", {}) or {}
         units = product.get("feature_units", {})
 
         mapping_results: List[MappingItem] = []
@@ -361,15 +267,15 @@ class MappingNode:
                 "🧭 Mapping start: product=%s name=%s features=%d top_k=%d alpha=%.2f",
                 product_id,
                 product_name,
-                len(features),
+                len(present_features),
                 self.top_k,
                 self.alpha,
             )
-            if not features:
+            if not present_features:
                 logger.info("💤 매핑 대상 특성이 없습니다. mapping.present_state나 target을 확인하세요.")
 
         # 🔥 feature별로 검색 TOOL → 매핑
-        for feature_name, value in features.items():
+        for feature_name, present_value in present_features.items():
             unit = units.get(feature_name)
             target_value = target_state.get(feature_name)
 
@@ -384,7 +290,7 @@ class MappingNode:
                     unit or "-",
                 )
             retrieval: RetrievalResult = await self._run_search(
-                product, feature_name, value, unit, extra_search_filters
+                product, feature_name, present_value, unit, extra_search_filters
             )
             original_count = len(retrieval["candidates"])
             retrieval["candidates"] = self._prune_candidates(retrieval["candidates"])
@@ -402,7 +308,7 @@ class MappingNode:
             for cand in retrieval["candidates"]:
                 prompt = self._build_prompt(
                     feature_name,
-                    value,
+                    present_value,
                     target_value,
                     unit,
                     cand["chunk_text"],
@@ -418,11 +324,12 @@ class MappingNode:
                     and target_value is not None
                 ):
                     required_value = target_value
-                if current_value is None and value is not None:
-                    current_value = value
+                if current_value is None and present_value is not None:
+                    current_value = present_value
 
                 item = MappingItem(
                     product_id=product_id,
+                    product_name=product_name,
                     feature_name=feature_name,
                     applies=llm_out["applies"],
                     required_value=required_value,
@@ -463,6 +370,17 @@ class MappingNode:
         # -----------------------------------------
         # c) 전역 State 업데이트
         # -----------------------------------------
+        # 매핑 결과(required_value)를 product_info.mapping.target에 반영해 이후 노드가 바로 비교할 수 있게 한다.
+        product_mapping = product.get("mapping") or {}
+        updated_target = dict(product_mapping.get("target") or {})
+        for fname, target_info in mapping_targets.items():
+            required_value = target_info.get("required_value")
+            if required_value is not None:
+                updated_target[fname] = required_value
+        product_mapping["target"] = updated_target
+        product["mapping"] = product_mapping
+        state["product_info"] = product
+
         mapping_payload = MappingResults(
             product_id=product_id,
             items=mapping_results,
@@ -510,10 +428,6 @@ def _get_default_llm_client():
 
 
 def _get_default_product_repository() -> ProductRepository:
-    # global _DEFAULT_PRODUCT_REPOSITORY
-    # if _DEFAULT_PRODUCT_REPOSITORY is None:
-    #     _DEFAULT_PRODUCT_REPOSITORY = ProductRepository(AsyncSessionLocal)
-    # return _DEFAULT_PRODUCT_REPOSITORY
     """ 수정: Repository 생성 방식 간소화"""
     global _DEFAULT_PRODUCT_REPOSITORY
     if _DEFAULT_PRODUCT_REPOSITORY is None:

@@ -99,14 +99,14 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
     mapping = state.get("mapping", {})
     mapping_items = mapping.get("items", [])
     strategy = state.get("strategy", {})
-    strategy_items = strategy.get("items", [])
     impact_score = (state.get("impact_scores", []) or [{}])[0]
 
     # 제품 표 추출 (rows 형식)
     product_rows = [
         [
             item.get("feature_name", ""),
-            item.get("product_id", ""),
+            # item.get("product_id", ""), #TODO map_products 에서 items에 코드 한줄 추가한다고 말해야함
+            item.get("product_name", ""),
             f"현재: {item.get('current_value', '-')}, 필요: {item.get('required_value','-')}"
         ] for item in mapping_items
     ]
@@ -128,7 +128,7 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
             "(빈값 대응)규제 적용 제품의 포장/성분 변경 필요"
 
         ]
-    strategy_steps = llm_struct.get("strategy")
+    strategy_steps = llm_struct.get("strategies")
     if not strategy_steps:
         strategy_steps = [
             "(빈값 대응)즉시 제품 성분 조정 계획 수립"
@@ -140,6 +140,7 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
         f"규제 카테고리: {mapping_items[0].get('parsed',{}).get('category','') if mapping_items else ''}",
         f"변경 요약: {mapping_items[0].get('regulation_summary','') if mapping_items else ''}",
         f"영향도: {impact_score.get('impact_level','N/A')} (점수: {impact_score.get('weighted_score', 0.0)})"
+        f"전략 권고사항: {strategy[0] if strategy else ''}",
     ]
 
     return [
@@ -153,7 +154,7 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
             "id": "products",
             "title": "2. 영향받는 제품 목록",
             "type": "table",
-            "headers": ["제품명", "브랜드", "조치"],
+            "headers": ["규제항목", "제품명", "조치"],
             "rows": product_rows
         },
         {
@@ -169,8 +170,14 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
             "content": strategy_steps
         },
         {
+            "id": "reasoning",
+            "title": "5. 영향 평가 근거",
+            "type": "paragraph",
+            "content": [impact_score.get('reasoning','')]
+        },
+        {
             "id": "references",
-            "title": "5. 참고 및 원문 링크",
+            "title": "6. 참고 및 원문 링크",
             "type": "links",
             "content": references
         }
@@ -183,7 +190,7 @@ def get_llm_brief_chain():
          "당신은 규제 분석 전문가입니다. 아래 데이터를 참고해 JSON 형식으로만 응답하세요. "
          "JSON의 최상위 키는 반드시 다음 두 가지여야 합니다:\n"
          "1. \"major_analysis\": 주요 변경 사항 해석을 담은 문자열 리스트 (3개)\n"
-         "2. \"strategy\": 대응 전략을 담은 문자열 리스트 (3개)\n"
+         "2. \"strategies\": 대응 전략을 담은 문자열 리스트 (3개)\n"
          "마크다운 태그(```json) 없이 순수 JSON 문자열만 반환하세요."),
         ("human", "{input}")
     ])
@@ -222,8 +229,7 @@ async def report_node(state: AppState) -> Dict[str, Any]:
     meta = state.get("product_info", {})
     mapping = state.get("mapping", {})
     mapping_items = mapping.get("items", [])
-    strategy = state.get("strategy", {})
-    strategy_items = strategy.get("items", [])
+    strategy = state.get("strategies", [])
     impact_score = (state.get("impact_scores", []) or [{}])[0]
 
     context_parts = [
@@ -231,7 +237,7 @@ async def report_node(state: AppState) -> Dict[str, Any]:
         f"규제 요약: {mapping_items[0].get('regulation_summary','') if mapping_items else ''}",
         f"영향도: {impact_score.get('impact_level','N/A')} ({impact_score.get('weighted_score',0.0)})",
         f"제품 정보: {mapping_items[0].get('feature_name','')} {mapping_items[0].get('current_value','')}" if mapping_items else "",
-        f"전략 권고사항: {strategy_items[0].get('recommendation','') if strategy_items else ''}",
+        f"전략 권고사항: {strategy[0] if strategy else ''}",
         f"영향 평가 reasoning: {impact_score.get('reasoning','')}"
     ]
     llm_context = "\n".join([part for part in context_parts if part])
