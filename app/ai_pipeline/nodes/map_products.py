@@ -510,10 +510,6 @@ def _get_default_llm_client():
 
 
 def _get_default_product_repository() -> ProductRepository:
-    # global _DEFAULT_PRODUCT_REPOSITORY
-    # if _DEFAULT_PRODUCT_REPOSITORY is None:
-    #     _DEFAULT_PRODUCT_REPOSITORY = ProductRepository(AsyncSessionLocal)
-    # return _DEFAULT_PRODUCT_REPOSITORY
     """ 수정: Repository 생성 방식 간소화"""
     global _DEFAULT_PRODUCT_REPOSITORY
     if _DEFAULT_PRODUCT_REPOSITORY is None:
