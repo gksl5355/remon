@@ -65,8 +65,8 @@ def parse_args():
     parser.add_argument(
         "--max-concurrency",
         type=int,
-        default=3,
-        help="최대 동시 실행 수 (기본값: 3)",
+        default=30,
+        help="최대 동시 실행 수 (기본값: 30)",
     )
     parser.add_argument(
         "--token-budget",

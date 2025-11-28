@@ -125,8 +125,8 @@ class PreprocessConfig:
     """문서 규칙 파악용 초기 분석 페이지 수. 기본값: 3"""
     
     # ==================== 병렬 처리 설정 ====================
-    VISION_MAX_CONCURRENCY: int = int(os.getenv("VISION_MAX_CONCURRENCY", "3"))
-    """페이지별 Vision LLM 호출 최대 동시 실행 수. 기본값: 3"""
+    VISION_MAX_CONCURRENCY: int = int(os.getenv("VISION_MAX_CONCURRENCY", "30"))
+    """페이지별 Vision LLM 호출 최대 동시 실행 수. 기본값: 30"""
     
     VISION_TOKEN_BUDGET: Optional[int] = (
         int(os.getenv("VISION_TOKEN_BUDGET")) if os.getenv("VISION_TOKEN_BUDGET") else None
