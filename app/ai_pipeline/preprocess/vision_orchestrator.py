@@ -106,7 +106,7 @@ class VisionOrchestrator:
         retry_backoff_seconds = retry_backoff_seconds or vision_config["retry_backoff_seconds"]
         self.enable_graph = enable_graph if enable_graph is not None else vision_config["enable_graph"]
         self.analysis_pages = analysis_pages or vision_config["analysis_pages"]
-        self.max_concurrency = max_concurrency or vision_config["max_concurrency"]
+        self.max_concurrency = max_concurrency or 30
         self.token_budget = token_budget if token_budget is not None else vision_config["token_budget"]
         
         if not self.api_key:
