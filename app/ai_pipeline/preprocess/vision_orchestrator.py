@@ -183,7 +183,8 @@ class VisionOrchestrator:
             index_summary = self._phase4_dual_indexing(
                 processing_results["chunks"],
                 graph_data,
-                Path(pdf_path).name
+                Path(pdf_path).name,
+                vision_results=vision_results
             )
             
             result = {
@@ -294,7 +295,7 @@ class VisionOrchestrator:
         
         페이지별 Vision LLM 호출을 병렬로 처리하여 처리 시간 단축.
         """
-        logger.info(f"Phase 1: Vision Ingestion 시작 (배치 단위 병렬 처리, 동적 DPI, max_concurrency={self.max_concurrency})")
+        logger.info(f"Phase 1: Vision Ingestion 시작 (병렬 처리, 동적 DPI, max_concurrency={self.max_concurrency})")
         
         # PDF 페이지 수 확인
         import pypdfium2 as pdfium
@@ -337,6 +338,56 @@ class VisionOrchestrator:
                             page_num = result["page_num"]
                             tokens_used = result.get("tokens_used", 0)
                             token_tracker.add_usage(page_num, model_name, tokens_used)
+        # 1. 복잡도 분석 및 DPI 결정 (모든 페이지)
+        complexity_results = {}
+        dpi_map = {}
+        
+        for page_idx in range(total_pages):
+            page_num = page_idx + 1
+            try:
+                complexity = self.complexity_analyzer.analyze_page(pdf_path, page_num)
+                complexity_results[page_num] = complexity
+                
+                # DPI 결정
+                if complexity["has_table"] or complexity["complexity_score"] >= 0.3:
+                    dpi_map[page_num] = 300
+                else:
+                    dpi_map[page_num] = 150
+                    
+            except Exception as e:
+                logger.error(f"페이지 {page_num} 복잡도 분석 실패: {e}")
+                complexity_results[page_num] = {"complexity_score": 0.1, "has_table": False}
+                dpi_map[page_num] = 150
+        
+        # 2. Vision LLM 호출 병렬 처리
+        semaphore = asyncio.Semaphore(self.max_concurrency)
+        token_tracker = TokenTracker()
+        token_tracker_lock = asyncio.Lock()
+        
+        async def process_page(page_idx: int) -> Optional[Dict[str, Any]]:
+            """단일 페이지 처리 (비동기, 동적 DPI)."""
+            page_num = page_idx + 1
+            
+            async with semaphore:  # 동시 실행 수 제한
+                try:
+                    complexity = complexity_results[page_num]
+                    dpi = dpi_map[page_num]
+                    
+                    # 동적 렌더링
+                    page_data = self.renderer.render_page_with_dpi(pdf_path, page_idx, dpi)
+                    
+                    # Vision 추출 (비동기)
+                    extraction = await self.vision_router.route_and_extract_async(
+                        image_base64=page_data["image_base64"],
+                        page_num=page_num,
+                        complexity_score=complexity["complexity_score"],
+                        system_prompt=StructureExtractor.SYSTEM_PROMPT
+                    )
+                    
+                    # 토큰 사용량 추적 (스레드 안전)
+                    tokens_used = extraction.get("tokens_used", 0)
+                    async with token_tracker_lock:
+                        token_tracker.add_usage(page_num, extraction["model_used"], tokens_used)
                         
                         # 예산 확인
                         if not token_tracker.check_budget(self.token_budget):
@@ -384,6 +435,48 @@ class VisionOrchestrator:
                 "structure": result["structure"],
                 "tokens_used": result["tokens_used"]
             })
+                                f"페이지 {page_num} 처리 중단."
+                            )
+                            return None
+                    
+                    # 구조화 (동기, 빠르므로 순차 처리)
+                    structure = self.structure_extractor.extract(
+                        extraction["content"],
+                        page_num
+                    )
+                    
+                    result = {
+                        "page_num": page_num,
+                        "model_used": extraction["model_used"],
+                        "complexity_score": complexity["complexity_score"],
+                        "has_table": complexity.get("has_table", False),
+                        "dpi": dpi,  # DPI 기록
+                        "structure": structure.dict(),
+                        "tokens_used": tokens_used
+                    }
+                    
+                    logger.debug(f"페이지 {page_num} 완료: {dpi} DPI, {tokens_used} 토큰 ({extraction['model_used']})")
+                    
+                    return result
+                    
+                except Exception as e:
+                    logger.error(f"페이지 {page_num} 실패: {e}", exc_info=True)
+                    return None
+        
+        # 모든 페이지 병렬 처리
+        tasks = [process_page(i) for i in range(total_pages)]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # 결과 정리 (None과 예외 제거, 페이지 번호 순 정렬)
+        vision_results = []
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error(f"페이지 처리 중 예외 발생: {result}")
+            elif result is not None:
+                vision_results.append(result)
+        
+        # 페이지 번호 순 정렬
+        vision_results.sort(key=lambda x: x["page_num"])
         
         logger.info(
             f"Phase 1 완료: {len(vision_results)}/{total_pages}개 페이지 처리. "
@@ -540,13 +633,57 @@ class VisionOrchestrator:
         self,
         chunks: List[Dict[str, Any]],
         graph_data: Dict[str, Any],
-        source_file: str
+        source_file: str,
+        vision_results: List[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """Phase 4: Qdrant + Graph 저장."""
+        """Phase 4: Qdrant + Graph 저장 (regulation_id 자동 생성)."""
         logger.info("Phase 4: Dual Indexing 시작")
         
-        summary = self.dual_indexer.index(chunks, graph_data, source_file)
+        import re
+        from pathlib import Path
         
-        logger.info(f"Phase 4 완료: {summary['qdrant_chunks']}개 청크 저장")
+        # regulation_id 생성 전략
+        regulation_id = None
+        
+        # 전략 1: 메타데이터에서 추출
+        if vision_results:
+            first_page = vision_results[0]
+            metadata = first_page.get("structure", {}).get("metadata", {})
+            
+            title = metadata.get("title", "")
+            country = metadata.get("country", "")
+            regulation_type = metadata.get("regulation_type", "")
+            
+            # title + country + type 조합으로 ID 생성
+            if title:
+                # 예: "FDA-US-Required-Warnings-Cigarette"
+                parts = []
+                if regulation_type:
+                    parts.append(regulation_type)
+                if country:
+                    parts.append(country)
+                # title에서 주요 단어 추출 (3개)
+                title_words = re.findall(r'\b[A-Z][a-z]+\b', title)[:3]
+                parts.extend(title_words)
+                
+                if parts:
+                    regulation_id = "-".join(parts)
+                    logger.info(f"regulation_id 생성 (메타데이터): {regulation_id}")
+        
+        # 전략 2: 파일명 기반 (fallback)
+        if not regulation_id:
+            file_stem = Path(source_file).stem
+            regulation_id = re.sub(r'[^A-Za-z0-9-]', '-', file_stem)
+            logger.info(f"regulation_id 생성 (파일명): {regulation_id}")
+        
+        summary = self.dual_indexer.index(
+            chunks=chunks, 
+            graph_data=graph_data, 
+            source_file=source_file,
+            regulation_id=regulation_id,
+            vision_results=vision_results
+        )
+        
+        logger.info(f"Phase 4 완료: {summary['qdrant_chunks']}개 청크 저장 (ref_blocks: {summary.get('reference_blocks_count', 0)})")
         
         return summary

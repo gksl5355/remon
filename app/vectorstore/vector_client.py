@@ -11,13 +11,20 @@ dependencies:
 
 import logging
 from typing import List, Dict, Any, Optional
+import urllib3
 from qdrant_client import QdrantClient
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from qdrant_client.models import (
     Distance,
     VectorParams,
     PointStruct,
     SparseVector,
     SparseVectorParams,
+    Filter,
+    FieldCondition,
+    MatchValue,
+    Range,
 )
 import os
 
@@ -36,6 +43,7 @@ try:
     QDRANT_COLLECTION = getattr(settings, "QDRANT_COLLECTION", "remon_regulations")
     QDRANT_PATH = getattr(settings, "QDRANT_PATH", "./data/qdrant")
     QDRANT_USE_LOCAL = os.getenv("QDRANT_USE_LOCAL", "false").lower() == "true"
+    QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 except ImportError:
     logger.warning("settings.py 로드 실패, 환경변수 사용")
     QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
@@ -43,6 +51,7 @@ except ImportError:
     QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "remon_regulations")
     QDRANT_PATH = os.getenv("QDRANT_PATH", "./data/qdrant")
     QDRANT_USE_LOCAL = os.getenv("QDRANT_USE_LOCAL", "false").lower() == "true"
+    QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 
 
 class VectorClient:
@@ -57,16 +66,16 @@ class VectorClient:
     """
 
     def __init__(
-        self, collection_name: str = QDRANT_COLLECTION, use_local: bool = None
+        self, collection_name: str = None, use_local: bool = None
     ):
         """
         Qdrant 클라이언트 초기화.
 
         Args:
-            collection_name: 컬렉션 이름
+            collection_name: 컬렉션 이름 (None이면 환경변수 사용)
             use_local: True면 로컬 저장소, False면 원격 서버, None이면 환경변수 사용
         """
-        self.collection_name = collection_name
+        self.collection_name = collection_name or QDRANT_COLLECTION
 
         if use_local is None:
             use_local = QDRANT_USE_LOCAL
@@ -75,12 +84,24 @@ class VectorClient:
             self.client = QdrantClient(path=QDRANT_PATH)
             logger.info(f"✅ Qdrant 로컬 모드: {QDRANT_PATH}")
         else:
-            self.client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
-            logger.info(f"✅ Qdrant 서버 모드: {QDRANT_HOST}:{QDRANT_PORT}")
-
-        self._ensure_collection()
-
-    def _ensure_collection(self) -> None:
+            # 원격 연결: URL 기반 (HTTPS 자동) + API Key 인증
+            qdrant_url = os.getenv("QDRANT_URL", f"https://{QDRANT_HOST}")
+            
+            if QDRANT_API_KEY:
+                self.client = QdrantClient(
+                    url=qdrant_url,
+                    api_key=QDRANT_API_KEY,
+                    timeout=30,
+                    prefer_grpc=False
+                )
+                logger.info(f"✅ Qdrant 원격 모드 (API Key 인증): {qdrant_url}")
+            else:
+                self.client = QdrantClient(
+                    url=qdrant_url,
+                    timeout=30,
+                    prefer_grpc=False
+                )
+                logger.info(f"✅ Qdrant 원격 모드 (인증 없음): {qdrant_url}")
         """컬렉션 생성 (없으면)."""
         collections = self.client.get_collections().collections
         exists = any(c.name == self.collection_name for c in collections)
@@ -135,8 +156,7 @@ class VectorClient:
                 if sparse_embeddings and idx < len(sparse_embeddings):
                     sparse = sparse_embeddings[idx]
                     vectors["sparse"] = SparseVector(
-                        indices=list(sparse.keys()),
-                        values=list(sparse.values()),
+                        indices=list(sparse.keys()), values=list(sparse.values())
                     )
 
                 payload = {"text": text, **meta}
@@ -180,7 +200,6 @@ class VectorClient:
             검색 결과 딕셔너리
         """
         qdrant_filter = self._build_qdrant_filter(filters)
-        
         # Dense 검색
         dense_results = list(
             self.client.query_points(
@@ -192,7 +211,6 @@ class VectorClient:
                 query_filter=qdrant_filter,
             )
         )
-        
         # Sparse 없으면 Dense만 반환
         if not query_sparse:
             return {
@@ -201,11 +219,9 @@ class VectorClient:
                 "metadatas": [r.payload for r in dense_results],
                 "scores": [r.score for r in dense_results],
             }
-        
         # Sparse 검색
         sparse_vector = SparseVector(
-            indices=list(query_sparse.keys()),
-            values=list(query_sparse.values()),
+            indices=list(query_sparse.keys()), values=list(query_sparse.values())
         )
         sparse_results = list(
             self.client.query_points(
@@ -300,3 +316,46 @@ class VectorClient:
             "points_count": info.points_count,
             "vectors_config": str(info.config.params.vectors),
         }
+
+    def verify_storage(self, sample_size: int = 3) -> Dict[str, Any]:
+        """저장 검증: Dense + Sparse + Metadata 확인."""
+        try:
+            info = self.client.get_collection(collection_name=self.collection_name)
+            scroll_result = self.client.scroll(
+                collection_name=self.collection_name,
+                limit=sample_size,
+                with_payload=True,
+                with_vectors=True,
+            )
+
+            points = scroll_result[0]
+            verification = {
+                "status": "success",
+                "collection_name": self.collection_name,
+                "total_points": info.points_count,
+                "samples": [],
+            }
+
+            for point in points:
+                sample = {
+                    "id": point.id,
+                    "has_dense": "dense" in point.vector,
+                    "has_sparse": "sparse" in point.vector,
+                    "dense_dim": (
+                        len(point.vector.get("dense", []))
+                        if "dense" in point.vector
+                        else 0
+                    ),
+                    "sparse_dim": (
+                        len(point.vector.get("sparse", {}).get("indices", []))
+                        if "sparse" in point.vector
+                        else 0
+                    ),
+                    "metadata_keys": list(point.payload.keys()),
+                    "text_preview": point.payload.get("text", "")[:100],
+                }
+                verification["samples"].append(sample)
+
+            return verification
+        except Exception as e:
+            return {"status": "error", "error": str(e)}

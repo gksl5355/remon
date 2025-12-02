@@ -25,6 +25,7 @@ class ProductInfo(TypedDict):
     country: Optional[str]
     category: Optional[str]
 
+
 # ---------------------------------------------------------------------------
 # 2) 검색 결과 – 검색 TOOL → 매핑 노드로 전달되는 데이터 구조
 # ---------------------------------------------------------------------------
@@ -120,6 +121,7 @@ class StrategyItem(TypedDict):
     summary: str
     recommendation: str
 
+
 class StrategyResults(TypedDict):
     product_id: str
     items: List[StrategyItem]
@@ -130,14 +132,16 @@ class ReportDraft(TypedDict, total=False):
     status: str
     sections: List[Dict[str, Any]]
 
+
 # ---------------------------------------------------------------------------
-# 6) 영향도 평가 결과 타입 정의 
+# 6) 영향도 평가 결과 타입 정의
 # ---------------------------------------------------------------------------
 class ImpactScoreItem(TypedDict):
-    raw_scores: Dict[str, Any]         
-    reasoning: str         
-    weighted_score: float         
-    impact_level: str 
+    raw_scores: Dict[str, Any]
+    reasoning: str
+    weighted_score: float
+    impact_level: str
+
 
 # ---------------------------------------------------------------------------
 # 7) LangGraph 전체 전역 State (AppState)
@@ -164,7 +168,9 @@ class AppState(TypedDict, total=False):
     vision_extraction_result: List[Dict[str, Any]]  # 페이지별 Vision LLM 추출 결과
     graph_data: Dict[str, Any]  # 지식 그래프 (엔티티 + 관계)
     dual_index_summary: Dict[str, Any]  # Qdrant + Graph 저장 요약
-    
+
     # change detection
-    change_context: Dict[str, Any]
+    change_context: Dict[str, Any]  # Legacy 규제 메타데이터 (legacy_regulation_id 포함)
+    change_detection_results: List[Dict[str, Any]]  # 변경 감지 상세 결과
+    change_summary: Dict[str, Any]  # 변경 감지 요약
     change_detection: Dict[str, Any]
