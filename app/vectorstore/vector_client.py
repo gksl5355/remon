@@ -88,7 +88,6 @@ class VectorClient:
             if QDRANT_API_KEY:
                 import httpx
                 self.client = QdrantClient(
-                    url=f"https://{QDRANT_HOST}",
                     api_key=QDRANT_API_KEY,
                     timeout=30,
                     https=httpx.Client(verify=False)
@@ -97,10 +96,6 @@ class VectorClient:
             else:
                 self.client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
                 logger.info(f"✅ Qdrant 서버 모드: {QDRANT_HOST}:{QDRANT_PORT}")
-
-        self._ensure_collection()
-
-    def _ensure_collection(self) -> None:
         """컬렉션 생성 (없으면)."""
         collections = self.client.get_collections().collections
         exists = any(c.name == self.collection_name for c in collections)
@@ -155,8 +150,7 @@ class VectorClient:
                 if sparse_embeddings and idx < len(sparse_embeddings):
                     sparse = sparse_embeddings[idx]
                     vectors["sparse"] = SparseVector(
-                        indices=list(sparse.keys()),
-                        values=list(sparse.values()),
+                        indices=list(sparse.keys()), values=list(sparse.values())
                     )
 
                 payload = {"text": text, **meta}
@@ -224,8 +218,7 @@ class VectorClient:
 
         # Sparse 검색
         sparse_vector = SparseVector(
-            indices=list(query_sparse.keys()),
-            values=list(query_sparse.values()),
+            indices=list(query_sparse.keys()), values=list(query_sparse.values())
         )
         sparse_results = list(
             self.client.query_points(
