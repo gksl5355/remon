@@ -67,87 +67,6 @@ Extract the following from the document image:
    - Use ## for sub-headers (e.g., "Section 1.1")
    - Preserve all text content
 
-2. **Entities**: Extract key entities as JSON array:
-   [{"name": "FDA", "type": "Organization", "context": "regulatory body"}]
-   
-3. **Tables**: Extract tables as JSON:
-   [{"headers": ["Item", "Limit"], "rows": [["Nicotine", "20mg/mL"]], "caption": "Table 1"}]
-
-Return ONLY valid JSON in this format:
-{
-  "markdown_content": "# Part 1\\n## Section 1.1\\n...",
-  "entities": [...],
-  "tables": [...]
-}"""
-    BATCH_SYSTEM_PROMPT = """You are a regulatory document structure expert.
-
-You will receive MULTIPLE document pages as images.
-For EACH page, you must extract the following:
-
-1. **Markdown Content**: Convert the page to clean Markdown format.
-   - Use # for top-level headers (e.g., "Part 1")
-   - Use ## for sub-headers (e.g., "Section 1.1")
-   - Use ### and deeper levels as needed for subsections
-   - Preserve all important text content from the page
-
-2. **Entities**: Extract key entities as a JSON array of OBJECTS:
-   [
-     {"name": "FDA", "type": "Organization", "context": "regulatory body"}
-   ]
-
-   - Each entity MUST be an object with:
-     - "name": the surface form of the entity (string)
-     - "type": one of "Organization", "Regulation", "Chemical", "Number", or "Unknown"
-     - "context": (optional) a short string describing how this entity is used in the page
-   - Do NOT return plain strings in the entities array. Always return objects.
-
-3. **Tables**: Extract tables as a JSON array of OBJECTS:
-   [
-     {
-       "headers": ["Item", "Limit"],
-       "rows": [["Nicotine", "20mg/mL"]],
-       "caption": "Table 1"
-     }
-   ]
-
-   - "headers": list of column names (array of strings)
-   - "rows": list of rows, where each row is an array of strings
-   - "caption": (optional) table title or brief description
-
-You MUST return ONLY a single JSON ARRAY at the top level.
-Each element of this array represents ONE page and MUST have the following structure:
-
-[
-  {
-    "page_index": 0,
-    "markdown_content": "# Part 1\\n## Section 1.1\\n...",
-    "entities": [
-      {"name": "FDA", "type": "Organization", "context": "regulatory body"}
-    ],
-    "tables": [
-      {
-        "headers": ["Item", "Limit"],
-        "rows": [["Nicotine", "20mg/mL"]],
-        "caption": "Table 1"
-      }
-    ]
-  },
-  {
-    "page_index": 1,
-    "markdown_content": "# Part 2\\n...",
-    "entities": [],
-    "tables": []
-  }
-]
-
-IMPORTANT:
-- The top-level response MUST be a valid JSON array.
-- Each object in the array MUST correspond to exactly one page.
-- The "page_index" MUST be an integer and MUST match the order of images provided
-  in the user message (0-based indexing: the first image is page_index 0, the second is 1, etc.).
-- If a page has no entities or tables, use empty arrays: "entities": [], "tables": [].
-- Do NOT include any explanatory text, comments, or Markdown outside of the JSON array.
-Return ONLY the JSON array."""
 2. **Reference Blocks**: Divide content into meaningful reference blocks.
    - Each block should be a complete semantic unit (paragraph, section, or clause)
    - Extract section numbers (e.g., "1114.5(a)(3)")
@@ -194,6 +113,64 @@ Return ONLY valid JSON in this format:
   "entities": [...],
   "tables": [...]
 }"""
+
+    BATCH_SYSTEM_PROMPT = """You are a regulatory document structure expert.
+
+You will receive MULTIPLE document pages as images.
+For EACH page, you must extract the following:
+
+1. **Markdown Content**: Convert the page to clean Markdown format.
+   - Use # for top-level headers (e.g., "Part 1")
+   - Use ## for sub-headers (e.g., "Section 1.1")
+   - Use ### and deeper levels as needed for subsections
+   - Preserve all important text content from the page
+
+2. **Reference Blocks**: Divide content into meaningful reference blocks.
+   - Each block should be a complete semantic unit (paragraph, section, or clause)
+   - Extract section numbers (e.g., "1114.5(a)(3)")
+   - Keep blocks under 500 words for efficient comparison
+
+3. **Metadata**: Extract document metadata (ONLY for page_index 0).
+   - title: Full regulation title
+   - country: Country code (e.g., "US", "KR", "EU")
+   - regulation_type: Type (e.g., "FDA", "EPA", "MFDS")
+   - keywords: Key terms for search
+   - effective_date: If mentioned (YYYY-MM-DD format)
+
+4. **Entities**: Extract key entities as a JSON array of OBJECTS:
+   [{"name": "FDA", "type": "Organization", "context": "regulatory body"}]
+
+5. **Tables**: Extract tables as a JSON array of OBJECTS:
+   [{"headers": ["Item", "Limit"], "rows": [["Nicotine", "20mg/mL"]], "caption": "Table 1"}]
+
+You MUST return ONLY a single JSON ARRAY at the top level.
+Each element represents ONE page:
+
+[
+  {
+    "page_index": 0,
+    "markdown_content": "# Part 1\\n## Section 1.1\\n...",
+    "reference_blocks": [{"section_ref": "1.1", "text": "...", "start_line": 1, "end_line": 10, "keywords": []}],
+    "metadata": {"title": "...", "country": "US", "regulation_type": "FDA", "keywords": [], "effective_date": null},
+    "entities": [{"name": "FDA", "type": "Organization", "context": "regulatory body"}],
+    "tables": [{"headers": ["Item", "Limit"], "rows": [["Nicotine", "20mg/mL"]], "caption": "Table 1"}]
+  },
+  {
+    "page_index": 1,
+    "markdown_content": "# Part 2\\n...",
+    "reference_blocks": [],
+    "metadata": null,
+    "entities": [],
+    "tables": []
+  }
+]
+
+IMPORTANT:
+- The top-level response MUST be a valid JSON array.
+- The "page_index" MUST match the order of images (0-based).
+- If a page has no data, use empty arrays or null.
+- Do NOT include any text outside of the JSON array.
+Return ONLY the JSON array."""
     
     def __init__(self):
         pass
@@ -243,25 +220,11 @@ Return ONLY valid JSON in this format:
         배치 단위 구조화 (여러 페이지를 한 번에 Vision LLM에 전송).
         
         Args:
-            page_infos: 페이지 정보 리스트 [{
-                "page_index": int,
-                "image_base64": str,
-                "complexity": float,
-                "has_table": bool,
-                "model_name": str
-            }]
+            page_infos: 페이지 정보 리스트
             model: 사용할 모델명 (gpt-4o, gpt-4o-mini)
             
         Returns:
-            List[Dict]: 페이지별 구조화 결과 [{
-                "page_index": int,
-                "page_num": int,
-                "model_used": str,
-                "content": str,
-                "complexity_score": float,
-                "tokens_used": int,
-                "structure": PageStructure.dict()
-            }]
+            List[Dict]: 페이지별 구조화 결과
         """
         from openai import OpenAI
         from ..config import PreprocessConfig
@@ -370,6 +333,8 @@ Return ONLY valid JSON in this format:
                     logger.warning(f"페이지 {page_num} 결과 없음, fallback 사용")
                     page_result = {
                         "markdown_content": f"# Page {page_num}\n\nContent extraction failed.",
+                        "reference_blocks": [],
+                        "metadata": None,
                         "entities": [],
                         "tables": []
                     }
@@ -378,6 +343,8 @@ Return ONLY valid JSON in this format:
                 structure = PageStructure(
                     page_num=page_num,
                     markdown_content=page_result.get("markdown_content", ""),
+                    reference_blocks=[ReferenceBlock(**rb) for rb in page_result.get("reference_blocks", [])],
+                    metadata=DocumentMetadata(**page_result["metadata"]) if page_result.get("metadata") else None,
                     entities=[ExtractedEntity(**e) for e in page_result.get("entities", [])],
                     tables=[ExtractedTable(**t) for t in page_result.get("tables", [])]
                 )

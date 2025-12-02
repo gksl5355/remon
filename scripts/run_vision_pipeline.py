@@ -61,36 +61,36 @@ def parse_args():
         default=True,
         help="LLM 출력을 .txt로 저장 (기본: True)",
     )
-    # 병렬 처리 설정
+    # 병렬 처리 설정 (config 기본값 사용, CLI로 오버라이드 가능)
     parser.add_argument(
         "--max-concurrency",
         type=int,
-        default=30,
-        help="최대 동시 실행 수 (기본값: 30)",
+        default=None,
+        help=f"최대 동시 실행 수 (기본값: .env의 VISION_MAX_CONCURRENCY={PreprocessConfig.VISION_MAX_CONCURRENCY})",
     )
     parser.add_argument(
         "--token-budget",
         type=int,
         default=None,
-        help="토큰 예산 (기본값: None, 제한 없음)",
+        help="토큰 예산 (기본값: .env의 VISION_TOKEN_BUDGET, 제한 없음)",
     )
     parser.add_argument(
         "--request-timeout",
         type=int,
-        default=120,
-        help="API 요청 타임아웃 초 (기본값: 120)",
+        default=None,
+        help=f"API 요청 타임아웃 초 (기본값: .env의 VISION_REQUEST_TIMEOUT={PreprocessConfig.VISION_REQUEST_TIMEOUT})",
     )
     parser.add_argument(
         "--retry-max-attempts",
         type=int,
-        default=2,
-        help="최대 재시도 횟수 (기본값: 2)",
+        default=None,
+        help=f"최대 재시도 횟수 (기본값: .env의 VISION_RETRY_MAX_ATTEMPTS={PreprocessConfig.VISION_RETRY_MAX_ATTEMPTS})",
     )
     parser.add_argument(
         "--retry-backoff-seconds",
         type=float,
-        default=1.0,
-        help="재시도 대기 시간 초 (기본값: 1.0)",
+        default=None,
+        help=f"재시도 대기 시간 초 (기본값: .env의 VISION_RETRY_BACKOFF_SECONDS={PreprocessConfig.VISION_RETRY_BACKOFF_SECONDS})",
     )
     parser.add_argument(
         "--no-parallel",
@@ -108,18 +108,7 @@ def parse_args():
         default=None,
         help="Qdrant 컬렉션명 (기본값: .env의 QDRANT_COLLECTION)",
     )
-    parser.add_argument(
-        "--batch-size-simple",
-        type=int,
-        default=None,
-        help="gpt-4o-mini용 배치 크기 (기본값: .env의 VISION_BATCH_SIZE_SIMPLE)",
-    )
-    parser.add_argument(
-        "--batch-size-complex",
-        type=int,
-        default=None,
-        help="gpt-4o용 배치 크기 (기본값: .env의 VISION_BATCH_SIZE_COMPLEX)",
-    )
+
     return parser.parse_args()
 
 
@@ -280,17 +269,18 @@ async def main():
     logger.info(f"📚 총 {len(pdf_files)}개 PDF 파일 발견")
     logger.info(f"🔍 지식 그래프: {'활성화' if args.enable_graph else '비활성화'}")
     logger.info(f"💾 출력 저장: {'활성화' if args.save_outputs else '비활성화'}")
-    logger.info(f"⚡ 병렬 처리: {'비활성화' if args.no_parallel else f'활성화 (max_concurrency={args.max_concurrency})'}")
+    max_concurrency_display = args.max_concurrency or PreprocessConfig.VISION_MAX_CONCURRENCY
+    logger.info(f"⚡ 병렬 처리: {'비활성화' if args.no_parallel else f'활성화 (max_concurrency={max_concurrency_display})'}")
     logger.info(f"🗄️  Qdrant 저장: {'건너뛰기 (테스트 모드)' if args.skip_indexing else '활성화'}")
 
-    # Orchestrator 생성 (생성자 인자로 설정 전달)
+    # Orchestrator 생성 (config 기본값, CLI로 오버라이드)
     orchestrator = VisionOrchestrator(
         max_concurrency=args.max_concurrency,
         token_budget=args.token_budget,
         request_timeout=args.request_timeout,
         retry_max_attempts=args.retry_max_attempts,
         retry_backoff_seconds=args.retry_backoff_seconds,
-        enable_graph=args.enable_graph,
+        enable_graph=args.enable_graph if args.enable_graph else None,
     )
     
     # 컬렉션명 설정

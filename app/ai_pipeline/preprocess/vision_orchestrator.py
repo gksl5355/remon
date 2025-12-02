@@ -338,56 +338,6 @@ class VisionOrchestrator:
                             page_num = result["page_num"]
                             tokens_used = result.get("tokens_used", 0)
                             token_tracker.add_usage(page_num, model_name, tokens_used)
-        # 1. 복잡도 분석 및 DPI 결정 (모든 페이지)
-        complexity_results = {}
-        dpi_map = {}
-        
-        for page_idx in range(total_pages):
-            page_num = page_idx + 1
-            try:
-                complexity = self.complexity_analyzer.analyze_page(pdf_path, page_num)
-                complexity_results[page_num] = complexity
-                
-                # DPI 결정
-                if complexity["has_table"] or complexity["complexity_score"] >= 0.3:
-                    dpi_map[page_num] = 300
-                else:
-                    dpi_map[page_num] = 150
-                    
-            except Exception as e:
-                logger.error(f"페이지 {page_num} 복잡도 분석 실패: {e}")
-                complexity_results[page_num] = {"complexity_score": 0.1, "has_table": False}
-                dpi_map[page_num] = 150
-        
-        # 2. Vision LLM 호출 병렬 처리
-        semaphore = asyncio.Semaphore(self.max_concurrency)
-        token_tracker = TokenTracker()
-        token_tracker_lock = asyncio.Lock()
-        
-        async def process_page(page_idx: int) -> Optional[Dict[str, Any]]:
-            """단일 페이지 처리 (비동기, 동적 DPI)."""
-            page_num = page_idx + 1
-            
-            async with semaphore:  # 동시 실행 수 제한
-                try:
-                    complexity = complexity_results[page_num]
-                    dpi = dpi_map[page_num]
-                    
-                    # 동적 렌더링
-                    page_data = self.renderer.render_page_with_dpi(pdf_path, page_idx, dpi)
-                    
-                    # Vision 추출 (비동기)
-                    extraction = await self.vision_router.route_and_extract_async(
-                        image_base64=page_data["image_base64"],
-                        page_num=page_num,
-                        complexity_score=complexity["complexity_score"],
-                        system_prompt=StructureExtractor.SYSTEM_PROMPT
-                    )
-                    
-                    # 토큰 사용량 추적 (스레드 안전)
-                    tokens_used = extraction.get("tokens_used", 0)
-                    async with token_tracker_lock:
-                        token_tracker.add_usage(page_num, extraction["model_used"], tokens_used)
                         
                         # 예산 확인
                         if not token_tracker.check_budget(self.token_budget):
@@ -435,48 +385,6 @@ class VisionOrchestrator:
                 "structure": result["structure"],
                 "tokens_used": result["tokens_used"]
             })
-                                f"페이지 {page_num} 처리 중단."
-                            )
-                            return None
-                    
-                    # 구조화 (동기, 빠르므로 순차 처리)
-                    structure = self.structure_extractor.extract(
-                        extraction["content"],
-                        page_num
-                    )
-                    
-                    result = {
-                        "page_num": page_num,
-                        "model_used": extraction["model_used"],
-                        "complexity_score": complexity["complexity_score"],
-                        "has_table": complexity.get("has_table", False),
-                        "dpi": dpi,  # DPI 기록
-                        "structure": structure.dict(),
-                        "tokens_used": tokens_used
-                    }
-                    
-                    logger.debug(f"페이지 {page_num} 완료: {dpi} DPI, {tokens_used} 토큰 ({extraction['model_used']})")
-                    
-                    return result
-                    
-                except Exception as e:
-                    logger.error(f"페이지 {page_num} 실패: {e}", exc_info=True)
-                    return None
-        
-        # 모든 페이지 병렬 처리
-        tasks = [process_page(i) for i in range(total_pages)]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # 결과 정리 (None과 예외 제거, 페이지 번호 순 정렬)
-        vision_results = []
-        for result in results:
-            if isinstance(result, Exception):
-                logger.error(f"페이지 처리 중 예외 발생: {result}")
-            elif result is not None:
-                vision_results.append(result)
-        
-        # 페이지 번호 순 정렬
-        vision_results.sort(key=lambda x: x["page_num"])
         
         logger.info(
             f"Phase 1 완료: {len(vision_results)}/{total_pages}개 페이지 처리. "
