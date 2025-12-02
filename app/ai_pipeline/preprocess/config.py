@@ -133,6 +133,13 @@ class PreprocessConfig:
     )
     """문서 단위 토큰 예산 (None이면 제한 없음). 기본값: None"""
     
+    # ==================== 배치 처리 설정 ====================
+    VISION_BATCH_SIZE_SIMPLE: int = int(os.getenv("VISION_BATCH_SIZE_SIMPLE", "5"))
+    """gpt-4o-mini용 배치 크기. 기본값: 5"""
+    
+    VISION_BATCH_SIZE_COMPLEX: int = int(os.getenv("VISION_BATCH_SIZE_COMPLEX", "2"))
+    """gpt-4o용 배치 크기. 기본값: 2"""
+    
     VISION_REQUEST_TIMEOUT: int = int(os.getenv("VISION_REQUEST_TIMEOUT", "120"))
     """Vision API 요청 타임아웃 (초). 기본값: 120"""
     
@@ -257,6 +264,8 @@ class PreprocessConfig:
             "request_timeout": cls.VISION_REQUEST_TIMEOUT,
             "retry_max_attempts": cls.VISION_RETRY_MAX_ATTEMPTS,
             "retry_backoff_seconds": cls.VISION_RETRY_BACKOFF_SECONDS,
+            "batch_size_simple": cls.VISION_BATCH_SIZE_SIMPLE,
+            "batch_size_complex": cls.VISION_BATCH_SIZE_COMPLEX,
         }
     
     @classmethod

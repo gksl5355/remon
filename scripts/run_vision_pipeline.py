@@ -108,6 +108,18 @@ def parse_args():
         default=None,
         help="Qdrant 컬렉션명 (기본값: .env의 QDRANT_COLLECTION)",
     )
+    parser.add_argument(
+        "--batch-size-simple",
+        type=int,
+        default=None,
+        help="gpt-4o-mini용 배치 크기 (기본값: .env의 VISION_BATCH_SIZE_SIMPLE)",
+    )
+    parser.add_argument(
+        "--batch-size-complex",
+        type=int,
+        default=None,
+        help="gpt-4o용 배치 크기 (기본값: .env의 VISION_BATCH_SIZE_COMPLEX)",
+    )
     return parser.parse_args()
 
 

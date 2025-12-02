@@ -294,7 +294,7 @@ class VisionOrchestrator:
         
         페이지별 Vision LLM 호출을 병렬로 처리하여 처리 시간 단축.
         """
-        logger.info(f"Phase 1: Vision Ingestion 시작 (병렬 처리, 동적 DPI, max_concurrency={self.max_concurrency})")
+        logger.info(f"Phase 1: Vision Ingestion 시작 (배치 단위 병렬 처리, 동적 DPI, max_concurrency={self.max_concurrency})")
         
         # PDF 페이지 수 확인
         import pypdfium2 as pdfium
@@ -302,103 +302,88 @@ class VisionOrchestrator:
         total_pages = len(pdf)
         pdf.close()
         
-        # 1. 복잡도 분석 및 DPI 결정 (모든 페이지)
-        complexity_results = {}
-        dpi_map = {}
+        # 1. 모든 페이지 정보 수집 (복잡도, DPI, 모델 결정)
+        page_infos = self._prepare_page_infos(pdf_path, total_pages)
         
-        for page_idx in range(total_pages):
-            page_num = page_idx + 1
-            try:
-                complexity = self.complexity_analyzer.analyze_page(pdf_path, page_num)
-                complexity_results[page_num] = complexity
-                
-                # DPI 결정
-                if complexity["has_table"] or complexity["complexity_score"] >= 0.3:
-                    dpi_map[page_num] = 300
-                else:
-                    dpi_map[page_num] = 150
-                    
-            except Exception as e:
-                logger.error(f"페이지 {page_num} 복잡도 분석 실패: {e}")
-                complexity_results[page_num] = {"complexity_score": 0.1, "has_table": False}
-                dpi_map[page_num] = 150
+        # 2. 모델별 배치 생성
+        batches = self._create_model_batches(page_infos)
         
-        # 2. Vision LLM 호출 병렬 처리
-        semaphore = asyncio.Semaphore(self.max_concurrency)
+        # 3. 배치별 병렬 처리
         token_tracker = TokenTracker()
         token_tracker_lock = asyncio.Lock()
         
-        async def process_page(page_idx: int) -> Optional[Dict[str, Any]]:
-            """단일 페이지 처리 (비동기, 동적 DPI)."""
-            page_num = page_idx + 1
-            
-            async with semaphore:  # 동시 실행 수 제한
+        semaphore = asyncio.Semaphore(self.max_concurrency)
+        
+        async def process_batch(batch: Dict[str, Any]) -> List[Dict[str, Any]]:
+            """단일 배치 처리 (비동기)."""
+            async with semaphore:
                 try:
-                    complexity = complexity_results[page_num]
-                    dpi = dpi_map[page_num]
+                    model_name = batch["model_name"]
+                    pages = batch["pages"]
                     
-                    # 동적 렌더링
-                    page_data = self.renderer.render_page_with_dpi(pdf_path, page_idx, dpi)
+                    logger.info(f"배치 처리 시작: {model_name}, {len(pages)}페이지 (페이지 {[p['page_index']+1 for p in pages]})")
                     
-                    # Vision 추출 (비동기)
-                    extraction = await self.vision_router.route_and_extract_async(
-                        image_base64=page_data["image_base64"],
-                        page_num=page_num,
-                        complexity_score=complexity["complexity_score"],
-                        system_prompt=StructureExtractor.SYSTEM_PROMPT
+                    # 배치 단위 Vision 호출
+                    batch_results = await asyncio.to_thread(
+                        self.structure_extractor.extract_batch,
+                        pages,
+                        model_name
                     )
                     
-                    # 토큰 사용량 추적 (스레드 안전)
-                    tokens_used = extraction.get("tokens_used", 0)
+                    # 토큰 사용량 추적
+                    total_batch_tokens = sum(r.get("tokens_used", 0) for r in batch_results)
                     async with token_tracker_lock:
-                        token_tracker.add_usage(page_num, extraction["model_used"], tokens_used)
+                        for result in batch_results:
+                            page_num = result["page_num"]
+                            tokens_used = result.get("tokens_used", 0)
+                            token_tracker.add_usage(page_num, model_name, tokens_used)
                         
                         # 예산 확인
                         if not token_tracker.check_budget(self.token_budget):
                             logger.warning(
                                 f"토큰 예산 초과: {token_tracker.total_tokens}/{self.token_budget}. "
-                                f"페이지 {page_num} 처리 중단."
+                                f"배치 처리 중단."
                             )
-                            return None
+                            return []
                     
-                    # 구조화 (동기, 빠르므로 순차 처리)
-                    structure = self.structure_extractor.extract(
-                        extraction["content"],
-                        page_num
-                    )
-                    
-                    result = {
-                        "page_num": page_num,
-                        "model_used": extraction["model_used"],
-                        "complexity_score": complexity["complexity_score"],
-                        "has_table": complexity.get("has_table", False),
-                        "dpi": dpi,  # DPI 기록
-                        "structure": structure.dict(),
-                        "tokens_used": tokens_used
-                    }
-                    
-                    logger.debug(f"페이지 {page_num} 완료: {dpi} DPI, {tokens_used} 토큰 ({extraction['model_used']})")
-                    
-                    return result
+                    logger.info(f"배치 완료: {model_name}, {len(batch_results)}페이지, {total_batch_tokens}토큰")
+                    return batch_results
                     
                 except Exception as e:
-                    logger.error(f"페이지 {page_num} 실패: {e}", exc_info=True)
-                    return None
+                    logger.error(f"배치 처리 실패 ({batch['model_name']}): {e}", exc_info=True)
+                    return []
         
-        # 모든 페이지 병렬 처리
-        tasks = [process_page(i) for i in range(total_pages)]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        # 모든 배치 병렬 처리
+        logger.info(f"총 {len(batches)}개 배치 생성: {[(b['model_name'], len(b['pages'])) for b in batches]}")
         
-        # 결과 정리 (None과 예외 제거, 페이지 번호 순 정렬)
-        vision_results = []
-        for result in results:
-            if isinstance(result, Exception):
-                logger.error(f"페이지 처리 중 예외 발생: {result}")
-            elif result is not None:
-                vision_results.append(result)
+        batch_tasks = [process_batch(batch) for batch in batches]
+        batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+        
+        # 결과 병합 및 정리
+        all_results = []
+        for batch_result in batch_results:
+            if isinstance(batch_result, Exception):
+                logger.error(f"배치 처리 중 예외 발생: {batch_result}")
+            elif batch_result:
+                all_results.extend(batch_result)
         
         # 페이지 번호 순 정렬
-        vision_results.sort(key=lambda x: x["page_num"])
+        all_results.sort(key=lambda x: x["page_num"])
+        
+        # 기존 형식으로 변환 (외부 호환성 유지)
+        vision_results = []
+        for result in all_results:
+            page_info = next((p for p in page_infos if p["page_index"] == result["page_index"]), {})
+            
+            vision_results.append({
+                "page_num": result["page_num"],
+                "model_used": result["model_used"],
+                "complexity_score": result["complexity_score"],
+                "has_table": page_info.get("has_table", False),
+                "dpi": page_info.get("dpi", 150),
+                "structure": result["structure"],
+                "tokens_used": result["tokens_used"]
+            })
         
         logger.info(
             f"Phase 1 완료: {len(vision_results)}/{total_pages}개 페이지 처리. "
@@ -407,6 +392,101 @@ class VisionOrchestrator:
         )
         
         return vision_results
+    
+    def _prepare_page_infos(self, pdf_path: str, total_pages: int) -> List[Dict[str, Any]]:
+        """모든 페이지 정보 수집 (복잡도, DPI, 모델 결정)."""
+        page_infos = []
+        
+        for page_idx in range(total_pages):
+            page_num = page_idx + 1
+            
+            try:
+                # 복잡도 분석
+                complexity = self.complexity_analyzer.analyze_page(pdf_path, page_num)
+                
+                # DPI 결정
+                if complexity["has_table"] or complexity["complexity_score"] >= 0.3:
+                    dpi = 300
+                else:
+                    dpi = 150
+                
+                # 모델 결정 (기존 VisionRouter 로직 재사용)
+                if complexity["complexity_score"] >= self.vision_router.complexity_threshold:
+                    model_name = self.vision_router.model_complex
+                else:
+                    model_name = self.vision_router.model_simple
+                
+                # 페이지 렌더링
+                page_data = self.renderer.render_page_with_dpi(pdf_path, page_idx, dpi)
+                
+                page_info = {
+                    "page_index": page_idx,
+                    "page_num": page_num,
+                    "image_base64": page_data["image_base64"],
+                    "complexity": complexity["complexity_score"],
+                    "has_table": complexity["has_table"],
+                    "dpi": dpi,
+                    "model_name": model_name
+                }
+                
+                page_infos.append(page_info)
+                
+                logger.info(f"페이지 {page_num}: 복잡도 {complexity['complexity_score']:.2f} → {dpi} DPI")
+                
+            except Exception as e:
+                logger.error(f"페이지 {page_num} 정보 수집 실패: {e}")
+                # Fallback 정보
+                page_infos.append({
+                    "page_index": page_idx,
+                    "page_num": page_num,
+                    "image_base64": "",
+                    "complexity": 0.1,
+                    "has_table": False,
+                    "dpi": 150,
+                    "model_name": self.vision_router.model_simple
+                })
+        
+        return page_infos
+    
+    def _create_model_batches(self, page_infos: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """모델별 배치 생성."""
+        from .config import PreprocessConfig
+        
+        config = PreprocessConfig.get_vision_config()
+        batch_size_simple = config["batch_size_simple"]
+        batch_size_complex = config["batch_size_complex"]
+        
+        # 모델별 그룹핑
+        model_groups = {}
+        for page_info in page_infos:
+            model_name = page_info["model_name"]
+            if model_name not in model_groups:
+                model_groups[model_name] = []
+            model_groups[model_name].append(page_info)
+        
+        # 배치 생성
+        batches = []
+        for model_name, pages in model_groups.items():
+            # 배치 크기 결정
+            if "4o-mini" in model_name or "mini" in model_name:
+                batch_size = batch_size_simple
+            else:
+                batch_size = batch_size_complex
+            
+            # 페이지를 배치 크기로 분할
+            for i in range(0, len(pages), batch_size):
+                batch_pages = pages[i:i + batch_size]
+                batches.append({
+                    "model_name": model_name,
+                    "pages": batch_pages
+                })
+        
+        logger.info(
+            f"배치 생성 완료: {len(batches)}개 배치. "
+            f"모델별 페이지 수: {[(model, len(pages)) for model, pages in model_groups.items()]}"
+        )
+        
+        return batches
     
     def _phase2_semantic_processing(
         self,
