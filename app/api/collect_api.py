@@ -3,7 +3,7 @@ module: collect_api.py
 description: 규제 문서 업로드 및 조회 API
 author: 조영우
 created: 2025-11-10
-updated: 2025-11-11
+updated: 2025-12-02
 dependencies:
     - fastapi
     - services.collect_service
@@ -18,7 +18,7 @@ from services.collect_service import CollectService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/regulations", tags=["Regulations"])
+router = APIRouter(prefix="/collect", tags=["collect"])
 service = CollectService()
 
 
@@ -60,48 +60,3 @@ async def collect_from_url(
     """
     logger.info(f"POST /regulations/url - url={url}, country={country}")
     return await service.process_url(url, country, db)
-
-
-@router.get("/")
-async def list_regulations(
-    country: str | None = Query(None, description="국가 필터"),
-    status: str | None = Query(None, description="상태 필터 (active/repealed)"),
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    규제 문서 목록을 조회한다.
-
-    Returns:
-        dict: 규제 문서 목록 및 페이지네이션 정보.
-    """
-    logger.info(f"GET /regulations - country={country}, status={status}, page={page}")
-    return await service.get_regulations(country, status, page, page_size, db)
-
-
-@router.get("/{regulation_id}")
-async def get_regulation(
-    regulation_id: int,
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    규제 문서 상세 정보를 조회한다.
-
-    Args:
-        regulation_id (int): 규제 문서 ID.
-
-    Returns:
-        dict: 규제 문서 상세 정보.
-
-    Raises:
-        HTTPException: 규제 문서를 찾을 수 없는 경우 404.
-    """
-    logger.info(f"GET /regulations/{regulation_id}")
-    regulation = await service.get_regulation_detail(regulation_id, db)
-    
-    if not regulation:
-        logger.warning(f"Regulation not found: regulation_id={regulation_id}")
-        raise HTTPException(status_code=404, detail="Regulation not found")
-    
-    return regulation
