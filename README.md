@@ -8,7 +8,7 @@
 - FastAPI (Backend, Python 3.11, uv 환경)
 - Vue3 (Frontend)
 - PostgreSQL (Main DB)
-- Chroma (VectorDB)
+- Qdrant (VectorDB)
 - Redis (옵션: 캐시/세션/비동기 큐)
 - OpenSearch (텍스트 검색, Hybrid Retrieval 예정)
 - LLM: GPT-4o mini  
@@ -71,7 +71,7 @@ DE1 – AI/DATA엔지니어 (수집·전처리 파이프라인)  김민제  /app
 |------|------|------|
 | 임베딩 모델 | ✅ BGE-M3 |
 | LLM | ✅ GPT-4o mini |
-| VectorDB | ✅ Chroma |
+| VectorDB | ✅ Qdrant |
 | OpenSearch | 🕐 Hybrid 실험 예정 |
 | 국가 구분 방식 | ✅ meta_country 필드 기반 |
 | 임베딩 저장 방식 | 🟡 VectorDB만 저장, SQL엔 문서 메타만 저장 권장 |
@@ -109,11 +109,11 @@ DE1 – AI/DATA엔지니어 (수집·전처리 파이프라인)  김민제  /app
 | 구분 | 담당자 | 책임 범위 |
 |:---:|:---:|:---|
 | **FE1 – 프론트엔드/UI 담당** | <img src="https://avatars.githubusercontent.com/SunYoung710" width=120px alt="박선영"/> [박선영](https://github.com/SunYoung710) | 사용자 인터페이스 / API 연동 / 리포트 시각화 |
-| **BE1 – 백엔드 리드 (트랜잭션·API 게이트웨이)** | <img src="https://avatars.githubusercontent.com/dreamFORcreative" width=120px alt="조영우"/> [조영우](https://github.com/dreamFORcreative) | 전체 API 라우팅 / 트랜잭션 관리 / 서비스 orchestration |
+| **BE1 – 백엔드 리드 (트랜잭션·API 게이트웨이)** | <img src="https://avatars.githubusercontent.com/bofoto" width=120px alt="조영우"/> [조영우](https://github.com/bofoto) | 전체 API 라우팅 / 트랜잭션 관리 / 서비스 orchestration |
 | **BE2 – 데이터베이스 엔지니어 (Repository & Schema)** | <img src="https://avatars.githubusercontent.com/Nam707" width=120px alt="남지수"/> [남지수](https://github.com/Nam707) | DB 구조 설계 / Repository 표준화 / ORM |
 | **AI1 – LangGraph 파이프라인 엔지니어** | <img src="https://avatars.githubusercontent.com/bluepaled0t" width=120px alt="고서아"/> [고서아](https://github.com/bluepaled0t) | LLM 파이프라인 (LangGraph) 설계 / 대응전략·리포트 생성 |
 | **AI2 – RAG 엔지니어 (임베딩·검색 시스템)** | <img src="https://avatars.githubusercontent.com/gksl5355" width=120px alt="조태환"/> [조태환](https://github.com/gksl5355) | RAG 검색·임베딩·VectorDB 구축 |
-| **DE1 – AI/DATA 엔지니어 (수집·전처리 파이프라인)** | <img src="https://avatars.githubusercontent.com/DWECK" width=120px alt="김민제"/> [김민제](https://github.com/DWECK) | 규제 데이터 크롤링 / 전처리 / RAG 입력 데이터 생성 |
+| **DE1 – AI/DATA 엔지니어 (수집·전처리 파이프라인)** | <img src="https://avatars.githubusercontent.com/dreamFORcreative" width=120px alt="김민제"/> [김민제](https://github.com/dreamFORcreative) | 규제 데이터 크롤링 / 전처리 / RAG 입력 데이터 생성 |
 
 
 
@@ -155,6 +155,7 @@ DE1 – AI/DATA엔지니어 (수집·전처리 파이프라인)  김민제  /app
 
 
 ---
+
 
 
 
