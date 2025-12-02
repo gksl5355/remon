@@ -88,38 +88,14 @@ class VectorClient:
             # 원격 연결: URL 기반 (HTTPS 자동) + API Key 인증
             qdrant_url = os.getenv("QDRANT_URL", f"https://{QDRANT_HOST}")
             
-            if QDRANT_API_KEY:
-                self.client = QdrantClient(
-                    url=qdrant_url,
-                    api_key=QDRANT_API_KEY,
-                    timeout=30,
-                    prefer_grpc=False
-                )
-                logger.info(f"✅ Qdrant 원격 모드 (API Key 인증): {qdrant_url}")
-            else:
-                self.client = QdrantClient(
-                    url=qdrant_url,
-                    timeout=30,
-                    prefer_grpc=False
-                )
-                logger.info(f"✅ Qdrant 원격 모드 (인증 없음): {qdrant_url}")
-        """컬렉션 생성 (없으면)."""
-        collections = self.client.get_collections().collections
-        exists = any(c.name == self.collection_name for c in collections)
-
-        if not exists:
-            self.client.create_collection(
-                collection_name=self.collection_name,
-                vectors_config={
-                    "dense": VectorParams(size=1024, distance=Distance.COSINE),
-                },
-                sparse_vectors_config={
-                    "sparse": SparseVectorParams(),
-                },
-            )
-            logger.info(f"✅ 컬렉션 생성: {self.collection_name}")
-        else:
-            logger.info(f"✅ 컬렉션 존재: {self.collection_name}")
+            # 원격 모드: requests 라이브러리 사용 (test_qdrant.py 방식)
+            self._use_requests = True
+            self._base_url = qdrant_url
+            self.client = None  # 검색용으로만 사용
+            logger.info(f"✅ Qdrant 원격 모드 (requests, SSL verify=False): {qdrant_url}")
+        
+        # 컬렉션 존재 확인
+        logger.info(f"✅ 컬렉션 사용: {self.collection_name}")
 
     def insert(
         self,
@@ -139,7 +115,7 @@ class VectorClient:
             sparse_embeddings: Sparse 벡터 (선택)
             batch_size: 배치 크기
         """
-        import uuid
+        import random
 
         total = len(texts)
         for batch_start in range(0, total, batch_size):
@@ -151,28 +127,56 @@ class VectorClient:
                 dense = dense_embeddings[idx]
                 meta = metadatas[idx]
 
-                point_id = str(uuid.uuid4())
-                vectors = {"dense": dense}
+                # Qdrant는 정수 ID만 허용 (UUID 문자열 불가)
+                point_id = random.randint(1, 2**63 - 1)
+                # NumPy float32 → Python float 변환
+                dense_list = [float(x) for x in dense]
+                vectors = {"dense": dense_list}
 
                 if sparse_embeddings and idx < len(sparse_embeddings):
                     sparse = sparse_embeddings[idx]
-                    vectors["sparse"] = SparseVector(
-                        indices=list(sparse.keys()), values=list(sparse.values())
-                    )
+                    vectors["sparse"] = {
+                        "indices": [int(k) for k in sparse.keys()],
+                        "values": [float(v) for v in sparse.values()]
+                    }
 
                 payload = {"text": text, **meta}
 
-                points.append(
-                    PointStruct(
-                        id=point_id,
-                        vector=vectors,
-                        payload=payload,
-                    )
-                )
+                points.append({
+                    "id": point_id,
+                    "vector": vectors,
+                    "payload": payload,
+                })
 
-            self.client.upsert(
-                collection_name=self.collection_name, points=points, wait=True
-            )
+            # 원격 모드면 requests 사용 (test_qdrant.py 방식)
+            if hasattr(self, '_use_requests'):
+                import requests
+                url = f"{self._base_url}/collections/{self.collection_name}/points?wait=true"
+                headers = {"api-key": QDRANT_API_KEY, "Content-Type": "application/json"}
+                resp = requests.put(
+                    url,
+                    json={"points": points},
+                    headers=headers,
+                    verify=False,
+                    timeout=30
+                )
+                resp.raise_for_status()
+            else:
+                # 로컬 모드는 기존 방식
+                points_struct = [
+                    PointStruct(
+                        id=p["id"],
+                        vector={k: SparseVector(**v) if k == "sparse" and isinstance(v, dict) else v for k, v in p["vector"].items()},
+                        payload=p["payload"]
+                    )
+                    for p in points
+                ]
+                self.client.upsert(
+                    collection_name=self.collection_name,
+                    points=points_struct,
+                    wait=True
+                )
+            
             logger.info(
                 f"  ✅ 배치 {batch_start//batch_size + 1}/{(total + batch_size - 1)//batch_size}: {len(points)}개 삽입"
             )
