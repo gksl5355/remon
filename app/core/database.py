@@ -20,8 +20,8 @@ from sqlalchemy.pool import NullPool
 import os
 from dotenv import load_dotenv
 
-
-
+# 모델들이 상속받을 Base 클래스 정의
+Base = declarative_base()
 
 
 load_dotenv()
@@ -71,3 +71,4 @@ def get_db_session():
     비동기 환경에서 await와 호환(예: await session.execute(...))
     """
     return AsyncSessionLocal()
+    

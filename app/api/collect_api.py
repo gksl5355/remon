@@ -60,3 +60,31 @@ async def collect_from_url(
     """
     logger.info(f"POST /regulations/url - url={url}, country={country}")
     return await service.process_url(url, country, db)
+
+
+@router.post("/crawl", status_code=201)
+async def crawl_regulation(
+    country: str = Query(..., description="국가명 (예: USA, Russia, Indonesia)"),
+    keywords: list[str] = Query(..., description="검색 키워드 리스트"),
+    category: str = Query("regulation", description="카테고리 (regulation 또는 news)"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    DiscoveryAgent를 사용하여 규제 문서를 크롤링한다.
+
+    Args:
+        country (str): 국가명.
+        keywords (list[str]): 검색 키워드 리스트.
+        category (str): 카테고리 (regulation 또는 news).
+
+    Returns:
+        dict: 크롤링 결과.
+    """
+    logger.info(f"POST /collect/crawl - country={country}, keywords={keywords}, category={category}")
+    
+    try:
+        result = await service.crawl_regulation(country, keywords, category, db)
+        return result
+    except Exception as e:
+        logger.error(f"크롤링 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"크롤링 실패: {str(e)}")

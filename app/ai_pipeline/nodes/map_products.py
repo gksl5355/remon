@@ -10,7 +10,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol, TYPE_CHECKING
 from collections import defaultdict
-
 # Protocol, TYPE_CHECKING 추가
 
 from sqlalchemy import text
@@ -46,7 +45,6 @@ from app.core.repositories.product_repository import ProductRepository
 
 
 logger = logging.getLogger(__name__)
-
 
 class MappingNode:
     """

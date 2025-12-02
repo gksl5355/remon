@@ -33,9 +33,9 @@ class ReportItem(Base):
     order_no = Column(Integer)
 
     # Relationships
-    report = relationship("Report", back_populates="items")
+    reports = relationship("Report", back_populates="items")
     version = relationship("RegulationVersion")
-    impact_score = relationship("ImpactScore")
+    impact_scores = relationship("ImpactScore")
 
 
 class ReportSummary(Base):

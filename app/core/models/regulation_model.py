@@ -11,7 +11,7 @@ class Regulation(Base):
     source_id = Column(Integer, ForeignKey("data_sources.source_id"), nullable=False)
     country_code = Column(String(2), ForeignKey("countries.country_code"), nullable=False)
     external_id = Column(String(200))
-    title = Column(String(100))
+    title = Column(String(200))
     proclaimed_date = Column(Date)
     effective_date = Column(Date)
     language = Column(String(10))
@@ -21,7 +21,7 @@ class Regulation(Base):
     # Relationships
     data_source = relationship("DataSource", back_populates="regulations")
     country = relationship("Country", back_populates="regulations")
-    versions = relationship("RegulationVersion", back_populates="regulation", cascade="all, delete-orphan")
+    version = relationship("RegulationVersion", back_populates="regulations", cascade="all, delete-orphan")
 
 
 class RegulationVersion(Base):
@@ -35,7 +35,7 @@ class RegulationVersion(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     # Relationships
-    regulation = relationship("Regulation", back_populates="versions")
+    regulations = relationship("Regulation", back_populates="version")
     translations = relationship("RegulationTranslation", back_populates="version", cascade="all, delete-orphan")
     changes = relationship("RegulationChangeHistory", back_populates="version", cascade="all, delete-orphan")
     # [삭제됨] Keynotes와의 관계 제거
@@ -61,15 +61,15 @@ class RegulationTranslation(Base):
     regulation_version_id = Column(Integer, ForeignKey("regulation_versions.regulation_version_id"), nullable=False)
     language_code = Column(String(10))
     translated_text = Column(Text)
-    glossary_term_id = Column(String, ForeignKey("glossary_terms.glossary_term_id")) # UUID 타입이면 DB에 맞게 조정
+    glossary_term_id = Column(Integer, ForeignKey("glossary_terms.glossary_term_id")) # UUID 타입이면 DB에 맞게 조정
     translation_status = Column(String(20))
     created_at = Column(DateTime, server_default=func.now())
 
     # Relationships
     version = relationship("RegulationVersion", back_populates="translations")
     glossary_term = relationship("GlossaryTerm", back_populates="translations")
-    impact_scores = relationship("ImpactScore", back_populates="translation")
-    reports = relationship("Report", back_populates="translation")
+    impact_scores = relationship("ImpactScore", back_populates="translations")
+    reports = relationship("Report", back_populates="translations")
 
 
 class RegulationChangeHistory(Base):
@@ -83,4 +83,4 @@ class RegulationChangeHistory(Base):
 
     # Relationships
     version = relationship("RegulationVersion", back_populates="changes")
-    reports = relationship("Report", back_populates="change")
+    reports = relationship("Report", back_populates="changes")
