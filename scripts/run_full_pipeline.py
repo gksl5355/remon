@@ -189,12 +189,16 @@ async def main() -> None:
     if not pdf_path.exists():
         raise FileNotFoundError(pdf_path)
 
-    state = _build_state(
+    raw_state = _build_state(
         pdf_path=pdf_path,
         use_db=args.use_db,
         product_json=args.product_json,
         product_id=args.product_id,
     )
+
+    state = AppState()
+    for key, value in raw_state.items():
+        state[key] = value
 
     mapping_context: Dict[str, Any] = {}
     if args.stub_llm:
