@@ -183,7 +183,8 @@ class VisionOrchestrator:
             index_summary = self._phase4_dual_indexing(
                 processing_results["chunks"],
                 graph_data,
-                Path(pdf_path).name
+                Path(pdf_path).name,
+                vision_results=vision_results
             )
             
             result = {
@@ -460,13 +461,57 @@ class VisionOrchestrator:
         self,
         chunks: List[Dict[str, Any]],
         graph_data: Dict[str, Any],
-        source_file: str
+        source_file: str,
+        vision_results: List[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """Phase 4: Qdrant + Graph 저장."""
+        """Phase 4: Qdrant + Graph 저장 (regulation_id 자동 생성)."""
         logger.info("Phase 4: Dual Indexing 시작")
         
-        summary = self.dual_indexer.index(chunks, graph_data, source_file)
+        import re
+        from pathlib import Path
         
-        logger.info(f"Phase 4 완료: {summary['qdrant_chunks']}개 청크 저장")
+        # regulation_id 생성 전략
+        regulation_id = None
+        
+        # 전략 1: 메타데이터에서 추출
+        if vision_results:
+            first_page = vision_results[0]
+            metadata = first_page.get("structure", {}).get("metadata", {})
+            
+            title = metadata.get("title", "")
+            country = metadata.get("country", "")
+            regulation_type = metadata.get("regulation_type", "")
+            
+            # title + country + type 조합으로 ID 생성
+            if title:
+                # 예: "FDA-US-Required-Warnings-Cigarette"
+                parts = []
+                if regulation_type:
+                    parts.append(regulation_type)
+                if country:
+                    parts.append(country)
+                # title에서 주요 단어 추출 (3개)
+                title_words = re.findall(r'\b[A-Z][a-z]+\b', title)[:3]
+                parts.extend(title_words)
+                
+                if parts:
+                    regulation_id = "-".join(parts)
+                    logger.info(f"regulation_id 생성 (메타데이터): {regulation_id}")
+        
+        # 전략 2: 파일명 기반 (fallback)
+        if not regulation_id:
+            file_stem = Path(source_file).stem
+            regulation_id = re.sub(r'[^A-Za-z0-9-]', '-', file_stem)
+            logger.info(f"regulation_id 생성 (파일명): {regulation_id}")
+        
+        summary = self.dual_indexer.index(
+            chunks=chunks, 
+            graph_data=graph_data, 
+            source_file=source_file,
+            regulation_id=regulation_id,
+            vision_results=vision_results
+        )
+        
+        logger.info(f"Phase 4 완료: {summary['qdrant_chunks']}개 청크 저장 (ref_blocks: {summary.get('reference_blocks_count', 0)})")
         
         return summary

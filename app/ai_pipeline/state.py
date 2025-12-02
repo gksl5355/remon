@@ -166,5 +166,6 @@ class AppState(TypedDict, total=False):
     dual_index_summary: Dict[str, Any]  # Qdrant + Graph 저장 요약
     
     # change detection
-    change_context: Dict[str, Any]
-    change_detection: Dict[str, Any]
+    change_context: Dict[str, Any]  # Legacy 규제 메타데이터 (legacy_regulation_id 포함)
+    change_detection_results: List[Dict[str, Any]]  # 변경 감지 상세 결과
+    change_summary: Dict[str, Any]  # 변경 감지 요약
