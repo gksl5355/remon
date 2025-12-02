@@ -43,7 +43,6 @@ class EmbeddingPipeline:
         self.use_sparse = use_sparse and HAS_FLAG_EMBEDDING
         self.model = None
         self._load_model()
-
     def _load_model(self) -> None:
         if HAS_FLAG_EMBEDDING and self.use_sparse:
             self.model = BGEM3FlagModel(self.model_name, use_fp16=self.use_fp16)

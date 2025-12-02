@@ -33,7 +33,6 @@ logger = logging.getLogger(__name__)
 # settings.py 통합 (환경변수 폴백)
 try:
     from app.config.settings import settings
-
     QDRANT_HOST = (
         getattr(settings, "QDRANT_URL", "http://localhost:6333")
         .replace("http://", "")
@@ -205,7 +204,6 @@ class VectorClient:
             검색 결과 딕셔너리
         """
         qdrant_filter = self._build_qdrant_filter(filters)
-
         # Dense 검색
         dense_results = list(
             self.client.query_points(
@@ -217,7 +215,6 @@ class VectorClient:
                 query_filter=qdrant_filter,
             )
         )
-
         # Sparse 없으면 Dense만 반환
         if not query_sparse:
             return {
@@ -226,7 +223,6 @@ class VectorClient:
                 "metadatas": [r.payload for r in dense_results],
                 "scores": [r.score for r in dense_results],
             }
-
         # Sparse 검색
         sparse_vector = SparseVector(
             indices=list(query_sparse.keys()), values=list(query_sparse.values())

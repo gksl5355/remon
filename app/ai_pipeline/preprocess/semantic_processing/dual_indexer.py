@@ -86,15 +86,16 @@ class DualIndexer:
         logger.info("✅ 로컬 Qdrant 저장 완료")
         storage_locations.append("local")
         
-        # 원격 저장
+        # 원격 저장 (작은 배치 크기로 타임아웃 방지)
         try:
-            logger.info(f"Qdrant 원격 저장 중: {self.collection_name}")
+            logger.info(f"Qdrant 원격 저장 중: {self.collection_name} (배치 크기: 10)")
             remote_client = VectorClient(collection_name=self.collection_name, use_local=False)
             remote_client.insert(
                 texts=texts,
                 dense_embeddings=embeddings_result["dense"],
                 metadatas=metadatas,
-                sparse_embeddings=embeddings_result.get("sparse")
+                sparse_embeddings=embeddings_result.get("sparse"),
+                batch_size=10  # 타임아웃 방지
             )
             logger.info("✅ 원격 Qdrant 저장 완료")
             storage_locations.append("remote")

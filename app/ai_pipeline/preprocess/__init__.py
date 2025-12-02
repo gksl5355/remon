@@ -39,11 +39,12 @@ async def _run_orchestrator(pdf_path: str) -> Dict[str, Any]:
 
 
 async def _run_vision_orchestrator(
-    pdf_path: str, vision_config: Optional[Dict[str, Any]] = None
+    pdf_path: str,
+    vision_config: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Vision Pipeline 실행.
-
+    
     Args:
         pdf_path: PDF 파일 경로
         vision_config: Vision 설정 딕셔너리 (None이면 기본값 사용)
@@ -66,7 +67,6 @@ async def _run_vision_orchestrator(
         orchestrator = VisionOrchestrator(**vision_config)
     else:
         orchestrator = VisionOrchestrator()
-
     return await asyncio.to_thread(orchestrator.process_pdf, pdf_path)
 
 
@@ -140,34 +140,33 @@ async def preprocess_node(state: AppState) -> AppState:
     # Vision Pipeline 설정 (preprocess_request에서 가져오기)
     vision_config = request.get("vision_config") if use_vision else None
 
+    # Vision Pipeline 설정 (preprocess_request에서 가져오기)
+    vision_config = request.get("vision_config") if use_vision else None
+    
     for pdf_path in pdf_paths:
         try:
             if use_vision:
-                result = await _run_vision_orchestrator(
-                    pdf_path, vision_config=vision_config
-                )
+                result = await _run_vision_orchestrator(pdf_path, vision_config=vision_config)
             else:
                 result = await _run_orchestrator(pdf_path)
-
+            
             result.setdefault("pdf_path", pdf_path)
             processed_results.append(result)
-
+            
             if result.get("status") == "success":
                 success_count += 1
-
+                
                 # Vision Pipeline 결과 수집
                 if use_vision:
-                    all_vision_results.extend(
-                        result.get("vision_extraction_result", [])
-                    )
-
+                    all_vision_results.extend(result.get("vision_extraction_result", []))
+                    
                     graph_data = result.get("graph_data", {})
                     all_graph_data["nodes"].extend(graph_data.get("nodes", []))
                     all_graph_data["edges"].extend(graph_data.get("edges", []))
-
+                    
                     if result.get("dual_index_summary"):
                         all_index_summaries.append(result["dual_index_summary"])
-
+                        
         except Exception as exc:  # pragma: no cover - defensive guard
             logger.exception("PDF 전처리 실패: %s", pdf_path)
             processed_results.append(
@@ -205,7 +204,7 @@ async def preprocess_node(state: AppState) -> AppState:
             "total_chunks": sum(s.get("qdrant_chunks", 0) for s in all_index_summaries),
             "total_nodes": len(all_graph_data["nodes"]),
             "total_edges": len(all_graph_data["edges"]),
-            "summaries": all_index_summaries,
+            "summaries": all_index_summaries
         }
 
     # product_info가 Preprocess 단계에서 전달되는 경우 상태에 반영

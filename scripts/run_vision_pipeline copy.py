@@ -28,7 +28,6 @@ sys.path.insert(0, str(project_root))
 
 # .env 파일 로드
 from dotenv import load_dotenv
-
 load_dotenv(project_root / ".env")
 
 from app.ai_pipeline.preprocess.config import PreprocessConfig
@@ -169,7 +168,6 @@ def save_llm_outputs(result: dict, pdf_name: str, timestamp: str) -> None:
         return
 
     vision_results = result.get("vision_extraction_result", [])
-
     # 파일명 길이 제한 (80글자)
     safe_pdf_name = pdf_name[:80] if len(pdf_name) > 80 else pdf_name
 
@@ -494,7 +492,6 @@ async def main():
         for r in results:
             if r["status"] != "success":
                 logger.info(f"  - {r['file']}")
-
     if args.save_outputs:
         logger.info(f"\n📁 출력 위치: {OUTPUT_DIR}")
 
