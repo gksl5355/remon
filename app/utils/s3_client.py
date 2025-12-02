@@ -21,20 +21,25 @@ class S3Client:
         self,
         access_key_id: str = None,
         secret_access_key: str = None,
-        region: str = "ap-northeast-2",
-        bucket_arn: str = "arn:aws:s3:ap-northeast-2:881490135253:accesspoint/sk-team-storage",
-        base_prefix: str = "skala-2.4.17/preprocessed_jsons/",
+        region: str = None,
+        bucket_arn: str = None,
+        base_prefix: str = None,
     ):
         import os
 
         # 환경변수에서 로드
         access_key_id = access_key_id or os.getenv("AWS_ACCESS_KEY_ID")
         secret_access_key = secret_access_key or os.getenv("AWS_SECRET_ACCESS_KEY")
+        region = region or os.getenv("AWS_DEFAULT_REGION", "ap-northeast-2")
+        bucket_arn = bucket_arn or os.getenv("AWS_S3_ACCESS_POINT_ARN")
+        base_prefix = base_prefix or f"{os.getenv('S3_BASE_PREFIX')}/{os.getenv('S3_APP_PREFIX')}/preprocessed_jsons/"
 
         if not access_key_id or not secret_access_key:
             raise ValueError(
                 "AWS 자격 증명 필요: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY 환경변수 설정"
             )
+        if not bucket_arn:
+            raise ValueError("AWS_S3_ACCESS_POINT_ARN 환경변수 설정 필요")
 
         self.s3 = boto3.client(
             "s3",

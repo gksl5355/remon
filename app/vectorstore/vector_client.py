@@ -67,16 +67,16 @@ class VectorClient:
     """
 
     def __init__(
-        self, collection_name: str = QDRANT_COLLECTION, use_local: bool = None
+        self, collection_name: str = None, use_local: bool = None
     ):
         """
         Qdrant 클라이언트 초기화.
 
         Args:
-            collection_name: 컬렉션 이름
+            collection_name: 컬렉션 이름 (None이면 환경변수 사용)
             use_local: True면 로컬 저장소, False면 원격 서버, None이면 환경변수 사용
         """
-        self.collection_name = collection_name
+        self.collection_name = collection_name or QDRANT_COLLECTION
 
         if use_local is None:
             use_local = QDRANT_USE_LOCAL
@@ -85,17 +85,24 @@ class VectorClient:
             self.client = QdrantClient(path=QDRANT_PATH)
             logger.info(f"✅ Qdrant 로컬 모드: {QDRANT_PATH}")
         else:
+            # 원격 연결: URL 기반 (HTTPS 자동) + API Key 인증
+            qdrant_url = os.getenv("QDRANT_URL", f"https://{QDRANT_HOST}")
+            
             if QDRANT_API_KEY:
-                import httpx
                 self.client = QdrantClient(
+                    url=qdrant_url,
                     api_key=QDRANT_API_KEY,
                     timeout=30,
-                    https=httpx.Client(verify=False)
+                    prefer_grpc=False
                 )
-                logger.info(f"✅ Qdrant 서버 모드 (API Key, SSL verify=False): https://{QDRANT_HOST}")
+                logger.info(f"✅ Qdrant 원격 모드 (API Key 인증): {qdrant_url}")
             else:
-                self.client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
-                logger.info(f"✅ Qdrant 서버 모드: {QDRANT_HOST}:{QDRANT_PORT}")
+                self.client = QdrantClient(
+                    url=qdrant_url,
+                    timeout=30,
+                    prefer_grpc=False
+                )
+                logger.info(f"✅ Qdrant 원격 모드 (인증 없음): {qdrant_url}")
         """컬렉션 생성 (없으면)."""
         collections = self.client.get_collections().collections
         exists = any(c.name == self.collection_name for c in collections)

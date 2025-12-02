@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class DualIndexer:
     """Vector + Graph 동시 저장."""
     
-    def __init__(self, collection_name: str = "remon_regulations"):
+    def __init__(self, collection_name: str = "skala-2.4.17-regulation"):
         self.collection_name = collection_name
         
     def index(
@@ -71,9 +71,11 @@ class DualIndexer:
             })
             metadatas.append(metadata)
         
-        # Qdrant 저장 (로컬만)
-        logger.info(f"Qdrant 로컬 저장 중: {self.collection_name}")
+        # Qdrant 저장 (로컬 + 원격)
+        storage_locations = []
         
+        # 로컬 저장
+        logger.info(f"Qdrant 로컬 저장 중: {self.collection_name}")
         local_client = VectorClient(collection_name=self.collection_name, use_local=True)
         local_client.insert(
             texts=texts,
@@ -82,6 +84,22 @@ class DualIndexer:
             sparse_embeddings=embeddings_result.get("sparse")
         )
         logger.info("✅ 로컬 Qdrant 저장 완료")
+        storage_locations.append("local")
+        
+        # 원격 저장
+        try:
+            logger.info(f"Qdrant 원격 저장 중: {self.collection_name}")
+            remote_client = VectorClient(collection_name=self.collection_name, use_local=False)
+            remote_client.insert(
+                texts=texts,
+                dense_embeddings=embeddings_result["dense"],
+                metadatas=metadatas,
+                sparse_embeddings=embeddings_result.get("sparse")
+            )
+            logger.info("✅ 원격 Qdrant 저장 완료")
+            storage_locations.append("remote")
+        except Exception as e:
+            logger.warning(f"⚠️ 원격 Qdrant 저장 실패 (로컬만 저장됨): {e}")
         
         # Graph 저장 (추후 구현)
         graph_summary = self._store_graph(graph_data)
@@ -93,7 +111,7 @@ class DualIndexer:
             "graph_nodes": graph_summary["nodes"],
             "graph_edges": graph_summary["edges"],
             "collection_name": self.collection_name,
-            "storage_locations": ["local"],
+            "storage_locations": storage_locations,
             "processed_at": datetime.utcnow().isoformat() + "Z"
         }
         

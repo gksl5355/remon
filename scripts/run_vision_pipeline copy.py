@@ -20,6 +20,7 @@ from pathlib import Path
 import sys
 from datetime import datetime
 import os
+from typing import Optional
 
 # 프로젝트 루트를 sys.path에 추가
 project_root = Path(__file__).parent.parent
@@ -436,7 +437,7 @@ async def main():
 
     # 컬렉션명 설정
     collection_name = args.collection or os.getenv(
-        "QDRANT_COLLECTION", "remon_regulations"
+        "QDRANT_COLLECTION", "skala-2.4.17-regulation"
     )
 
     # Orchestrator 생성
