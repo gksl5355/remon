@@ -4,8 +4,7 @@ Manual end-to-end runner for the LangGraph pipeline.
 
 Usage example:
     uv run python scripts/run_full_pipeline.py \
-        --pdf data/1_sample_data.pdf \
-        --product-json tests/data/sample_products.json
+        --pdf data/1_sample_data.pdf 
 
 Options:
     --use-db            Fetch product via ProductRepository (requires DB)
@@ -118,7 +117,29 @@ def _build_state(
     if use_db:
         if not product_id:
             raise ValueError("--product-id is required with --use-db")
+   
+        state["product_info"] = {
+            "product_id": product_id,
+            "product_name": f"Product-{product_id}",  # 최소 placeholder
+
+            "mapping": {
+                "present_state": {
+                    "nicotin": 0.8,
+                    "tarr": 8.0,
+                },
+                "target": {
+                    "nicotin": None,
+                    "tarr": None,
+                }
+            },
+            "feature_units": {
+                "nicotin": "mg",
+                "tarr": "mg",
+            },
+        }
+
         state["mapping_filters"] = {"product_id": product_id}
+
     else:
         if not product_json:
             raise ValueError("--product-json is required when not using DB")
@@ -168,12 +189,16 @@ async def main() -> None:
     if not pdf_path.exists():
         raise FileNotFoundError(pdf_path)
 
-    state = _build_state(
+    raw_state = _build_state(
         pdf_path=pdf_path,
         use_db=args.use_db,
         product_json=args.product_json,
         product_id=args.product_id,
     )
+
+    state = AppState()
+    for key, value in raw_state.items():
+        state[key] = value
 
     mapping_context: Dict[str, Any] = {}
     if args.stub_llm:
@@ -208,6 +233,9 @@ async def main() -> None:
 
     strategies = result.get("strategies") or result.get("strategy")
     logger.info("Strategies: %s", strategies)
+
+    impact_scores = result.get("impact_scores")
+    logger.info("Impact scores: %s", impact_scores)
 
     report = result.get("report")
     if report:
