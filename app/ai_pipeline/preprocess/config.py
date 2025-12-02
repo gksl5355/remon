@@ -251,3 +251,6 @@ class PreprocessConfig:
             "path": cls.QDRANT_PATH,
             "collection": cls.QDRANT_COLLECTION,
         }
+
+        
+    

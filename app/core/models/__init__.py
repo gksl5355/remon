@@ -8,7 +8,8 @@ from app.core.database import Base
 # (모델 파일들이 Base를 상속받아 정의되어 있어야 함)
 from .admin_model import AdminUser
 from .country_model import Country
-from .product_model import Product, ProductExportCountry
+from .product_model import Product
+# ProductExportCountry 삭제
 from .data_source_model import DataSource, CrawlJob, CrawlLog
 from .regulation_model import (
     Regulation, 
@@ -26,7 +27,7 @@ __all__ = [
     "AdminUser",
     "Country",
     "Product",
-    "ProductExportCountry",
+    # "ProductExportCountry",
     "DataSource",
     "CrawlJob",
     "CrawlLog",

@@ -14,7 +14,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from app.core.models import Base
 from app.core.models.admin_model import AdminUser
 from app.core.models.country_model import Country
-from app.core.models.product_model import Product, ProductExportCountry
+from app.core.models.product_model import Product
+#  ProductExportCountry 삭제
 from app.core.models.data_source_model import DataSource, CrawlJob, CrawlLog
 from app.core.models.regulation_model import (
     Regulation, 
