@@ -10,7 +10,7 @@ class Country(Base):
     
     # Relationships////////:100  varchar
     regulations = relationship("Regulation", back_populates="country")
-    product_exports = relationship("ProductExportCountry", back_populates="country")
+    # product_exports = relationship("ProductExportCountry", back_populates="country")
     reports = relationship("Report", back_populates="country")
 
     # [추가] 이제 국가가 여러 제품을 가집니다 (1:N)

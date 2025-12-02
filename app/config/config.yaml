@@ -1,68 +1,119 @@
 # [Tavily API 설정]
-# API 키는 .env에서 로드됩니다.
+# API 키는 .env에서 로드됨
 
 targets:
-  # ==========================================
-  # 1. 미국 (USA) - 제품 규격 및 세금/유통
-  # ==========================================
-  
-  # [Main 1] FDA (식품의약국) - 담배 제품 규격, PMTA, 경고문구
-  # 요청하신 URL: www.fda.gov/tobacco-products/...
+  # 1. 미국 FDA
   - country: "USA FDA Official"
-    code: "US_FDA"
+    code: "US"  # [수정] US_FDA -> US (DB가 2글자만 받으므로 수정 필수)
     enabled: true
     category: "regulation"
     keywords:
-      # FDA 사이트 내 '담배' 섹션에서 PDF/문서 검색
       - "site:fda.gov/tobacco-products final rule filetype:pdf"
       - "site:fda.gov guidance for industry tobacco pdf"
-      - "site:fda.gov PMTA marketing order summary"
 
-  # [Main 2] GovInfo / TTB (주류담배세금무역국) - Title 27 CFR (세금, 제조 허가)
-  # 요청하신 URL: www.govinfo.gov/app/collection/cfr/.../title27
+  # 2. 미국 TTB (Title 27)
   - country: "USA TTB/CFR Title 27"
-    code: "US_TTB"
+    code: "US"  # [수정] US_TTB -> US
     enabled: true
     category: "regulation"
     keywords:
-      # Title 27(알코올/담배) 관련 최신 연방 규정집 검색
       - "site:govinfo.gov CFR Title 27 tobacco products pdf"
-      - "site:ttb.gov tobacco industry circular pdf" # TTB 공식 업계 회람
 
-  # [추천 추가] Federal Register (연방 관보) - 법 개정 알림 (가장 빠름)
+  # 3. 미국 연방 관보
   - country: "USA Federal Register"
-    code: "US_FED_REG"
+    code: "US"  # [수정] US_FED_REG -> US
+    enabled: true
+    category: "news"
+    keywords:
+      - "site:federalregister.gov tobacco products final rule"
+
+  # 4. 러시아 EAEU
+  - country: "Russia EAEU"
+    code: "RU"  # [수정] RU_EAEU -> RU
     enabled: true
     category: "regulation"
     keywords:
-      # 담배 관련 '최종 규칙(Final Rule)' 및 '제안된 규칙(Proposed Rule)'
-      - "site:federalregister.gov tobacco products final rule 2024 2025"
-      - "site:federalregister.gov electronic nicotine delivery systems regulation"
-
-  # ==========================================
-  # 2. 러시아 (Russia) - 기술 규정 및 집행
-  # ==========================================
-
-  # [Main] EAEU (유라시아 경제 연합) - TR CU 035/2014 (담배 기술 규정)
-  # 요청하신 URL: eec.eaeunion.org/.../tabac.php
-  - country: "Russia EAEU Technical Reg"
-    code: "RU_EAEU"
-    enabled: true
-    category: "regulation"
-    keywords:
-      # EAEU 사이트 내 담배 기술 규정 원문 및 개정안
       - "site:eec.eaeunion.org TR CU 035/2014 tobacco pdf"
-      - "site:eec.eaeunion.org Технический регламент на табачную продукцию"
 
-  # [추천 추가] Rospotrebnadzor (러시아 소비자 감독국) - 단속/집행
+  # 5. 러시아 집행
   - country: "Russia Enforcement"
-    code: "RU_ENFORCE"
+    code: "RU"  # [수정] RU_ENFORCE -> RU
     enabled: true
     category: "regulation"
     keywords:
-      # 담배/니코틴 함유 제품 단속 정보
-      - "site:rospotrebnadzor.ru табачная продукция (tobacco products) regulation"
-      - "site:rospotrebnadzor.ru никотинсодержащая продукция (nicotine products) control"
+      - "site:rospotrebnadzor.ru tobacco regulation control"
+
+
+
+    # ...
+    # code가 'US'로 들어오면 DB 체크 후 정상 처리됨
+    # code가 'US_FDA'로 들어오면 DB 크기 초과 에러 발생 (이게 문제였음)
+
+# # [Tavily API 설정]
+# # API 키는 .env에서 로드됩니다.
+
+# targets:
+#   # ==========================================
+#   # 1. 미국 (USA) - 제품 규격 및 세금/유통
+#   # ==========================================
+  
+#   # [Main 1] FDA (식품의약국) - 담배 제품 규격, PMTA, 경고문구
+#   # 요청하신 URL: www.fda.gov/tobacco-products/...
+#   - country: "USA FDA Official"
+#     code: "US_FDA"
+#     enabled: true
+#     category: "regulation"
+#     keywords:
+#       # FDA 사이트 내 '담배' 섹션에서 PDF/문서 검색
+#       - "site:fda.gov/tobacco-products final rule filetype:pdf"
+#       - "site:fda.gov guidance for industry tobacco pdf"
+#       - "site:fda.gov PMTA marketing order summary"
+
+#   # [Main 2] GovInfo / TTB (주류담배세금무역국) - Title 27 CFR (세금, 제조 허가)
+#   # 요청하신 URL: www.govinfo.gov/app/collection/cfr/.../title27
+#   - country: "USA TTB/CFR Title 27"
+#     code: "US_TTB"
+#     enabled: true
+#     category: "regulation"
+#     keywords:
+#       # Title 27(알코올/담배) 관련 최신 연방 규정집 검색
+#       - "site:govinfo.gov CFR Title 27 tobacco products pdf"
+#       - "site:ttb.gov tobacco industry circular pdf" # TTB 공식 업계 회람
+
+#   # [추천 추가] Federal Register (연방 관보) - 법 개정 알림 (가장 빠름)
+#   - country: "USA Federal Register"
+#     code: "US_FED_REG"
+#     enabled: true
+#     category: "regulation"
+#     keywords:
+#       # 담배 관련 '최종 규칙(Final Rule)' 및 '제안된 규칙(Proposed Rule)'
+#       - "site:federalregister.gov tobacco products final rule 2024 2025"
+#       - "site:federalregister.gov electronic nicotine delivery systems regulation"
+
+#   # ==========================================
+#   # 2. 러시아 (Russia) - 기술 규정 및 집행
+#   # ==========================================
+
+#   # [Main] EAEU (유라시아 경제 연합) - TR CU 035/2014 (담배 기술 규정)
+#   # 요청하신 URL: eec.eaeunion.org/.../tabac.php
+#   - country: "Russia EAEU Technical Reg"
+#     code: "RU_EAEU"
+#     enabled: true
+#     category: "regulation"
+#     keywords:
+#       # EAEU 사이트 내 담배 기술 규정 원문 및 개정안
+#       - "site:eec.eaeunion.org TR CU 035/2014 tobacco pdf"
+#       - "site:eec.eaeunion.org Технический регламент на табачную продукцию"
+
+#   # [추천 추가] Rospotrebnadzor (러시아 소비자 감독국) - 단속/집행
+#   - country: "Russia Enforcement"
+#     code: "RU_ENFORCE"
+#     enabled: true
+#     category: "regulation"
+#     keywords:
+#       # 담배/니코틴 함유 제품 단속 정보
+#       - "site:rospotrebnadzor.ru табачная продукция (tobacco products) regulation"
+#       - "site:rospotrebnadzor.ru никотинсодержащая продукция (nicotine products) control"
 
 # targets:
 #   # 1. [Main] FDA CTP (Center for Tobacco Products)
