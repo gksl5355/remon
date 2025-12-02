@@ -37,6 +37,7 @@ from app.ai_pipeline.nodes.llm import llm
 from app.ai_pipeline.tools.hybrid_retriever import HybridRetriever
 from app.ai_pipeline.tools.strategy_history import StrategyHistoryTool  
 
+from app.ai_pipeline.prompts.strategy_prompt import STRATEGY_PROMPT
 
 #----------------------------------------------------------------------
 # 설정
@@ -155,66 +156,23 @@ def _build_llm_prompt(
     history_strategies: List[str],
 ) -> str:
 
-    products_block = "\n".join(f"- {p}" for p in products) if products else "- (no mapped products)"
+    products_block = (
+        "\n".join(f"- {p}" for p in products) 
+        if products else "- (no mapped products)"
+    )
     history_block = (
         "\n".join(f"- {s}" for s in history_strategies)
         if history_strategies
         else "- (no relevant historical strategies)"
     )
 
-    prompt = f"""
-You are a senior regulatory compliance strategy consultant
-specializing in global tobacco and nicotine regulations.
+    prompt = STRATEGY_PROMPT.format(
+        regulation_summary=regulation_summary,
+        products_block=products_block,
+        history_block=history_block,
+    )
 
-Generate **actionable, product-specific compliance strategies**
-based on the information below.
-
-[REGULATION SUMMARY]
-{regulation_summary.strip()}
-
-[MAPPED PRODUCTS]
-{products_block}
-
-[REFERENCE: HISTORICAL STRATEGIES]
-{history_block}
-
-[REQUIREMENTS]
-1. Provide strategies that are immediately executable actions  
-   (e.g., "Establish a reformulation plan…", "Initiate inventory withdrawal…",  
-   "Prepare updated packaging…").
-
-2. Consider both compliance (legal) requirements and business impact mitigation.
-
-3. Output format: **one strategy per line**  
-   (no bullets or numbering needed by the LLM; the parser will handle extraction).
-
-4. When the regulation contains explicit numerical values  
-   (e.g., nicotine concentration %, tar mg, warning label area %,  
-   allowed advertising period, maximum refill volume, etc.),  
-   you must reflect those numbers **exactly as stated**.  
-   - Do NOT invent new numbers, percentages, limits, or thresholds.  
-   - If the regulation provides no numbers, do NOT introduce any.
-
-5. Each strategy must describe a **concrete, actionable operational task**.  
-   - Examples: update packaging/labeling, conduct additional testing,  
-     execute inventory depletion, adjust product formulation,  
-     update online/offline product descriptions.  
-   - Avoid vague principles such as "enhance compliance" or  
-     "improve internal processes." Every line must be an action  
-     that a real operational team can immediately execute.
-
-6. Use the [REFERENCE: HISTORICAL STRATEGIES] only when they are relevant.  
-   - Do NOT include historical strategies that do not match the current regulation  
-     or the mapped products.  
-   - If proposing new strategies, they must be clearly grounded in  
-     either (a) the current regulation + products, or  
-     (b) patterns observed in the historical strategies.
-
-Now generate the strategies.
-"""
     return textwrap.dedent(prompt).strip()
-
-
 
 #----------------------------------------------------------------------
 # 유틸: history payload -> 과거 전략 리스트 추출
@@ -275,16 +233,17 @@ def generate_strategy_node(state: AppState) -> Dict[str, Any]:
     #   - 공식 필드: state["mapping"]
     #   - 레거시 호환: state["mapping_results"] (있다면 fallback)
     mapping_results = getattr(state, "mapping", None)
+
     if mapping_results is None and isinstance(state, dict):
         mapping_results = state.get("mapping") or state.get("mapping_results")
 
-    if not mapping_results:
+    if mapping_results is None:
         raise ValueError(
             "state.mapping 이 비어 있습니다. "
             "map_products 노드 결과가 필요합니다."
         )
     
-    items: List[Dict[str, Any]] = mapping_results.get("items") or []
+    items = mapping_results["items"]
 
     # 매핑 결과가 하나도 없는 경우: 파이프라인은 계속 진행하되, 전략은 빈 리스트로 반환
     if not items:
@@ -303,8 +262,8 @@ def generate_strategy_node(state: AppState) -> Dict[str, Any]:
         raise ValueError("MappingItem.regulation_summary 가 비어 있습니다.")
 
     # 제품 리스트: 현재 파이프라인은 단일 product 기준이므로 product_id 하나만 리스트로 사용
-    product_id = mapping_results.get("product_id")
-    mapped_products: List[str] = [product_id] if product_id else []
+    product_name = state.get("product_info", {}).get("product_name")
+    mapped_products = [product_name] if product_name else []
 
     # 2) history 검색 (HybridRetriever)
     query_text = _build_query_text(regulation_summary, mapped_products)
@@ -336,11 +295,17 @@ def generate_strategy_node(state: AppState) -> Dict[str, Any]:
     history_strategies = _extract_history_strategies(history_results)
 
     # 3) LLM 호출하여 새로운 대응 전략 생성
-    prompt = _build_llm_prompt(
-        regulation_summary=regulation_summary,
-        products=mapped_products,
-        history_strategies=history_strategies,
-    )
+    refined_prompt = state.get("refined_generate_strategy_prompt")
+
+    if refined_prompt:
+        print("[Strategy] Using REFINED STRATEGY PROMPT from validator")
+        prompt = refined_prompt
+    else:
+        prompt = _build_llm_prompt(
+            regulation_summary=regulation_summary,
+            products=mapped_products,
+            history_strategies=history_strategies,
+        )
 
     raw_output = llm.invoke(prompt)
 
@@ -351,6 +316,10 @@ def generate_strategy_node(state: AppState) -> Dict[str, Any]:
         raw_output_text = str(raw_output)
 
     new_strategies = _parse_strategies(raw_output_text)
+
+    # refined prompt 성공 후 제거
+    if state.get("refined_generate_strategy_prompt"):
+        state["refined_generate_strategy_prompt"] = None
 
     # 4) Qdrant history 저장 (실패해도 파이프라인은 계속 진행)
     try:
@@ -364,4 +333,8 @@ def generate_strategy_node(state: AppState) -> Dict[str, Any]:
 
     # LangGraph 에서는 이 dict 이 AppState 에 merge 됨
     # (state["strategies"]: List[str])
-    return {"strategies": new_strategies}
+    state["strategies"] = new_strategies
+    
+    return state
+
+ 

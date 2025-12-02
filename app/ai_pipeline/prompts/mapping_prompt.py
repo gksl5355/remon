@@ -42,3 +42,15 @@ Rules:
 - If the feature is unrelated, applies=false.
 Output only the JSON.
 """
+
+MAPPING_SCHEMA = {
+    "applies": "boolean",
+    "required_value": "number | string | null",
+    "current_value": "number | string | null",
+    "gap": "number | null",
+    "parsed": {
+        "category": "string | null",
+        "requirement_type": ["max", "min", "range", "boolean", "other"],
+        "condition": "string | null"
+    }
+}

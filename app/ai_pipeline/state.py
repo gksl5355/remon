@@ -160,3 +160,6 @@ class AppState(TypedDict, total=False):
     # change detection
     change_context: Dict[str, Any]
     change_detection: Dict[str, Any]
+    #validation
+    validation_result: Optional[Dict[str, Any]]
+    validation_retry_count: int = 0

@@ -1,4 +1,4 @@
-IMPACT_PROMPT_TEMPLATE = """
+IMPACT_PROMPT = """
 You are a senior regulatory impact analyst specializing in nicotine, tobacco, 
 public health regulations, and product compliance. Your role is to evaluate the 
 business, legal, and operational impact of regulatory changes using a 
@@ -79,3 +79,46 @@ OUTPUT (JSON ONLY)
   "reasoning": "..."
 }}
 """
+
+IMPACT_SCHEMA = {
+    "directness": {
+        "type": "integer",
+        "allowed_values": [0, 1],
+        "description": "Direct impact to product formulation/packaging/etc."
+    },
+
+    "legal_severity": {
+        "type": "integer",
+        "range": [1, 5],
+        "description": "Level of legal penalty severity"
+    },
+
+    "scope": {
+        "type": "integer",
+        "range": [1, 5],
+        "description": "Sales exposure impact score"
+    },
+
+    "regulatory_urgency": {
+        "type": "integer",
+        "range": [1, 5],
+        "description": "Urgency based on months_left"
+    },
+
+    "operational_urgency": {
+        "type": "integer",
+        "range": [1, 5],
+        "description": "Complexity of operational response"
+    },
+
+    "response_cost": {
+        "type": "integer",
+        "range": [1, 5],
+        "description": "Estimated operational or CAPEX response cost"
+    },
+
+    "reasoning": {
+        "type": "string",
+        "description": "Explanation grounded in regulation, mapping, and strategy"
+    }
+}
