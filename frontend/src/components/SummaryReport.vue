@@ -181,7 +181,7 @@ const sectionClass = (type) => {
 </script>
 
 <style scoped>
-@reference "tailwindcss";
+/* @reference "tailwindcss"; */
 
 table {
   width: 100%;
