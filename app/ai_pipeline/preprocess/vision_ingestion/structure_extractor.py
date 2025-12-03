@@ -31,7 +31,6 @@ class ExtractedTable(BaseModel):
 class ReferenceBlock(BaseModel):
     """Reference Block (비교 단위)."""
     section_ref: str
-    text: str
     start_line: int
     end_line: int
     keywords: List[str] = Field(default_factory=list)
@@ -87,24 +86,25 @@ Analyze the document image and extract structured data following DDH (Division-D
 - **Subsection**: Use `#### (a)`, `#### (b)` for lettered subsections
 - **Paragraph**: Use `##### (1)`, `##### (2)` for numbered paragraphs
 
-**Preserve original text exactly:**
-- Keep all section numbers, citations, and legal references
-- Maintain paragraph structure and line breaks
-- Do NOT summarize or paraphrase
+**CRITICAL: NEVER SUMMARIZE. Extract FULL original text word-by-word.**
+- Keep ALL section numbers, citations, and legal references
+- Maintain ALL paragraph structure and line breaks
+- Do NOT summarize, paraphrase, or use "..." ellipsis
+- Extract COMPLETE sentences and paragraphs
+- NEVER use phrases like "Comments on these topics..." or "This section describes..."
 
 **Table handling:**
 - Insert table placeholder: `[TABLE: Table 1 - Nicotine Limits]`
 - Full table data goes in "tables" array
 
-## 2. Reference Blocks (Metadata for Chunking)
-**Purpose**: Provide metadata for each semantic unit WITHOUT duplicating full text.
+## 2. Reference Blocks (Index for Chunking)
+**Purpose**: Provide section index and keywords WITHOUT duplicating text.
 - `section_ref`: Section identifier (e.g., "§ 1141.1(a)", "Table 1")
-- `text`: BRIEF summary or first sentence (max 200 chars)
 - `start_line`: Approximate line number in markdown
 - `end_line`: Approximate end line
 - `keywords`: Key terms for search (3-5 terms)
 
-**Note**: Full text is in markdown_content. Reference blocks are INDEX ONLY.
+**Note**: Full text is in markdown_content. Reference blocks are INDEX ONLY (no text field).
 
 ## 3. Metadata (Complete Document Information)
 **Extract ALL available fields:**
@@ -161,8 +161,8 @@ Extract organizations, regulations, chemicals, numbers:
 {
   "markdown_content": "# Title 21\\n## Chapter I\\n### § 1141.1 Scope\\n(a) This part sets forth...\\n\\n[TABLE: Table 1]\\n\\n### § 1141.2 Definitions\\n...",
   "reference_blocks": [
-    {"section_ref": "§ 1141.1(a)", "text": "Requirements for health warnings...", "start_line": 5, "end_line": 10, "keywords": ["health warnings", "cigarette packages"]},
-    {"section_ref": "Table 1", "text": "Maximum concentration limits", "start_line": 15, "end_line": 20, "keywords": ["nicotine", "limits", "concentration"]}
+    {"section_ref": "§ 1141.1(a)", "start_line": 5, "end_line": 10, "keywords": ["health warnings", "cigarette packages"]},
+    {"section_ref": "Table 1", "start_line": 15, "end_line": 20, "keywords": ["nicotine", "limits", "concentration"]}
   ],
   "metadata": {
     "document_id": null,
@@ -191,9 +191,10 @@ Extract organizations, regulations, chemicals, numbers:
 **CRITICAL REMINDERS:**
 1. Return ONLY the JSON object (no ```json wrapper)
 2. All metadata fields must be present (use null if unknown)
-3. markdown_content contains FULL original text
-4. reference_blocks are INDEX/METADATA only (brief summaries)
-5. Tables go in both markdown (as placeholder) and tables array (full data)"""
+3. markdown_content contains FULL original text (NO SUMMARIZATION, NO "..." ELLIPSIS)
+4. reference_blocks contain section_ref + keywords ONLY (no text field)
+5. Tables go in both markdown (as placeholder) and tables array (full data)
+6. NEVER use phrases like "Comments on these topics..." - extract COMPLETE text"""
 
     SYSTEM_PROMPT_RU = """You are a regulatory document structure expert specializing in Russian regulatory formats (GOST, GOST R standards).
 
@@ -208,26 +209,30 @@ Analyze the Russian regulatory document image and extract structured data follow
 - **Section**: Use `## Раздел 1` or `## Section 1`
 - **Subsection**: Use `### 1.1 Общие положения`
 - **Paragraph**: Use `#### 1.1.1` for numbered paragraphs
+- **Document Requisites**: Use `### 01 Государственный герб`, `### 16 Гриф утверждения` (preserve original numbering)
 
-**Preserve original text exactly:**
-- Keep all section numbers, citations, and legal references
-- Maintain paragraph structure and line breaks
-- Do NOT summarize or paraphrase
+**CRITICAL: NEVER SUMMARIZE. Extract FULL original text word-by-word.**
+- Keep ALL section numbers, citations, and legal references
+- Maintain ALL paragraph structure and line breaks
+- Do NOT summarize, paraphrase, or use "..." ellipsis
+- Extract COMPLETE sentences and paragraphs
 - Preserve Cyrillic characters correctly
+- Keep dimension values as-is (e.g., "20 mm", "12 pt", "1.0 ~ 1.5")
 
 **Table handling:**
 - Insert table placeholder: `[TABLE: Таблица 1 - Реквизиты]`
 - Full table data goes in "tables" array
 
-## 2. Reference Blocks (Metadata for Chunking)
-**Purpose**: Provide metadata for each semantic unit WITHOUT duplicating full text.
-- `section_ref`: Section identifier (e.g., "1.1.1", "Таблица 1")
-- `text`: BRIEF summary or first sentence (max 200 chars)
+## 2. Reference Blocks (Index for Chunking)
+**Purpose**: Provide section index and keywords WITHOUT duplicating text.
+- `section_ref`: Section identifier (e.g., "1.1.1", "Таблица 1", "16 Гриф утверждения")
 - `start_line`: Approximate line number in markdown
 - `end_line`: Approximate end line
 - `keywords`: Key terms for search (3-5 terms in Russian)
+  - Include dimensions if found: ["поля", "20mm", "шрифт", "12pt"]
+  - Include requisite keywords: ["УТВЕРЖДАЮ", "подпись", "дата"]
 
-**Note**: Full text is in markdown_content. Reference blocks are INDEX ONLY.
+**Note**: Full text is in markdown_content. Reference blocks are INDEX ONLY (no text field).
 
 ## 3. Metadata (Extract from EACH page independently)
 **CRITICAL: Extract document metadata visible on THIS page only.**
@@ -261,11 +266,12 @@ Analyze the Russian regulatory document image and extract structured data follow
 **Field rules:**
 - Use `null` if information not found (do NOT omit fields)
 - `jurisdiction_code`: "RU" for Russia
-- `authority`: Full agency name in Russian
+- `authority`: Full agency name in Russian (e.g., "Росстандарт")
 - `citation_code`: Official GOST citation (e.g., "ГОСТ Р 7.0.97-2025")
 - `language`: "ru" for Russian
-- Dates: YYYY-MM-DD format
+- Dates: YYYY-MM-DD format (convert from DD.MM.YYYY if needed)
 - `page_range`: [start_page, end_page] if multi-page document
+- `keywords`: Include layout parameters if found (e.g., ["поля-20mm", "шрифт-12pt", "интервал-1.5"])
 
 ## 4. Entities
 Extract organizations, standards, terms:
@@ -289,7 +295,8 @@ Extract organizations, standards, terms:
 {
   "markdown_content": "# ГОСТ Р 7.0.97-2025\\n## Раздел 1\\n### 1.1 Общие положения\\n...",
   "reference_blocks": [
-    {"section_ref": "1.1", "text": "Общие положения...", "start_line": 5, "end_line": 10, "keywords": ["документ", "реквизиты"]}
+    {"section_ref": "1.1", "start_line": 5, "end_line": 10, "keywords": ["документ", "реквизиты"]},
+    {"section_ref": "16 Гриф утверждения", "start_line": 25, "end_line": 30, "keywords": ["УТВЕРЖДАЮ", "утверждение", "подпись"]}
   ],
   "metadata": {
     "document_id": null,
@@ -318,45 +325,45 @@ Extract organizations, standards, terms:
 **CRITICAL REMINDERS:**
 1. Return ONLY the JSON object (no ```json wrapper)
 2. All metadata fields must be present (use null if unknown)
-3. markdown_content contains FULL original text in Russian
-4. reference_blocks are INDEX/METADATA only (brief summaries)
+3. markdown_content contains FULL original text in Russian (NO SUMMARIZATION, NO "..." ELLIPSIS, preserve dimensions)
+4. reference_blocks contain section_ref + keywords ONLY (no text field)
 5. Tables go in both markdown (as placeholder) and tables array (full data)
-6. Preserve Cyrillic characters correctly"""
+6. Preserve Cyrillic characters correctly
+7. Extract layout parameters (margins, fonts, spacing) to keywords array"""
 
     SYSTEM_PROMPT_ID = """You are a regulatory document structure expert specializing in Indonesian regulatory formats (UU, PP, Peraturan Menteri, Peraturan Daerah).
 
 **CRITICAL: You MUST return ONLY a valid JSON object. No markdown code blocks, no explanations, ONLY the JSON.**
 
 ## Task Overview
-Analyze the Indonesian regulatory document image and extract structured data following Indonesian legal drafting standards (UU No. 12/2011).
+Analyze the Indonesian regulatory document image and extract structured data following Indonesian legal drafting patterns.
 
-## 1. Markdown Content (Indonesian Legal Pattern Recognition)
+## 1. Markdown Content (Indonesian Legal Pattern)
 **Identify and label hierarchical structure:**
-- **Regulation ID**: Use `# UU No. 12 Tahun 2011` or `# PP No. 45 Tahun 2023`
-- **BAB**: Use `## BAB I KETENTUAN UMUM`
+- **Regulation ID**: Use `# UU No. 12 Tahun 2011`
+- **BAB**: Use `## BAB I - KETENTUAN UMUM`
 - **Pasal**: Use `### Pasal 1`
-- **Ayat**: Use `#### (1)`, `#### (2)` for numbered ayat
-- **Huruf**: Use `##### a.`, `##### b.` for lettered subsections
+- **Ayat**: Use `#### (1)`, `#### (2)` for numbered paragraphs
 
-**Preserve original text exactly:**
-- Keep all pasal numbers, citations, and legal references
-- Maintain paragraph structure and line breaks
-- Do NOT summarize or paraphrase
+**CRITICAL: NEVER SUMMARIZE. Extract FULL original text word-by-word.**
+- Keep ALL section numbers, citations, and legal references
+- Maintain ALL paragraph structure and line breaks
+- Do NOT summarize, paraphrase, or use "..." ellipsis
+- Extract COMPLETE sentences and paragraphs
 - Preserve Indonesian legal terminology correctly
 
 **Table handling:**
-- Insert table placeholder: `[TABLE: Tabel 1 - Ketentuan]`
+- Insert table placeholder: `[TABLE: Tabel 1 - Hierarki Peraturan]`
 - Full table data goes in "tables" array
 
-## 2. Reference Blocks (Metadata for Chunking)
-**Purpose**: Provide metadata for each semantic unit WITHOUT duplicating full text.
+## 2. Reference Blocks (Index for Chunking)
+**Purpose**: Provide section index and keywords WITHOUT duplicating text.
 - `section_ref`: Section identifier (e.g., "Pasal 1", "BAB I", "Tabel 1")
-- `text`: BRIEF summary or first sentence (max 200 chars)
 - `start_line`: Approximate line number in markdown
 - `end_line`: Approximate end line
 - `keywords`: Key terms for search (3-5 terms in Indonesian)
 
-**Note**: Full text is in markdown_content. Reference blocks are INDEX ONLY.
+**Note**: Full text is in markdown_content. Reference blocks are INDEX ONLY (no text field).
 
 ## 3. Metadata (Extract from EACH page independently)
 **CRITICAL: Extract document metadata visible on THIS page only.**
@@ -418,7 +425,7 @@ Extract organizations, regulations, legal terms:
 {
   "markdown_content": "# UU No. 12 Tahun 2011\\n## BAB I\\n### Pasal 1\\n(1) Dalam Undang-Undang ini yang dimaksud dengan...\\n\\n[TABLE: Tabel 1]",
   "reference_blocks": [
-    {"section_ref": "Pasal 1", "text": "Ketentuan umum...", "start_line": 5, "end_line": 10, "keywords": ["ketentuan", "umum"]}
+    {"section_ref": "Pasal 1", "start_line": 5, "end_line": 10, "keywords": ["ketentuan", "umum"]}
   ],
   "metadata": {
     "document_id": null,
@@ -452,6 +459,8 @@ Extract organizations, regulations, legal terms:
 5. Tables go in both markdown (as placeholder) and tables array (full data)
 6. Preserve Indonesian legal terminology correctly"""
 
+
+
     # 기본 프롬프트 (하위 호환성)
     SYSTEM_PROMPT = SYSTEM_PROMPT_US
 
@@ -466,12 +475,12 @@ You will receive MULTIPLE document pages as images. Extract structured data for 
 
 ### 1. Markdown Content (DDH Pattern)
 - Use `#` for Title/Part, `##` for Chapter/Subpart, `###` for Section (§)
-- Preserve original text exactly (no summarization)
+- Extract FULL original text (NO SUMMARIZATION, NO "..." ELLIPSIS)
 - Insert `[TABLE: caption]` for tables
 
 ### 2. Reference Blocks (Index Only)
 - Brief metadata for each section/table
-- `section_ref`, `text` (max 200 chars), `start_line`, `end_line`, `keywords`
+- `section_ref`, `start_line`, `end_line`, `keywords`
 
 ### 3. Metadata (Extract from EACH page independently)
 **CRITICAL: Extract document metadata visible on THIS page only.**
@@ -513,7 +522,7 @@ You will receive MULTIPLE document pages as images. Extract structured data for 
   {
     "page_index": 0,
     "markdown_content": "# Title 21\\n### § 1141.1 Scope\\n(a) This part sets forth...\\n\\n[TABLE: Table 1]",
-    "reference_blocks": [{"section_ref": "§ 1141.1(a)", "text": "Requirements for...", "start_line": 5, "end_line": 10, "keywords": ["health warnings"]}],
+    "reference_blocks": [{"section_ref": "§ 1141.1(a)", "start_line": 5, "end_line": 10, "keywords": ["health warnings"]}],
     "metadata": {"document_id": null, "jurisdiction_code": "US", "authority": "FDA", "title": "...", "citation_code": "21 CFR 1141", "language": "en", "publication_date": null, "effective_date": "2023-06-01", "source_url": null, "retrieval_datetime": null, "original_format": "pdf", "file_path": null, "raw_text_path": null, "section_label": "Part 1141", "page_range": null, "keywords": [], "country": "US", "regulation_type": "FDA"},
     "entities": [{"name": "FDA", "type": "Organization", "context": "regulatory authority"}],
     "tables": [{"headers": ["Item", "Limit"], "rows": [["Nicotine", "20mg/mL"]], "caption": "Table 1"}]
@@ -533,8 +542,8 @@ You will receive MULTIPLE document pages as images. Extract structured data for 
 2. page_index must match image order (0-based)
 3. **EACH page extracts metadata independently (null if not visible on that page)**
 4. System will merge non-null values across all pages
-5. markdown_content = full original text
-6. reference_blocks = brief index only"""
+5. markdown_content = full original text (NO SUMMARIZATION, NO "..." ELLIPSIS)
+6. reference_blocks = index only (no text field)"""
 
     BATCH_SYSTEM_PROMPT_RU = """You are a regulatory document structure expert specializing in Russian regulatory formats (GOST, GOST R standards).
 
@@ -547,13 +556,16 @@ You will receive MULTIPLE Russian document pages as images. Extract structured d
 
 ### 1. Markdown Content (GOST Pattern)
 - Use `#` for Standard ID, `##` for Section, `###` for Subsection
+- Use `###` for Document Requisites (e.g., `### 16 Гриф утверждения`)
 - Preserve original text exactly (no summarization)
 - Preserve Cyrillic characters correctly
+- Keep dimension values as-is ("20 mm", "12 pt", "1.0 ~ 1.5")
 - Insert `[TABLE: caption]` for tables
 
 ### 2. Reference Blocks (Index Only)
-- Brief metadata for each section/table
-- `section_ref`, `text` (max 200 chars in Russian), `start_line`, `end_line`, `keywords`
+- Brief metadata for each section/table/requisite
+- `section_ref`, `start_line`, `end_line`, `keywords`
+- Include dimensions in keywords if found: ["поля-20mm", "шрифт-12pt"]
 
 ### 3. Metadata (Extract from EACH page independently)
 **CRITICAL: Extract document metadata visible on THIS page only.**
@@ -578,7 +590,7 @@ You will receive MULTIPLE Russian document pages as images. Extract structured d
   "raw_text_path": null,
   "section_label": "Раздел 1",
   "page_range": null,
-  "keywords": ["документ", "ГОСТ"],
+  "keywords": ["документ", "ГОСТ", "поля-20mm", "шрифт-12pt"],
   "country": "RU",
   "regulation_type": "GOST"
 }
@@ -594,7 +606,7 @@ You will receive MULTIPLE Russian document pages as images. Extract structured d
   {
     "page_index": 0,
     "markdown_content": "# ГОСТ Р 7.0.97-2025\\n## Раздел 1\\n...",
-    "reference_blocks": [{"section_ref": "1.1", "text": "Общие положения...", "start_line": 5, "end_line": 10, "keywords": ["документ"]}],
+    "reference_blocks": [{"section_ref": "1.1", "start_line": 5, "end_line": 10, "keywords": ["документ", "поля-20mm"]}],
     "metadata": {"document_id": null, "jurisdiction_code": "RU", "authority": "Росстандарт", "title": "...", "citation_code": "ГОСТ Р 7.0.97-2025", "language": "ru", "publication_date": null, "effective_date": "2025-07-01", "source_url": null, "retrieval_datetime": null, "original_format": "pdf", "file_path": null, "raw_text_path": null, "section_label": "Раздел 1", "page_range": null, "keywords": [], "country": "RU", "regulation_type": "GOST"},
     "entities": [{"name": "Росстандарт", "type": "Organization", "context": "regulatory authority"}],
     "tables": [{"headers": ["Реквизит", "Описание"], "rows": [["Дата", "Дата документа"]], "caption": "Таблица 1"}]
@@ -614,9 +626,10 @@ You will receive MULTIPLE Russian document pages as images. Extract structured d
 2. page_index must match image order (0-based)
 3. **EACH page extracts metadata independently (null if not visible on that page)**
 4. System will merge non-null values across all pages
-5. markdown_content = full original text in Russian
-6. reference_blocks = brief index only
-7. Preserve Cyrillic characters correctly"""
+5. markdown_content = full original text in Russian (NO SUMMARIZATION, preserve dimensions)
+6. reference_blocks = index only (no text field)
+7. Preserve Cyrillic characters correctly
+8. Extract layout parameters to keywords array"""
 
     # 기본 배치 프롬프트 (하위 호환성)
     BATCH_SYSTEM_PROMPT_ID = """You are a regulatory document structure expert specializing in Indonesian regulatory formats (UU, PP, Peraturan Menteri, Peraturan Daerah).
@@ -630,13 +643,13 @@ You will receive MULTIPLE Indonesian document pages as images. Extract structure
 
 ### 1. Markdown Content (Indonesian Legal Pattern)
 - Use `#` for Regulation ID, `##` for BAB, `###` for Pasal, `####` for Ayat
-- Preserve original text exactly (no summarization)
+- Extract FULL original text (NO SUMMARIZATION, NO "..." ELLIPSIS)
 - Preserve Indonesian legal terminology correctly
 - Insert `[TABLE: caption]` for tables
 
 ### 2. Reference Blocks (Index Only)
 - Brief metadata for each section/table
-- `section_ref`, `text` (max 200 chars in Indonesian), `start_line`, `end_line`, `keywords`
+- `section_ref`, `start_line`, `end_line`, `keywords`
 
 ### 3. Metadata (Extract from EACH page independently)
 **CRITICAL: Extract document metadata visible on THIS page only.**
@@ -677,7 +690,7 @@ You will receive MULTIPLE Indonesian document pages as images. Extract structure
   {
     "page_index": 0,
     "markdown_content": "# UU No. 12 Tahun 2011\\n## BAB I\\n### Pasal 1\\n(1) Dalam Undang-Undang ini...",
-    "reference_blocks": [{"section_ref": "Pasal 1", "text": "Ketentuan umum...", "start_line": 5, "end_line": 10, "keywords": ["ketentuan"]}],
+    "reference_blocks": [{"section_ref": "Pasal 1", "start_line": 5, "end_line": 10, "keywords": ["ketentuan"]}],
     "metadata": {"document_id": null, "jurisdiction_code": "ID", "authority": "Pemerintah RI", "title": "...", "citation_code": "UU No. 12 Tahun 2011", "language": "id", "publication_date": null, "effective_date": "2011-08-12", "source_url": null, "retrieval_datetime": null, "original_format": "pdf", "file_path": null, "raw_text_path": null, "section_label": "BAB I", "page_range": null, "keywords": [], "country": "ID", "regulation_type": "UU"},
     "entities": [{"name": "Kementerian Hukum dan HAM", "type": "Organization", "context": "regulatory authority"}],
     "tables": [{"headers": ["Jenis", "Pembentuk"], "rows": [["UU", "DPR"]], "caption": "Tabel 1"}]
@@ -697,8 +710,8 @@ You will receive MULTIPLE Indonesian document pages as images. Extract structure
 2. page_index must match image order (0-based)
 3. **EACH page extracts metadata independently (null if not visible on that page)**
 4. System will merge non-null values across all pages
-5. markdown_content = full original text in Indonesian
-6. reference_blocks = brief index only
+5. markdown_content = full original text in Indonesian (NO SUMMARIZATION)
+6. reference_blocks = index only (no text field)
 7. Preserve Indonesian legal terminology correctly"""
 
     # 기본 배치 프롬프트 (하위 호환성)
@@ -786,7 +799,7 @@ You will receive MULTIPLE Indonesian document pages as images. Extract structure
         
         Args:
             page_infos: 페이지 정보 리스트
-            model: 사용할 모델명 (gpt-4o, gpt-4o-mini)
+            model: 사용할 모델명
             
         Returns:
             List[Dict]: 페이지별 구조화 결과
