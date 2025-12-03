@@ -1,18 +1,5 @@
 """
 module: report_service.py
-<<<<<<< HEAD
-description: 리포트 생성 / 조회 로직
-"""
-from app.config.logger import logger
-
-class ReportService:
-    """리포트 관련 서비스"""
-
-    async def generate_report(self, data: dict):
-        """리포트를 생성"""
-        logger.info("리포트 생성 중...")
-        return {"report_id": 1, "summary": "샘플 리포트"}
-=======
 description: 리포트 생성, 조회 및 관련 비즈니스 로직을 처리하는 서비스 계층
 author: 조영우
 created: 2025-11-10
@@ -167,4 +154,3 @@ class ReportService:
         # TODO: PDF/Excel 생성 (reportlab, openpyxl 등)
         
         return None
->>>>>>> origin/main
