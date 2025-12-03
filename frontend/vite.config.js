@@ -6,6 +6,7 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: '/skala2-4-17/',
   plugins: [
     vue(),
     vueDevTools(),
