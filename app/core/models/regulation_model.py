@@ -72,22 +72,6 @@ class RegulationTranslation(Base):
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 
-# class RegulationTranslation(Base):
-#     __tablename__ = "regulation_translations"
-
-#     translation_id = Column(Integer, primary_key=True, index=True)
-#     regulation_version_id = Column(Integer, ForeignKey("regulation_versions.regulation_version_id"), nullable=False)
-#     language_code = Column(String(10))
-#     translated_text = Column(Text)
-#     glossary_term_id = Column(Integer, ForeignKey("glossary_terms.glossary_term_id")) # UUID 타입이면 DB에 맞게 조정
-#     translation_status = Column(String(20))
-#     created_at = Column(DateTime, server_default=func.now())
-
-#     # Relationships
-#     version = relationship("RegulationVersion", back_populates="translations")
-#     glossary_term = relationship("GlossaryTerm", back_populates="translations")
-#     impact_scores = relationship("ImpactScore", back_populates="translations")
-#     reports = relationship("Report", back_populates="translations")
 
 
 class RegulationChangeHistory(Base):

@@ -77,11 +77,6 @@ class RegulationTranslationBase(BaseModel):
     translation_status: Optional[TranslationStatusEnum] = TranslationStatusEnum.queued
     s3_key: Optional[str] = None  # [신규]
     
-    # regulation_version_id: int
-    # language_code: Optional[str] = None
-    # translated_text: Optional[str] = None
-    # glossary_term_id: Optional[str] = None # UUID string
-    # translation_status: Optional[str] = None
 
 class RegulationTranslationCreate(RegulationTranslationBase):
     pass

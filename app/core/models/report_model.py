@@ -20,15 +20,7 @@ class Report(Base):
     product_id = Column(Integer, ForeignKey("products.product_id"))
     country_code = Column(String(2), ForeignKey("countries.country_code"), nullable=False)
 
-    # report_id = Column(Integer, primary_key=True, index=True)
-    # created_reason = Column(String(30))
-    # created_at = Column(DateTime, server_default=func.now())
-    # file_path = Column(String(500))
-    
-    # translation_id = Column(Integer, ForeignKey("regulation_translations.translation_id"), nullable=False)
-    # change_id = Column(Integer, ForeignKey("regulation_change_history.change_id"))
-    # product_id = Column(Integer, ForeignKey("products.product_id"))
-    # country_code = Column(String(2), ForeignKey("countries.country_code"), nullable=False)
+
 
     # Relationships
     translations = relationship("RegulationTranslation", back_populates="reports")
