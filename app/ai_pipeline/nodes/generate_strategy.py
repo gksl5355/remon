@@ -1,13 +1,4 @@
 #======================================================================
-<<<<<<< HEAD
-# 대응 전략
-# RAG로 이전 규제 대응 history 반영 
-# input : 
-# output : 대응 전략 3가지 str 리스트 
-#======================================================================
-
-
-=======
 # app/ai_pipeline/nodes/generate_strategy.py
 # 규제 대응 전략 생성 노드
 #
@@ -347,4 +338,3 @@ def generate_strategy_node(state: AppState) -> Dict[str, Any]:
     return state
 
  
->>>>>>> origin/main
