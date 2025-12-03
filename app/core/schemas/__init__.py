@@ -32,7 +32,7 @@ from .report_schema import (
     ReportCreate,
     ReportResponse,
     ReportItemCreate,
-    ReportWithItemsResponse
+    # ReportWithItemsResponse
 )
 
 from .impact_schema import (

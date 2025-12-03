@@ -78,6 +78,61 @@ class RegulationRepository(BaseRepository[Regulation]):
         )
         return result.scalars().all()
     
+    async def find_by_title_and_country(
+        self, 
+        db: AsyncSession, 
+        title: str, 
+        country_code: str,
+        exclude_regulation_id: int = None
+    ) -> Optional[Regulation]:
+        """제목과 국가로 Legacy 규제 검색 (JSONB)"""
+        from sqlalchemy import text
+        
+        if exclude_regulation_id:
+            sql = """
+                SELECT regulation_id, regul_data 
+                FROM regulations 
+                WHERE regul_data->>'title' ILIKE :title
+                AND regul_data->>'jurisdiction_code' = :country
+                AND regulation_id != :exclude_id
+                ORDER BY created_at DESC
+                LIMIT 1
+            """
+            params = {"title": f"%{title}%", "country": country_code, "exclude_id": exclude_regulation_id}
+        else:
+            sql = """
+                SELECT regulation_id, regul_data 
+                FROM regulations 
+                WHERE regul_data->>'title' ILIKE :title
+                AND regul_data->>'jurisdiction_code' = :country
+                ORDER BY created_at DESC
+                LIMIT 1
+            """
+            params = {"title": f"%{title}%", "country": country_code}
+        
+        result = await db.execute(text(sql), params)
+        row = result.fetchone()
+        if row:
+            reg = Regulation()
+            reg.regulation_id = row[0]
+            reg.regul_data = row[1]
+            return reg
+        return None
+    
+    async def get_regul_data(
+        self, 
+        db: AsyncSession, 
+        regulation_id: int
+    ) -> Optional[Dict]:
+        """regulation_id로 regul_data (vision 결과) 조회"""
+        from sqlalchemy import text
+        result = await db.execute(
+            text("SELECT regul_data FROM regulations WHERE regulation_id = :reg_id"),
+            {"reg_id": regulation_id}
+        )
+        row = result.fetchone()
+        return row[0] if row else None
+    
 
     # 추가
     async def check_all_products_processed(
@@ -95,8 +150,8 @@ class RegulationRepository(BaseRepository[Regulation]):
         # 실제 로직은 비즈니스 요구사항에 따라 다름
         
         from sqlalchemy import func, select
-        from core.models.product_model import Product
-        from core.models.regulation_model import RegulationTranslation
+        from app.core.models.product_model import Product
+        from app.core.models.regulation_model import RegulationTranslation
         
         # 전체 제품 수
         total_products = await db.execute(select(func.count(Product.product_id)))

@@ -48,6 +48,11 @@ data/
 data/*
 app/data/
 .uv-cache/
+
+google-chrome-stable_current_amd64.deb
+db/
+db/*
+test_insert.py
 Dockerfile*
 deploy/
 output/
