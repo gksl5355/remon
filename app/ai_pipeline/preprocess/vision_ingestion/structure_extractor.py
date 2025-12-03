@@ -72,7 +72,7 @@ class PageStructure(BaseModel):
 class StructureExtractor:
     """LLM 출력을 Pydantic 모델로 변환."""
     
-    SYSTEM_PROMPT = """You are a regulatory document structure expert specializing in US regulatory formats (CFR, USC, Federal Register).
+    SYSTEM_PROMPT_US = """You are a regulatory document structure expert specializing in US regulatory formats (CFR, USC, Federal Register).
 
 **CRITICAL: You MUST return ONLY a valid JSON object. No markdown code blocks, no explanations, ONLY the JSON.**
 
@@ -195,7 +195,138 @@ Extract organizations, regulations, chemicals, numbers:
 4. reference_blocks are INDEX/METADATA only (brief summaries)
 5. Tables go in both markdown (as placeholder) and tables array (full data)"""
 
-    BATCH_SYSTEM_PROMPT = """You are a regulatory document structure expert specializing in US regulatory formats (CFR, USC, Federal Register).
+    SYSTEM_PROMPT_RU = """You are a regulatory document structure expert specializing in Russian regulatory formats (GOST, GOST R standards).
+
+**CRITICAL: You MUST return ONLY a valid JSON object. No markdown code blocks, no explanations, ONLY the JSON.**
+
+## Task Overview
+Analyze the Russian regulatory document image and extract structured data following GOST document management standards.
+
+## 1. Markdown Content (GOST Pattern Recognition)
+**Identify and label hierarchical structure:**
+- **Standard ID**: Use `# GOST R 7.0.97-2025` or `# ГОСТ Р 7.0.97-2025`
+- **Section**: Use `## Раздел 1` or `## Section 1`
+- **Subsection**: Use `### 1.1 Общие положения`
+- **Paragraph**: Use `#### 1.1.1` for numbered paragraphs
+
+**Preserve original text exactly:**
+- Keep all section numbers, citations, and legal references
+- Maintain paragraph structure and line breaks
+- Do NOT summarize or paraphrase
+- Preserve Cyrillic characters correctly
+
+**Table handling:**
+- Insert table placeholder: `[TABLE: Таблица 1 - Реквизиты]`
+- Full table data goes in "tables" array
+
+## 2. Reference Blocks (Metadata for Chunking)
+**Purpose**: Provide metadata for each semantic unit WITHOUT duplicating full text.
+- `section_ref`: Section identifier (e.g., "1.1.1", "Таблица 1")
+- `text`: BRIEF summary or first sentence (max 200 chars)
+- `start_line`: Approximate line number in markdown
+- `end_line`: Approximate end line
+- `keywords`: Key terms for search (3-5 terms in Russian)
+
+**Note**: Full text is in markdown_content. Reference blocks are INDEX ONLY.
+
+## 3. Metadata (Extract from EACH page independently)
+**CRITICAL: Extract document metadata visible on THIS page only.**
+- If field not visible on current page, use null
+- System will accumulate non-null values across pages
+- First page typically has standard ID/title, later pages may have dates
+
+**All fields required (use null if not found on THIS page):**
+```json
+{
+  "document_id": "GOST-R-7.0.97-2025",
+  "jurisdiction_code": "RU",
+  "authority": "Федеральное агентство по техническому регулированию и метрологии",
+  "title": "Система стандартов по информации",
+  "citation_code": "ГОСТ Р 7.0.97-2025",
+  "language": "ru",
+  "publication_date": "2025-01-01",
+  "effective_date": "2025-07-01",
+  "source_url": null,
+  "retrieval_datetime": null,
+  "original_format": "pdf",
+  "file_path": null,
+  "raw_text_path": null,
+  "section_label": "Раздел 1",
+  "page_range": [1, 50],
+  "keywords": ["документ", "реквизиты", "ГОСТ"],
+  "country": "RU",
+  "regulation_type": "GOST"
+}
+```
+**Field rules:**
+- Use `null` if information not found (do NOT omit fields)
+- `jurisdiction_code`: "RU" for Russia
+- `authority`: Full agency name in Russian
+- `citation_code`: Official GOST citation (e.g., "ГОСТ Р 7.0.97-2025")
+- `language`: "ru" for Russian
+- Dates: YYYY-MM-DD format
+- `page_range`: [start_page, end_page] if multi-page document
+
+## 4. Entities
+Extract organizations, standards, terms:
+```json
+[{"name": "Росстандарт", "type": "Organization", "context": "regulatory authority"}]
+```
+
+## 5. Tables (Preserve Original Structure)
+**Extract tables with full data:**
+```json
+[{
+  "headers": ["Реквизит", "Описание"],
+  "rows": [["Дата", "Дата документа"]],
+  "caption": "Таблица 1: Реквизиты документа"
+}]
+```
+
+## Output Format (STRICT JSON)
+**You MUST return this exact structure. No code blocks, no extra text:**
+
+{
+  "markdown_content": "# ГОСТ Р 7.0.97-2025\\n## Раздел 1\\n### 1.1 Общие положения\\n...",
+  "reference_blocks": [
+    {"section_ref": "1.1", "text": "Общие положения...", "start_line": 5, "end_line": 10, "keywords": ["документ", "реквизиты"]}
+  ],
+  "metadata": {
+    "document_id": null,
+    "jurisdiction_code": "RU",
+    "authority": "Росстандарт",
+    "title": "Система стандартов",
+    "citation_code": "ГОСТ Р 7.0.97-2025",
+    "language": "ru",
+    "publication_date": null,
+    "effective_date": "2025-07-01",
+    "source_url": null,
+    "retrieval_datetime": null,
+    "original_format": "pdf",
+    "file_path": null,
+    "raw_text_path": null,
+    "section_label": "Раздел 1",
+    "page_range": null,
+    "keywords": ["документ", "ГОСТ"],
+    "country": "RU",
+    "regulation_type": "GOST"
+  },
+  "entities": [{"name": "Росстандарт", "type": "Organization", "context": "regulatory authority"}],
+  "tables": [{"headers": ["Реквизит", "Описание"], "rows": [["Дата", "Дата документа"]], "caption": "Таблица 1"}]
+}
+
+**CRITICAL REMINDERS:**
+1. Return ONLY the JSON object (no ```json wrapper)
+2. All metadata fields must be present (use null if unknown)
+3. markdown_content contains FULL original text in Russian
+4. reference_blocks are INDEX/METADATA only (brief summaries)
+5. Tables go in both markdown (as placeholder) and tables array (full data)
+6. Preserve Cyrillic characters correctly"""
+
+    # 기본 프롬프트 (하위 호환성)
+    SYSTEM_PROMPT = SYSTEM_PROMPT_US
+
+    BATCH_SYSTEM_PROMPT_US = """You are a regulatory document structure expert specializing in US regulatory formats (CFR, USC, Federal Register).
 
 **CRITICAL: You MUST return ONLY a valid JSON array. No markdown code blocks, no explanations, ONLY the JSON array.**
 
@@ -275,9 +406,123 @@ You will receive MULTIPLE document pages as images. Extract structured data for 
 4. System will merge non-null values across all pages
 5. markdown_content = full original text
 6. reference_blocks = brief index only"""
+
+    BATCH_SYSTEM_PROMPT_RU = """You are a regulatory document structure expert specializing in Russian regulatory formats (GOST, GOST R standards).
+
+**CRITICAL: You MUST return ONLY a valid JSON array. No markdown code blocks, no explanations, ONLY the JSON array.**
+
+## Task
+You will receive MULTIPLE Russian document pages as images. Extract structured data for EACH page following GOST patterns.
+
+## Per-Page Extraction
+
+### 1. Markdown Content (GOST Pattern)
+- Use `#` for Standard ID, `##` for Section, `###` for Subsection
+- Preserve original text exactly (no summarization)
+- Preserve Cyrillic characters correctly
+- Insert `[TABLE: caption]` for tables
+
+### 2. Reference Blocks (Index Only)
+- Brief metadata for each section/table
+- `section_ref`, `text` (max 200 chars in Russian), `start_line`, `end_line`, `keywords`
+
+### 3. Metadata (Extract from EACH page independently)
+**CRITICAL: Extract document metadata visible on THIS page only.**
+- If field not visible on current page, use null
+- System will accumulate non-null values across pages
+
+**All fields required (use null if not found on THIS page):**
+```json
+{
+  "document_id": null,
+  "jurisdiction_code": "RU",
+  "authority": "Росстандарт",
+  "title": "Full standard title",
+  "citation_code": "ГОСТ Р 7.0.97-2025",
+  "language": "ru",
+  "publication_date": null,
+  "effective_date": "2025-07-01",
+  "source_url": null,
+  "retrieval_datetime": null,
+  "original_format": "pdf",
+  "file_path": null,
+  "raw_text_path": null,
+  "section_label": "Раздел 1",
+  "page_range": null,
+  "keywords": ["документ", "ГОСТ"],
+  "country": "RU",
+  "regulation_type": "GOST"
+}
+```
+
+### 4. Entities & Tables
+- Extract as JSON arrays
+
+## Output Format (STRICT JSON ARRAY)
+**Return ONLY this structure (no code blocks):**
+
+[
+  {
+    "page_index": 0,
+    "markdown_content": "# ГОСТ Р 7.0.97-2025\\n## Раздел 1\\n...",
+    "reference_blocks": [{"section_ref": "1.1", "text": "Общие положения...", "start_line": 5, "end_line": 10, "keywords": ["документ"]}],
+    "metadata": {"document_id": null, "jurisdiction_code": "RU", "authority": "Росстандарт", "title": "...", "citation_code": "ГОСТ Р 7.0.97-2025", "language": "ru", "publication_date": null, "effective_date": "2025-07-01", "source_url": null, "retrieval_datetime": null, "original_format": "pdf", "file_path": null, "raw_text_path": null, "section_label": "Раздел 1", "page_range": null, "keywords": [], "country": "RU", "regulation_type": "GOST"},
+    "entities": [{"name": "Росстандарт", "type": "Organization", "context": "regulatory authority"}],
+    "tables": [{"headers": ["Реквизит", "Описание"], "rows": [["Дата", "Дата документа"]], "caption": "Таблица 1"}]
+  },
+  {
+    "page_index": 1,
+    "markdown_content": "### 1.2 Определения\\n...",
+    "reference_blocks": [],
+    "metadata": {"document_id": null, "jurisdiction_code": null, "authority": null, "title": null, "citation_code": null, "language": null, "publication_date": null, "effective_date": "2025-07-15", "source_url": null, "retrieval_datetime": null, "original_format": null, "file_path": null, "raw_text_path": null, "section_label": null, "page_range": null, "keywords": [], "country": null, "regulation_type": null},
+    "entities": [],
+    "tables": []
+  }
+]
+
+**CRITICAL:**
+1. Return ONLY the JSON array (no ```json wrapper)
+2. page_index must match image order (0-based)
+3. **EACH page extracts metadata independently (null if not visible on that page)**
+4. System will merge non-null values across all pages
+5. markdown_content = full original text in Russian
+6. reference_blocks = brief index only
+7. Preserve Cyrillic characters correctly"""
+
+    # 기본 배치 프롬프트 (하위 호환성)
+    BATCH_SYSTEM_PROMPT = BATCH_SYSTEM_PROMPT_US
     
-    def __init__(self):
-        pass
+    def __init__(self, language_code: str = "en"):
+        """
+        Args:
+            language_code: 문서 언어 코드 (en, ru, ko 등)
+        """
+        self.language_code = language_code.lower()
+    
+    def get_system_prompt(self) -> str:
+        """
+        언어별 시스템 프롬프트 반환.
+        
+        Returns:
+            해당 언어의 시스템 프롬프트
+        """
+        if self.language_code == "ru":
+            return self.SYSTEM_PROMPT_RU
+        else:
+            # 기본값: 영어/미국 (en, ko 등 모두 US 프롬프트 사용)
+            return self.SYSTEM_PROMPT_US
+    
+    def get_batch_system_prompt(self) -> str:
+        """
+        언어별 배치 시스템 프롬프트 반환.
+        
+        Returns:
+            해당 언어의 배치 프롬프트
+        """
+        if self.language_code == "ru":
+            return self.BATCH_SYSTEM_PROMPT_RU
+        else:
+            return self.BATCH_SYSTEM_PROMPT_US
     
     def extract(self, llm_output: str, page_num: int) -> PageStructure:
         """
@@ -339,14 +584,14 @@ You will receive MULTIPLE document pages as images. Extract structured data for 
         client = OpenAI(api_key=config["api_key"], timeout=config["request_timeout"])
         client = PreprocessConfig.wrap_openai_client(client)
         
-        # 배치 메시지 구성
+        # 배치 메시지 구성 (언어별 프롬프트)
         messages = [
             {
                 "role": "system",
                 "content": [
                     {
                         "type": "text",
-                        "text": self.BATCH_SYSTEM_PROMPT,
+                        "text": self.get_batch_system_prompt(),
                         "cache_control": {"type": "ephemeral"}
                     }
                 ]
