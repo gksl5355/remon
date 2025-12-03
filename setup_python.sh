@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 #!/usr/bin/env bash
+=======
+#!/usr/bin/bash
+>>>>>>> origin/main
 set -e
 
 echo "🐍 Python 3.11.13 환경 자동 세팅 시작..."
@@ -94,3 +98,40 @@ echo ""
 echo "   source $RC_FILE"
 echo ""
 
+<<<<<<< HEAD
+=======
+# ------------------------------
+# 6️⃣ uv 설치 (Python 패키지 관리자)
+# ------------------------------
+if ! command -v uv &> /dev/null; then
+    echo "📦 uv 설치 중..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="$HOME/.cargo/bin:$PATH"
+    echo "✅ uv 설치 완료"
+else
+    echo "✅ uv가 이미 설치되어 있습니다: $(uv --version)"
+fi
+
+# ------------------------------
+# 7️⃣ 가상환경 생성 및 의존성 설치
+# ------------------------------
+if [ -d ".venv" ]; then
+    echo "🔄 기존 가상환경 제거 중..."
+    rm -rf .venv
+fi
+
+echo "🔧 가상환경 생성 중..."
+uv venv
+
+echo "📦 의존성 설치 중..."
+source .venv/bin/activate
+uv pip install -e .
+
+echo ""
+echo "✅ 전체 설정 완료!"
+echo ""
+echo "가상환경 활성화:"
+echo "   source .venv/bin/activate"
+echo ""
+
+>>>>>>> origin/main

@@ -13,6 +13,11 @@ __pycache__/
 venv/
 .env
 .venv/
+<<<<<<< HEAD
+=======
+.ipynb_checkpoints/
+.pytest_cache/
+>>>>>>> origin/main
 
 # ============ Node ============
 node_modules/
@@ -32,3 +37,23 @@ tmp/
 .cache/
 *.bak
 *.swp
+<<<<<<< HEAD
+=======
+.github/
+alembic/
+alembic.ini
+# ============ AI Generated Files 작업용 ============
+app/ai_pipeline/preprocess/demo
+.amazonq/
+.github
+docs/
+tests/
+uv.lock
+data/
+data/*
+app/data/
+.uv-cache/
+Dockerfile*
+deploy/
+output/
+>>>>>>> origin/main

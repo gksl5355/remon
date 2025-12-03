@@ -1,9 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+<<<<<<< HEAD
 from api import regulation_api, report_api, auth_api
 
 from api.admin import admin_regulation_api, admin_summary_api, admin_websearch_api
+=======
+from app.api import regulation_api, report_api, auth_api
+from app.api.admin import admin_regulation_api, admin_summary_api, admin_websearch_api
+>>>>>>> origin/main
 
 app = FastAPI(
     title="REMON Regulatory Monitoring API",
@@ -29,6 +34,11 @@ app.include_router(auth_api.router, prefix="/api")
 app.include_router(admin_regulation_api.router, prefix="/api")
 app.include_router(admin_summary_api.router, prefix="/api")
 app.include_router(admin_websearch_api.router, prefix="/api")
+<<<<<<< HEAD
+=======
+# app.include_router(collect_api.router, prefix="/api")
+# app.include_router(mapping_api.router, prefix="/api")
+>>>>>>> origin/main
 
 @app.get("/")
 def root():

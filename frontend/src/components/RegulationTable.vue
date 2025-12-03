@@ -1,7 +1,14 @@
 <template>
+<<<<<<< HEAD
   <div
     class="bg-[#111]/90 backdrop-blur-lg rounded-2xl shadow-[0_0_25px_rgba(0,0,0,0.4)]
            flex flex-col overflow-hidden h-[calc(100vh-180px)]"
+=======
+  <!-- 11-27 스크롤 가능하게 변경 (조영우) -->
+  <div
+    class="bg-[#111]/90 backdrop-blur-lg rounded-2xl shadow-[0_0_25px_rgba(0,0,0,0.4)]
+           flex flex-col overflow-hidden h-full"
+>>>>>>> origin/main
   >
     <!-- 🔹 헤더 (sticky) -->
     <div
@@ -64,9 +71,15 @@ import { onBeforeUnmount, onMounted, ref } from "vue";
 // 🔹 badgeClass를 맨 위에서 정의 (Vue가 정상적으로 가져감)
 const badgeClass = (level) => {
   return {
+<<<<<<< HEAD
     긴급: "bg-[#D94C3D]",
     높음: "bg-[#D4AF37]/90 text-black font-bold",
     보통: "bg-[#444]/80 text-gray-200",
+=======
+    높음: "bg-[#D94C3D]",
+    보통: "bg-[#D4AF37]/90 text-black font-bold",
+    낮음: "bg-[#444]/80 text-gray-200",
+>>>>>>> origin/main
   }[level] || "bg-[#444]/60 text-gray-300";
 };
 

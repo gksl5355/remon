@@ -1,0 +1,70 @@
+"""
+module: mapping_service.py
+description: 규제-제품 매핑 및 영향도 평가 비즈니스 로직
+author: 조영우
+created: 2025-11-10
+updated: 2025-11-17
+dependencies:
+    - sqlalchemy.ext.asyncio
+"""
+
+import logging
+from sqlalchemy.ext.asyncio import AsyncSession
+from core.models.enums import RiskLevelEnum
+
+logger = logging.getLogger(__name__)
+
+
+class MappingService:
+    """규제-제품 매핑 관련 비즈니스 로직을 처리하는 서비스 클래스"""
+    
+    #TODO utils/risk_calculator.py에 일반함수로 구현 할지 고려
+    @staticmethod
+    def calculate_risk_level(impact_score: float) -> RiskLevelEnum:
+        """영향도 점수로 위험 수준 계산"""
+        if impact_score >= 0.7:
+            return RiskLevelEnum.HIGH
+        elif impact_score >= 0.4:
+            return RiskLevelEnum.MEDIUM
+        else:
+            return RiskLevelEnum.LOW
+
+    async def get_mapping_results(
+        self, db: AsyncSession, regulation_id: int
+    ) -> dict | None:
+        """
+        특정 규제에 대한 제품 매핑 결과를 조회한다.
+
+        Args:
+            db (AsyncSession): 데이터베이스 세션.
+            regulation_id (int): 규제 문서 ID.
+
+        Returns:
+            dict | None: 매핑 결과 또는 None.
+        """
+        logger.info(f"Fetching mapping results for regulation_id={regulation_id}")
+
+        # TODO: BE2(남지수) - MappingRepository.get_by_regulation_id() 구현 후 연동
+        # TODO: AI2(조태환) - Qdrant 벡터 검색 결과 연동
+
+        return None
+
+    async def analyze_mapping(self, db: AsyncSession, regulation_id: int) -> dict:
+        """
+        규제-제품 매핑 분석을 실행한다 (AI 파이프라인 트리거).
+
+        Args:
+            db (AsyncSession): 데이터베이스 세션.
+            regulation_id (int): 규제 문서 ID.
+
+        Returns:
+            dict: 분석 작업 ID 및 상태.
+        """
+        logger.info(f"Starting mapping analysis for regulation_id={regulation_id}")
+
+        async with db.begin():
+            # TODO: AI1(고서아) - ai_service.start_mapping() 호출
+            # TODO: AI2(조태환) - Qdrant 하이브리드 벡터 검색 및 유사도 계산
+            pass
+
+        return {"job_id": None, "status": "pending"}

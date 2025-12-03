@@ -8,7 +8,11 @@
 - FastAPI (Backend, Python 3.11, uv 환경)
 - Vue3 (Frontend)
 - PostgreSQL (Main DB)
+<<<<<<< HEAD
 - Chroma (VectorDB)
+=======
+- Qdrant (VectorDB)
+>>>>>>> origin/main
 - Redis (옵션: 캐시/세션/비동기 큐)
 - OpenSearch (텍스트 검색, Hybrid Retrieval 예정)
 - LLM: GPT-4o mini  
@@ -33,11 +37,19 @@
 |------|------|------|
 | FastAPI 기본환경 (uv) | ✅ 완료 | |
 | ERD | ✅ 초안 완성 | 일부 조정 예정 |
+<<<<<<< HEAD
 | SQLAlchemy 모델화 | 🕐 예정 | |
 | 더미데이터 생성 | 🕐 예정 | DB 담당 예정 |
 | VectorDB 스키마 | ⛔ 미정 | RAG 구조 확정 후 반영 |
 | OpenSearch 연계 | 🕐 검토 중 | Hybrid Retrieval 실험 예정 |
 | API 문서 자동화 | 🕐 예정 | |
+=======
+| SQLAlchemy 모델화 | @지수 | |
+| 더미데이터 생성 | ✅ 초안 완성 | @민제, @영우, @지수 검토중 |
+| VectorDB 스키마 | @민제  검토중|  |
+| OpenSearch 연계 | 🕐 검토 중 | Qdrant - dense+sparse 예정 |
+| API 문서 자동화 | ✅| |
+>>>>>>> origin/main
 | 배포(EKS) | ⛔ 미정 | |
 ---
 ## 4. 모듈별 역할 요약
@@ -55,6 +67,7 @@
 ## 5. 팀 역할 분담
 ```
 구분  인원  주요 폴더 / 파일  책임 범위
+<<<<<<< HEAD
 FE1 – 프론트엔드/UI 담당 박선영 프론트엔드 마스터🥇 /frontend/→ pages/, components/, composables/, services/api.js  사용자 인터페이스 / API 연동 / 리포트 시각화
 BE1 – 백엔드 리드 (트랜잭션·API 게이트웨이) 조영우 백엔드리드 /app/api/
 /app/services/
@@ -64,6 +77,17 @@ BE2 – 데이터베이스 엔지니어 (Repository & Schema) 남지수 백엔�
 AI1 – LangGraph 파이프라인 엔지니어  고서아 LLM 마스터 /app/ai_pipeline/pipeline_orchestrator.py/app/ai_pipeline/chains//app/ai_pipeline/agents/ LLM 파이프라인 (LangGraph) 설계 / 대응전략·리포트 생성
 AI2 – RAG 엔지니어 (임베딩·검색 시스템) 조태환 RAG 마스터 /app/ai_pipeline/memory//app/vectorstore//app/ai_pipeline/utils/  RAG 검색·임베딩·VectorDB 구축
 DE1 – AI/DATA엔지니어 (수집·전처리 파이프라인)  김민제 데이터 엔지니어링 팀장  /app/crawler//app/pipelines/collect//app/pipelines/refine//app/services/collect_service.py  규제 데이터 크롤링 / 전처리 / RAG 입력 데이터 생성
+=======
+FE1 – 프론트엔드/UI 담당 박선영  /frontend/→ pages/, components/, composables/, services/api.js  사용자 인터페이스 / API 연동 / 리포트 시각화
+BE1 – 백엔드 리드 (트랜잭션·API 게이트웨이) 조영우/app/api/
+/app/services/
+/app/config/
+/app/main.py  전체 API 라우팅 / 트랜잭션 관리 / 서비스 orchestration
+BE2 – 데이터베이스 엔지니어 (Repository & Schema) 남지수  /app/core/→ database.py, models/, schemas/, repositories/ DB 구조 설계 / Repository 표준화 / ORM
+AI1 – LangGraph 파이프라인 엔지니어  고서아 /app/ai_pipeline/pipeline_orchestrator.py/app/ai_pipeline/chains//app/ai_pipeline/agents/ LLM 파이프라인 (LangGraph) 설계 / 대응전략·리포트 생성
+AI2 – RAG 엔지니어 (임베딩·검색 시스템) 조태환 /app/ai_pipeline/memory//app/vectorstore//app/ai_pipeline/utils/  RAG 검색·임베딩·VectorDB 구축
+DE1 – AI/DATA엔지니어 (수집·전처리 파이프라인)  김민제  /app/crawler//app/pipelines/collect//app/pipelines/refine//app/services/collect_service.py  규제 데이터 크롤링 / 전처리 / RAG 입력 데이터 생성
+>>>>>>> origin/main
 ```
 ---
 ## 6. RAG Schema 개요 (초안)
@@ -71,7 +95,11 @@ DE1 – AI/DATA엔지니어 (수집·전처리 파이프라인)  김민제 데�
 |------|------|------|
 | 임베딩 모델 | ✅ BGE-M3 |
 | LLM | ✅ GPT-4o mini |
+<<<<<<< HEAD
 | VectorDB | ✅ Chroma |
+=======
+| VectorDB | ✅ Qdrant |
+>>>>>>> origin/main
 | OpenSearch | 🕐 Hybrid 실험 예정 |
 | 국가 구분 방식 | ✅ meta_country 필드 기반 |
 | 임베딩 저장 방식 | 🟡 VectorDB만 저장, SQL엔 문서 메타만 저장 권장 |
@@ -109,11 +137,19 @@ DE1 – AI/DATA엔지니어 (수집·전처리 파이프라인)  김민제 데�
 | 구분 | 담당자 | 책임 범위 |
 |:---:|:---:|:---|
 | **FE1 – 프론트엔드/UI 담당** | <img src="https://avatars.githubusercontent.com/SunYoung710" width=120px alt="박선영"/> [박선영](https://github.com/SunYoung710) | 사용자 인터페이스 / API 연동 / 리포트 시각화 |
+<<<<<<< HEAD
 | **BE1 – 백엔드 리드 (트랜잭션·API 게이트웨이)** | <img src="https://avatars.githubusercontent.com/dreamFORcreative" width=120px alt="조영우"/> [조영우](https://github.com/dreamFORcreative) | 전체 API 라우팅 / 트랜잭션 관리 / 서비스 orchestration |
 | **BE2 – 데이터베이스 엔지니어 (Repository & Schema)** | <img src="https://avatars.githubusercontent.com/Nam707" width=120px alt="남지수"/> [남지수](https://github.com/Nam707) | DB 구조 설계 / Repository 표준화 / ORM |
 | **AI1 – LangGraph 파이프라인 엔지니어** | <img src="https://avatars.githubusercontent.com/bluepaled0t" width=120px alt="고서아"/> [고서아](https://github.com/bluepaled0t) | LLM 파이프라인 (LangGraph) 설계 / 대응전략·리포트 생성 |
 | **AI2 – RAG 엔지니어 (임베딩·검색 시스템)** | <img src="https://avatars.githubusercontent.com/gksl5355" width=120px alt="조태환"/> [조태환](https://github.com/gksl5355) | RAG 검색·임베딩·VectorDB 구축 |
 | **DE1 – AI/DATA 엔지니어 (수집·전처리 파이프라인)** | <img src="https://avatars.githubusercontent.com/DWECK" width=120px alt="김민제"/> [김민제](https://github.com/DWECK) | 규제 데이터 크롤링 / 전처리 / RAG 입력 데이터 생성 |
+=======
+| **BE1 – 백엔드 리드 (트랜잭션·API 게이트웨이)** | <img src="https://avatars.githubusercontent.com/bofoto" width=120px alt="조영우"/> [조영우](https://github.com/bofoto) | 전체 API 라우팅 / 트랜잭션 관리 / 서비스 orchestration |
+| **BE2 – 데이터베이스 엔지니어 (Repository & Schema)** | <img src="https://avatars.githubusercontent.com/Nam707" width=120px alt="남지수"/> [남지수](https://github.com/Nam707) | DB 구조 설계 / Repository 표준화 / ORM |
+| **AI1 – LangGraph 파이프라인 엔지니어** | <img src="https://avatars.githubusercontent.com/bluepaled0t" width=120px alt="고서아"/> [고서아](https://github.com/bluepaled0t) | LLM 파이프라인 (LangGraph) 설계 / 대응전략·리포트 생성 |
+| **AI2 – RAG 엔지니어 (임베딩·검색 시스템)** | <img src="https://avatars.githubusercontent.com/gksl5355" width=120px alt="조태환"/> [조태환](https://github.com/gksl5355) | RAG 검색·임베딩·VectorDB 구축 |
+| **DE1 – AI/DATA 엔지니어 (수집·전처리 파이프라인)** | <img src="https://avatars.githubusercontent.com/dreamFORcreative" width=120px alt="김민제"/> [김민제](https://github.com/dreamFORcreative) | 규제 데이터 크롤링 / 전처리 / RAG 입력 데이터 생성 |
+>>>>>>> origin/main
 
 
 
@@ -159,3 +195,9 @@ DE1 – AI/DATA엔지니어 (수집·전처리 파이프라인)  김민제 데�
 
 
 
+<<<<<<< HEAD
+=======
+
+
+
+>>>>>>> origin/main
