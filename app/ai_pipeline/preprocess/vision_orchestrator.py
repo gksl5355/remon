@@ -212,7 +212,7 @@ class VisionOrchestrator:
         
         병렬 처리를 원하면 _phase1_vision_ingestion_parallel() 사용.
         """
-        logger.info("Phase 1: Vision Ingestion 시작 (순차 처리, 동적 DPI)")
+        logger.info("Phase 1: Vision Ingestion 시작 (순차 처리, 동적 DPI, 메타데이터 누적)")
         
         # PDF 페이지 수 확인
         import pypdfium2 as pdfium
@@ -222,6 +222,9 @@ class VisionOrchestrator:
         
         vision_results = []
         token_tracker = TokenTracker()
+        
+        # 문서 공통 메타데이터 누적 (페이지별로 갱신)
+        accumulated_metadata = {}
         
         for page_idx in range(total_pages):
             page_num = page_idx + 1
@@ -267,6 +270,21 @@ class VisionOrchestrator:
                     page_num
                 )
                 
+                # 6. 메타데이터 누적 갱신 (공통 필드만)
+                if structure.metadata:
+                    page_meta = structure.metadata.dict()
+                    for key, value in page_meta.items():
+                        # null이 아닌 값이 발견되면 누적
+                        if value is not None:
+                            if key not in accumulated_metadata or accumulated_metadata[key] is None:
+                                accumulated_metadata[key] = value
+                                logger.debug(f"페이지 {page_num}: {key} = {value} (누적)")
+                
+                # 7. 누적된 메타데이터를 현재 페이지에 적용
+                if accumulated_metadata:
+                    from .vision_ingestion.structure_extractor import DocumentMetadata
+                    structure.metadata = DocumentMetadata(**accumulated_metadata)
+                
                 vision_results.append({
                     "page_num": page_num,
                     "model_used": extraction["model_used"],
@@ -287,6 +305,7 @@ class VisionOrchestrator:
             f"Phase 1 완료: {len(vision_results)}/{total_pages}개 페이지. "
             f"총 토큰: {token_tracker.total_tokens}"
         )
+        logger.info(f"누적된 공통 메타데이터: {len([k for k, v in accumulated_metadata.items() if v is not None])}개 필드")
         return vision_results
     
     async def _phase1_vision_ingestion_parallel(self, pdf_path: str) -> List[Dict[str, Any]]:
