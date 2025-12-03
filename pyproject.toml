@@ -12,6 +12,8 @@ dependencies = [
   "pyjwt>=2.10.1",
   "aiosqlite>=0.21.0",
   "httpx<0.28",
+  "pymupdf>=1.26.6",
+  "lingua-language-detector>=2.1.1",
 ]
 
 # -------------------------------
