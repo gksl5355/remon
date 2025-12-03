@@ -94,8 +94,16 @@ Analyze the document image and extract structured data following DDH (Division-D
 - NEVER use phrases like "Comments on these topics..." or "This section describes..."
 
 **Table handling:**
-- Insert table placeholder: `[TABLE: Table 1 - Nicotine Limits]`
-- Full table data goes in "tables" array
+- Extract tables as markdown directly in markdown_content
+- Also include structured data in "tables" array for metadata
+- Example:
+  ```markdown
+  **Table 1: Nicotine Limits**
+  
+  | Item | Limit | Unit |
+  |---|---|---|
+  | Nicotine | 20 | mg/mL |
+  ```
 
 ## 2. Reference Blocks (Index for Chunking)
 **Purpose**: Provide section index and keywords WITHOUT duplicating text.
@@ -220,8 +228,8 @@ Analyze the Russian regulatory document image and extract structured data follow
 - Keep dimension values as-is (e.g., "20 mm", "12 pt", "1.0 ~ 1.5")
 
 **Table handling:**
-- Insert table placeholder: `[TABLE: Таблица 1 - Реквизиты]`
-- Full table data goes in "tables" array
+- Extract tables as markdown directly in markdown_content
+- Also include structured data in "tables" array for metadata
 
 ## 2. Reference Blocks (Index for Chunking)
 **Purpose**: Provide section index and keywords WITHOUT duplicating text.
@@ -353,8 +361,8 @@ Analyze the Indonesian regulatory document image and extract structured data fol
 - Preserve Indonesian legal terminology correctly
 
 **Table handling:**
-- Insert table placeholder: `[TABLE: Tabel 1 - Hierarki Peraturan]`
-- Full table data goes in "tables" array
+- Extract tables as markdown directly in markdown_content
+- Also include structured data in "tables" array for metadata
 
 ## 2. Reference Blocks (Index for Chunking)
 **Purpose**: Provide section index and keywords WITHOUT duplicating text.
@@ -476,7 +484,7 @@ You will receive MULTIPLE document pages as images. Extract structured data for 
 ### 1. Markdown Content (DDH Pattern)
 - Use `#` for Title/Part, `##` for Chapter/Subpart, `###` for Section (§)
 - Extract FULL original text (NO SUMMARIZATION, NO "..." ELLIPSIS)
-- Insert `[TABLE: caption]` for tables
+- Extract tables as markdown directly (not placeholders)
 
 ### 2. Reference Blocks (Index Only)
 - Brief metadata for each section/table
@@ -560,7 +568,7 @@ You will receive MULTIPLE Russian document pages as images. Extract structured d
 - Preserve original text exactly (no summarization)
 - Preserve Cyrillic characters correctly
 - Keep dimension values as-is ("20 mm", "12 pt", "1.0 ~ 1.5")
-- Insert `[TABLE: caption]` for tables
+- Extract tables as markdown directly (not placeholders)
 
 ### 2. Reference Blocks (Index Only)
 - Brief metadata for each section/table/requisite
@@ -645,7 +653,7 @@ You will receive MULTIPLE Indonesian document pages as images. Extract structure
 - Use `#` for Regulation ID, `##` for BAB, `###` for Pasal, `####` for Ayat
 - Extract FULL original text (NO SUMMARIZATION, NO "..." ELLIPSIS)
 - Preserve Indonesian legal terminology correctly
-- Insert `[TABLE: caption]` for tables
+- Extract tables as markdown directly (not placeholders)
 
 ### 2. Reference Blocks (Index Only)
 - Brief metadata for each section/table
