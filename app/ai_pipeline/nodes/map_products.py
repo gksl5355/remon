@@ -248,13 +248,9 @@ class MappingNode:
         target_state = mapping_spec.get("target") or {}
         present_state = mapping_spec.get("present_state") or {}
         # present_state가 비어있으면 target 혹은 구 버전 features를 활용해 최소한의 매핑을 진행한다.
-<<<<<<< HEAD
-        present_features = present_state or target_state or product.get("features", {}) or {}
-=======
         present_features = (
             present_state or target_state or product.get("features", {}) or {}
         )
->>>>>>> 9286e720fc6e1df67424a9067f29075bcde3ff61
         units = product.get("feature_units", {})
 
         mapping_results: List[MappingItem] = []
@@ -278,13 +274,9 @@ class MappingNode:
                 self.alpha,
             )
             if not present_features:
-<<<<<<< HEAD
-                logger.info("💤 매핑 대상 특성이 없습니다. mapping.present_state나 target을 확인하세요.")
-=======
                 logger.info(
                     "💤 매핑 대상 특성이 없습니다. mapping.present_state나 target을 확인하세요."
                 )
->>>>>>> 9286e720fc6e1df67424a9067f29075bcde3ff61
 
         # 🔥 feature별로 검색 TOOL → 매핑
         for feature_name, present_value in present_features.items():
@@ -441,11 +433,7 @@ def _get_default_llm_client():
 
 
 def _get_default_product_repository() -> ProductRepository:
-<<<<<<< HEAD
-    """ 수정: Repository 생성 방식 간소화"""
-=======
     """수정: Repository 생성 방식 간소화"""
->>>>>>> 9286e720fc6e1df67424a9067f29075bcde3ff61
     global _DEFAULT_PRODUCT_REPOSITORY
     if _DEFAULT_PRODUCT_REPOSITORY is None:
         _DEFAULT_PRODUCT_REPOSITORY = ProductRepository()
