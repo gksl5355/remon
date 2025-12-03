@@ -1,41 +1,102 @@
 plugins {
-	id 'java'
-	id 'org.springframework.boot' version '3.5.8'
-	id 'io.spring.dependency-management' version '1.1.7'
+    id 'java'
+    // [요청 반영] 팀원 요구사항에 맞춰 3.5.8 버전 지정
+    id 'org.springframework.boot' version '3.5.8'
+    id 'io.spring.dependency-management' version '1.1.7'
 }
 
 group = 'com.global17'
 version = '0.0.1-SNAPSHOT'
-description = 'auth-service for remon project to Spring Boot'
+description = 'auth-service for remon project'
 
 java {
-	toolchain {
-		languageVersion = JavaLanguageVersion.of(21)
-	}
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
 }
 
 configurations {
-	compileOnly {
-		extendsFrom annotationProcessor
-	}
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
 }
 
 repositories {
-	mavenCentral()
+    mavenCentral()
+    // 혹시 3.5.8이 사내 저장소나 Snapshot 저장소에 있다면 아래 저장소 추가가 필요할 수 있습니다.
+    // maven { url 'https://repo.spring.io/milestone' }
+    // maven { url 'https://repo.spring.io/snapshot' }
 }
 
 dependencies {
-	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-	implementation 'org.springframework.boot:spring-boot-starter-validation'
-	implementation 'org.springframework.boot:spring-boot-starter-web'
-	compileOnly 'org.projectlombok:lombok'
-	developmentOnly 'org.springframework.boot:spring-boot-devtools'
-	runtimeOnly 'org.postgresql:postgresql'
-	annotationProcessor 'org.projectlombok:lombok'
-	testImplementation 'org.springframework.boot:spring-boot-starter-test'
-	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    // 1. Web & JPA
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    
+    // 2. DB Driver
+    runtimeOnly 'org.postgresql:postgresql'
+    
+    // 3. Utils (Lombok)
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    
+    // 4. AWS S3 SDK (버전 관리 BOM 사용)
+    implementation platform('software.amazon.awssdk:bom:2.29.0')
+    implementation 'software.amazon.awssdk:s3'
+
+    // 5. HTTP Client (Tavily 요청용)
+    implementation 'org.apache.httpcomponents.client5:httpclient5'
+
+    // 6. Test
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+	// [추가] HTML 파싱 및 텍스트 추출용 (Java의 BeautifulSoup)
+    implementation 'org.jsoup:jsoup:1.17.2'
 }
 
 tasks.named('test') {
-	useJUnitPlatform()
+    useJUnitPlatform()
 }
+// plugins {
+// 	id 'java'
+// 	id 'org.springframework.boot' version '3.5.8'
+// 	id 'io.spring.dependency-management' version '1.1.7'
+// }
+
+// group = 'com.global17'
+// version = '0.0.1-SNAPSHOT'
+// description = 'auth-service for remon project to Spring Boot'
+
+// java {
+// 	toolchain {
+// 		languageVersion = JavaLanguageVersion.of(21)
+// 	}
+// }
+
+// configurations {
+// 	compileOnly {
+// 		extendsFrom annotationProcessor
+// 	}
+// }
+
+// repositories {
+// 	mavenCentral()
+// }
+
+// dependencies {
+// 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+// 	implementation 'org.springframework.boot:spring-boot-starter-validation'
+// 	implementation 'org.springframework.boot:spring-boot-starter-web'
+// 	compileOnly 'org.projectlombok:lombok'
+// 	developmentOnly 'org.springframework.boot:spring-boot-devtools'
+// 	runtimeOnly 'org.postgresql:postgresql'
+// 	annotationProcessor 'org.projectlombok:lombok'
+// 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+// 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+// }
+
+// tasks.named('test') {
+// 	useJUnitPlatform()
+// }
