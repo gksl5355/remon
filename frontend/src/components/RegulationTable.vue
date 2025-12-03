@@ -1,7 +1,8 @@
 <template>
+  <!-- 11-27 스크롤 가능하게 변경 (조영우) -->
   <div
     class="bg-[#111]/90 backdrop-blur-lg rounded-2xl shadow-[0_0_25px_rgba(0,0,0,0.4)]
-           flex flex-col overflow-hidden h-[calc(100vh-180px)]"
+           flex flex-col overflow-hidden h-full"
   >
     <!-- 🔹 헤더 (sticky) -->
     <div
