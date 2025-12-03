@@ -136,17 +136,19 @@ class VisionOrchestrator:
         self.entity_extractor = EntityExtractor()
         self.graph_manager = GraphManager()
         
-    def process_pdf(self, pdf_path: str, use_parallel: bool = True) -> Dict[str, Any]:
+    def process_pdf(self, pdf_path: str, use_parallel: bool = True, language_code: str = None) -> Dict[str, Any]:
         """
         PDF 전체 처리 파이프라인.
         
         Args:
             pdf_path: PDF 파일 경로
             use_parallel: 병렬 처리 사용 여부 (기본값: True)
+            language_code: 문서 언어 코드 (None이면 자동 감지)
             
         Returns:
             Dict: {
                 "status": "success",
+                "language_code": "en",
                 "vision_extraction_result": [...],
                 "graph_data": {...},
                 "dual_index_summary": {...}
@@ -155,6 +157,27 @@ class VisionOrchestrator:
         logger.info(f"=== Vision Pipeline 시작: {Path(pdf_path).name} (병렬: {use_parallel}) ===")
         
         try:
+            # 언어 감지 (제공되지 않은 경우)
+            if language_code is None:
+                from app.crawler.pdf_language_detector import detect_pdf_language
+                
+                logger.info("문서 언어 감지 중...")
+                lang_result = detect_pdf_language(pdf_path)
+                
+                if lang_result['success']:
+                    language_code = lang_result['language_code'].lower()
+                    logger.info(
+                        f"감지된 언어: {lang_result['language_name']} ({language_code}), "
+                        f"신뢰도: {lang_result['confidence']:.2f}"
+                    )
+                else:
+                    language_code = "en"  # fallback
+                    logger.warning(f"언어 감지 실패, 기본값 사용: {language_code}")
+            else:
+                logger.info(f"지정된 언어: {language_code}")
+            
+            # StructureExtractor에 언어 설정
+            self.structure_extractor = StructureExtractor(language_code=language_code)
             # Phase 1: Vision Ingestion
             if use_parallel and self.max_concurrency > 1:
                 # 비동기 병렬 처리
@@ -189,6 +212,7 @@ class VisionOrchestrator:
             
             result = {
                 "status": "success",
+                "language_code": language_code,
                 "vision_extraction_result": vision_results,
                 "graph_data": graph_data,
                 "dual_index_summary": index_summary,
@@ -244,12 +268,12 @@ class VisionOrchestrator:
                 # 3. 동적 렌더링
                 page_data = self.renderer.render_page_with_dpi(pdf_path, page_idx, dpi)
                 
-                # 4. Vision 추출
+                # 4. Vision 추출 (언어별 프롬프트 사용)
                 extraction = self.vision_router.route_and_extract(
                     image_base64=page_data["image_base64"],
                     page_num=page_num,
                     complexity_score=complexity["complexity_score"],
-                    system_prompt=StructureExtractor.SYSTEM_PROMPT
+                    system_prompt=self.structure_extractor.get_system_prompt()
                 )
                 
                 # 토큰 사용량 추적
