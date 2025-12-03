@@ -17,9 +17,9 @@ class Report(Base):
     country_code = Column(String(2), ForeignKey("countries.country_code"), nullable=False)
 
     # Relationships
-    translation = relationship("RegulationTranslation", back_populates="reports")
-    change = relationship("RegulationChangeHistory", back_populates="reports")
-    items = relationship("ReportItem", back_populates="report", cascade="all, delete-orphan")
+    # translation = relationship("RegulationTranslation", back_populates="reports")
+    # change = relationship("RegulationChangeHistory", back_populates="reports")
+    # items = relationship("ReportItem", back_populates="report", cascade="all, delete-orphan")
     # [삭제됨] ReportSummary와의 관계 제거 (1:1 or 1:N 관계가 FK 삭제로 끊어짐)
 
 
@@ -33,7 +33,7 @@ class ReportItem(Base):
     order_no = Column(Integer)
 
     # Relationships
-    reports = relationship("Report", back_populates="items")
+    # reports = relationship("Report", back_populates="items")
     version = relationship("RegulationVersion")
     impact_scores = relationship("ImpactScore")
 
