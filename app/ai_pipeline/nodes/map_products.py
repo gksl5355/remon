@@ -288,7 +288,6 @@ class MappingNode:
                 logger.info(
                     "🔍 Searching feature=%s value=%s unit=%s",
                     feature_name,
-                    value,
                     unit or "-",
                 )
             retrieval: RetrievalResult = await self._run_search(
