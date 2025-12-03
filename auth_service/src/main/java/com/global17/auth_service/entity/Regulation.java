@@ -35,34 +35,3 @@ public class Regulation {
 }
 
 
-// package com.global17.auth_service.entity;
-
-// import jakarta.persistence.*;
-// import lombok.*;
-// import java.time.LocalDate;
-
-// @Entity
-// @Table(name = "regulations")
-// @Getter @Setter
-// @NoArgsConstructor @AllArgsConstructor
-// @Builder
-// public class Regulation {
-
-//     @Id
-//     @GeneratedValue(strategy = GenerationType.IDENTITY)
-//     private Long regulationId;
-
-//     @Column(name = "source_id")
-//     private Integer sourceId;
-
-//     @Column(name = "country_code", length = 2)
-//     private String countryCode;
-
-//     private String title;
-
-//     @Column(name = "status")
-//     private String status;
-
-//     @Column(name = "created_at")
-//     private LocalDate createdAt;
-// }

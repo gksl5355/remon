@@ -9,12 +9,26 @@ class Report(Base):
     report_id = Column(Integer, primary_key=True, index=True)
     created_reason = Column(String(30))
     created_at = Column(DateTime, server_default=func.now())
-    file_path = Column(String(500))
+    file_path = Column(String(500)) # 로컬 경로 (기존)
     
+    # [신규] S3 Key 및 PDF 업데이트 시간
+    s3_key = Column(String(500), nullable=True)
+    pdf_updated_at = Column(DateTime, nullable=True)
+
     translation_id = Column(Integer, ForeignKey("regulation_translations.translation_id"), nullable=False)
     change_id = Column(Integer, ForeignKey("regulation_change_history.change_id"))
     product_id = Column(Integer, ForeignKey("products.product_id"))
     country_code = Column(String(2), ForeignKey("countries.country_code"), nullable=False)
+
+    # report_id = Column(Integer, primary_key=True, index=True)
+    # created_reason = Column(String(30))
+    # created_at = Column(DateTime, server_default=func.now())
+    # file_path = Column(String(500))
+    
+    # translation_id = Column(Integer, ForeignKey("regulation_translations.translation_id"), nullable=False)
+    # change_id = Column(Integer, ForeignKey("regulation_change_history.change_id"))
+    # product_id = Column(Integer, ForeignKey("products.product_id"))
+    # country_code = Column(String(2), ForeignKey("countries.country_code"), nullable=False)
 
     # Relationships
     translations = relationship("RegulationTranslation", back_populates="reports")
@@ -52,3 +66,6 @@ class ReportSummary(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     # [변경] FK 제거로 인해 모든 Relationship 삭제됨
+
+    # [신규] 수정 시간 (캐시 신선도 체크용)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)

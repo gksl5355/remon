@@ -1,7 +1,7 @@
 from typing import Optional, List, Dict, Any
 from datetime import date, datetime
 from pydantic import BaseModel
-from app.core.models.enums import ChangeTypeEnum
+from app.core.models.enums import ChangeTypeEnum, TranslationStatusEnum
 
 # --- Regulation Schemas ---
 
@@ -71,17 +71,31 @@ class RegulationChangeKeynoteResponse(RegulationChangeKeynoteBase):
 
 class RegulationTranslationBase(BaseModel):
     regulation_version_id: int
-    language_code: Optional[str] = None
+    language_code: str
     translated_text: Optional[str] = None
-    glossary_term_id: Optional[str] = None # UUID string
-    translation_status: Optional[str] = None
+    glossary_term_id: Optional[str] = None
+    translation_status: Optional[TranslationStatusEnum] = TranslationStatusEnum.queued
+    s3_key: Optional[str] = None  # [신규]
+    
+    # regulation_version_id: int
+    # language_code: Optional[str] = None
+    # translated_text: Optional[str] = None
+    # glossary_term_id: Optional[str] = None # UUID string
+    # translation_status: Optional[str] = None
 
 class RegulationTranslationCreate(RegulationTranslationBase):
     pass
 
+class RegulationTranslationUpdate(BaseModel):
+    # 업데이트용 스키마 (필요 시 사용)
+    translated_text: Optional[str] = None
+    translation_status: Optional[TranslationStatusEnum] = None
+    s3_key: Optional[str] = None
+
 class RegulationTranslationResponse(RegulationTranslationBase):
     translation_id: int
     created_at: datetime
+    updated_at: datetime  # [신규]
 
     class Config:
         from_attributes = True
