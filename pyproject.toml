@@ -81,7 +81,6 @@ api = [
   "python-multipart>=0.0.20",
   "requests==2.32.3",
   "psycopg2-binary>=2.9.11",
-<<<<<<< HEAD
   "alembic>=1.17.2",
   "python-dotenv>=1.2.1",
   "greenlet>=3.2.4",
@@ -91,9 +90,6 @@ api = [
   "python-dateutil>=2.9.0.post0",
   "selenium>=4.38.0",
   "webdriver-manager>=4.0.2",
-=======
-  "boto3>=1.35.0",
->>>>>>> 9286e720fc6e1df67424a9067f29075bcde3ff61
 ]
 
 # -----------------------------------
