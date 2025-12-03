@@ -264,21 +264,59 @@ class ChangeDetectionNode:
     def _extract_reference_blocks(
         self, vision_results: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        """Vision 결과에서 Reference Blocks 추출."""
+        """
+        Vision 결과에서 Reference Blocks 추출.
+        
+        변경: markdown_content를 청킹하여 reference_blocks 생성.
+        이전 reference_blocks는 메타데이터용이므로 사용 안 함.
+        """
+        from app.ai_pipeline.preprocess.semantic_processing import HierarchyChunker
+        
+        chunker = HierarchyChunker(max_tokens=1024)
         ref_blocks = []
+        
         for page_result in vision_results:
             structure = page_result.get("structure", {})
-            blocks = structure.get("reference_blocks", [])
-            for block in blocks:
+            markdown_content = structure.get("markdown_content", "")
+            page_num = page_result.get("page_num")
+            
+            if not markdown_content:
+                continue
+            
+            # 마크다운 청킹
+            chunks = chunker.chunk_document(markdown_content, page_num)
+            
+            for chunk in chunks:
+                # 계층 구조에서 section_ref 추출
+                hierarchy = chunk.get("hierarchy", [])
+                section_ref = hierarchy[-1] if hierarchy else f"Page{page_num}"
+                
                 ref_blocks.append(
                     {
-                        "section_ref": block.get("section_ref"),
-                        "text": block.get("text"),
-                        "keywords": block.get("keywords", []),
-                        "page_num": page_result.get("page_num"),
+                        "section_ref": section_ref,
+                        "text": chunk["text"],
+                        "keywords": self._extract_keywords(chunk["text"]),
+                        "page_num": page_num,
+                        "hierarchy": hierarchy,
                     }
                 )
+        
         return ref_blocks
+    
+    def _extract_keywords(self, text: str, max_keywords: int = 5) -> List[str]:
+        """텍스트에서 키워드 추출 (간단한 토큰 기반)."""
+        import re
+        
+        # 숫자 포함 단어 우선 (예: 20mg, § 1141.1)
+        numeric_words = re.findall(r'\b\w*\d+\w*\b', text)
+        
+        # 대문자 시작 단어 (고유명사)
+        capitalized = re.findall(r'\b[A-Z][a-z]+\b', text)
+        
+        # 결합 및 중복 제거
+        keywords = list(dict.fromkeys(numeric_words[:3] + capitalized[:3]))
+        
+        return keywords[:max_keywords]
 
     async def _find_legacy_regulation_s3(
         self, vision_results: List[Dict[str, Any]]
@@ -482,31 +520,120 @@ class ChangeDetectionNode:
     async def _match_reference_blocks(
         self, new_blocks: List[Dict[str, Any]], legacy_blocks: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        """CoT Step 1: Section 번호 기반 정확 매칭 (밀림 현상 방지)."""
-        logger.info("Section 번호 기반 매칭 시작 (LLM 생략, 규칙 기반)")
+        """
+        CoT Step 1: 계층 구조 기반 정확 매칭 (밀림 현상 방지).
+        
+        전략:
+        1. 계층 구조 완전 일치 (hierarchy 배열 비교)
+        2. section_ref 일치 (fallback)
+        3. 키워드 유사도 (fuzzy matching)
+        """
+        logger.info("계층 구조 기반 매칭 시작 (규칙 기반)")
 
-        # Section 번호로 정확 매칭 (밀림 현상 방지)
         matched_pairs = []
+        matched_legacy_indices = set()
 
+        # 전략 1: 계층 구조 완전 일치
         for new_block in new_blocks:
+            new_hierarchy = new_block.get("hierarchy", [])
+            
+            if not new_hierarchy:
+                continue
+            
+            for idx, legacy_block in enumerate(legacy_blocks):
+                if idx in matched_legacy_indices:
+                    continue
+                
+                legacy_hierarchy = legacy_block.get("hierarchy", [])
+                
+                # 계층 구조 완전 일치
+                if new_hierarchy == legacy_hierarchy:
+                    matched_pairs.append(
+                        {
+                            "new_block": new_block,
+                            "legacy_block": legacy_block,
+                            "match_confidence": 1.0,
+                            "match_reason": f"Exact hierarchy match: {' > '.join(new_hierarchy)}",
+                        }
+                    )
+                    matched_legacy_indices.add(idx)
+                    break
+        
+        # 전략 2: section_ref 일치 (fallback)
+        for new_block in new_blocks:
+            # 이미 매칭된 경우 스킵
+            if any(p["new_block"] == new_block for p in matched_pairs):
+                continue
+            
             new_section = new_block["section_ref"]
-
-            # 동일 Section 번호 찾기
-            legacy_block = next(
-                (b for b in legacy_blocks if b["section_ref"] == new_section), None
-            )
-
-            if legacy_block:
+            
+            for idx, legacy_block in enumerate(legacy_blocks):
+                if idx in matched_legacy_indices:
+                    continue
+                
+                legacy_section = legacy_block["section_ref"]
+                
+                if new_section == legacy_section:
+                    matched_pairs.append(
+                        {
+                            "new_block": new_block,
+                            "legacy_block": legacy_block,
+                            "match_confidence": 0.9,
+                            "match_reason": f"Section ref match: {new_section}",
+                        }
+                    )
+                    matched_legacy_indices.add(idx)
+                    break
+        
+        # 전략 3: 키워드 유사도 (fuzzy matching)
+        for new_block in new_blocks:
+            if any(p["new_block"] == new_block for p in matched_pairs):
+                continue
+            
+            new_keywords = set(new_block.get("keywords", []))
+            
+            if not new_keywords:
+                continue
+            
+            best_match = None
+            best_score = 0.0
+            
+            for idx, legacy_block in enumerate(legacy_blocks):
+                if idx in matched_legacy_indices:
+                    continue
+                
+                legacy_keywords = set(legacy_block.get("keywords", []))
+                
+                if not legacy_keywords:
+                    continue
+                
+                # Jaccard 유사도
+                intersection = len(new_keywords & legacy_keywords)
+                union = len(new_keywords | legacy_keywords)
+                score = intersection / union if union > 0 else 0.0
+                
+                if score > best_score and score >= 0.5:  # 임계값
+                    best_score = score
+                    best_match = (idx, legacy_block)
+            
+            if best_match:
+                idx, legacy_block = best_match
                 matched_pairs.append(
                     {
                         "new_block": new_block,
                         "legacy_block": legacy_block,
-                        "match_confidence": 1.0,
-                        "match_reason": f"Exact section match: {new_section}",
+                        "match_confidence": best_score,
+                        "match_reason": f"Keyword similarity: {best_score:.2f}",
                     }
                 )
+                matched_legacy_indices.add(idx)
 
-        logger.info(f"Section 매칭 완료: {len(matched_pairs)}개 쌍 (정확 매칭)")
+        logger.info(
+            f"매칭 완료: {len(matched_pairs)}개 쌍 "
+            f"(정확: {sum(1 for p in matched_pairs if p['match_confidence'] == 1.0)}, "
+            f"section: {sum(1 for p in matched_pairs if p['match_confidence'] == 0.9)}, "
+            f"fuzzy: {sum(1 for p in matched_pairs if p['match_confidence'] < 0.9)})"
+        )
         return matched_pairs
 
     async def _detect_change_by_ref_id(

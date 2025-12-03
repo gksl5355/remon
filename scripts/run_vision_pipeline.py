@@ -21,6 +21,7 @@ sys.path.insert(0, str(project_root))
 
 # .env 파일 로드
 from dotenv import load_dotenv
+
 load_dotenv(project_root / ".env")
 
 from app.ai_pipeline.preprocess.config import PreprocessConfig
@@ -118,7 +119,7 @@ def save_llm_outputs(result: dict, pdf_name: str, timestamp: str) -> None:
         return
 
     vision_results = result.get("vision_extraction_result", [])
-    
+
     # 파일명 길이 제한 (80글자)
     safe_pdf_name = pdf_name[:80] if len(pdf_name) > 80 else pdf_name
 
@@ -161,7 +162,9 @@ async def process_single_pdf(pdf_path: Path, args, orchestrator) -> dict:
 
     # 병렬 처리 여부 설정
     use_parallel = not args.no_parallel
-    result = await asyncio.to_thread(orchestrator.process_pdf, str(pdf_path), use_parallel)
+    result = await asyncio.to_thread(
+        orchestrator.process_pdf, str(pdf_path), use_parallel
+    )
 
     # 테스트 모드: 콘솔에 상세 결과 출력
     if args.skip_indexing and result["status"] == "success":
@@ -175,17 +178,21 @@ async def process_single_pdf(pdf_path: Path, args, orchestrator) -> dict:
     if result["status"] == "success":
         vision_results = result.get("vision_extraction_result", [])
         index_summary = result.get("dual_index_summary", {})
-        
+
         gpt4o_count = sum(1 for p in vision_results if p.get("model_used") == "gpt-4o")
         total_tokens = sum(p.get("tokens_used", 0) for p in vision_results)
 
         if args.skip_indexing:
-            logger.info(f"✅ 완료: {len(vision_results)}페이지, {total_tokens:,}토큰 (Qdrant 저장 건너뜀)")
+            logger.info(
+                f"✅ 완료: {len(vision_results)}페이지, {total_tokens:,}토큰 (Qdrant 저장 건너뜀)"
+            )
         else:
-            logger.info(f"✅ 완료: {len(vision_results)}페이지, {index_summary.get('qdrant_chunks', 0)}청크, {total_tokens:,}토큰")
+            logger.info(
+                f"✅ 완료: {len(vision_results)}페이지, {index_summary.get('qdrant_chunks', 0)}청크, {total_tokens:,}토큰"
+            )
     else:
         logger.error(f"❌ 실패: {result.get('error')}")
-    
+
     return result
 
 
@@ -194,11 +201,11 @@ def _print_detailed_results(result: dict) -> None:
     vision_results = result.get("vision_extraction_result", [])
     processing_results = result.get("processing_results", {})
     chunks = processing_results.get("chunks", [])
-    
+
     logger.info("\n" + "=" * 60)
     logger.info("📄 Vision 추출 결과 상세")
     logger.info("=" * 60)
-    
+
     for page_result in vision_results:
         page_num = page_result["page_num"]
         model = page_result["model_used"]
@@ -206,7 +213,7 @@ def _print_detailed_results(result: dict) -> None:
         tokens = page_result.get("tokens_used", 0)
         structure = page_result["structure"]
         markdown = structure.get("markdown_content", "")
-        
+
         logger.info(f"\n[페이지 {page_num}]")
         logger.info(f"  모델: {model}")
         logger.info(f"  복잡도: {complexity:.2f}")
@@ -214,7 +221,7 @@ def _print_detailed_results(result: dict) -> None:
         logger.info(f"  표 포함: {page_result.get('has_table', False)}")
         logger.info(f"  내용:\n{markdown}")
         logger.info("-" * 60)
-    
+
     if chunks:
         logger.info("\n" + "=" * 60)
         logger.info("📦 청킹 결과 요약")
@@ -238,7 +245,7 @@ async def main():
 
     # PDF 목록 수집
     pdf_files = []
-    
+
     if args.pdf:
         # 단일 파일 지정
         pdf_path = Path(args.pdf)
@@ -254,14 +261,14 @@ async def main():
         folder_path = Path(args.folder)
         if not folder_path.is_absolute():
             folder_path = project_root / folder_path
-        
+
         if not folder_path.exists():
             logger.error(f"❌ 폴더 없음: {folder_path}")
             return
-        
+
         pdf_files = sorted(folder_path.glob("*.pdf"))
         pdf_files = [p for p in pdf_files if not p.name.startswith(".")]
-    
+
     if not pdf_files:
         logger.error("❌ 처리할 PDF 파일이 없습니다")
         return
@@ -269,9 +276,15 @@ async def main():
     logger.info(f"📚 총 {len(pdf_files)}개 PDF 파일 발견")
     logger.info(f"🔍 지식 그래프: {'활성화' if args.enable_graph else '비활성화'}")
     logger.info(f"💾 출력 저장: {'활성화' if args.save_outputs else '비활성화'}")
-    max_concurrency_display = args.max_concurrency or PreprocessConfig.VISION_MAX_CONCURRENCY
-    logger.info(f"⚡ 병렬 처리: {'비활성화' if args.no_parallel else f'활성화 (max_concurrency={max_concurrency_display})'}")
-    logger.info(f"🗄️  Qdrant 저장: {'건너뛰기 (테스트 모드)' if args.skip_indexing else '활성화'}")
+    max_concurrency_display = (
+        args.max_concurrency or PreprocessConfig.VISION_MAX_CONCURRENCY
+    )
+    logger.info(
+        f"⚡ 병렬 처리: {'비활성화' if args.no_parallel else f'활성화 (max_concurrency={max_concurrency_display})'}"
+    )
+    logger.info(
+        f"🗄️  Qdrant 저장: {'건너뛰기 (테스트 모드)' if args.skip_indexing else '활성화'}"
+    )
 
     # Orchestrator 생성 (config 기본값, CLI로 오버라이드)
     orchestrator = VisionOrchestrator(
@@ -282,28 +295,33 @@ async def main():
         retry_backoff_seconds=args.retry_backoff_seconds,
         enable_graph=args.enable_graph if args.enable_graph else None,
     )
-    
+
     # 컬렉션명 설정
     if args.collection:
         from app.ai_pipeline.preprocess.semantic_processing import DualIndexer
+
         orchestrator.dual_indexer = DualIndexer(collection_name=args.collection)
         logger.info(f"🗄️  Qdrant 컬렉션: {args.collection}")
     else:
-        logger.info(f"🗄️  Qdrant 컬렉션: {os.getenv('QDRANT_COLLECTION', 'remon_regulations')}")
-    
+        logger.info(
+            f"🗄️  Qdrant 컬렉션: {os.getenv('QDRANT_COLLECTION', 'remon_regulations')}"
+        )
+
     # 테스트 모드: Qdrant 저장 건너뛰기 (스크립트 레벨에서만 처리)
     if args.skip_indexing:
         from unittest.mock import MagicMock
+
         # DualIndexer를 Mock으로 교체
         orchestrator.dual_indexer = MagicMock()
-        orchestrator.dual_indexer.index = lambda chunks, graph_data, source_file: {
+        orchestrator.dual_indexer.index = lambda chunks, graph_data, source_file, regulation_id=None, vision_results=None: {
             "status": "skipped",
             "qdrant_chunks": 0,
+            "reference_blocks_count": 0,
             "graph_nodes": len(graph_data.get("nodes", [])),
             "graph_edges": len(graph_data.get("edges", [])),
             "collection_name": "test_mode",
             "processed_at": "test_mode",
-            "message": "Indexing skipped for testing"
+            "message": "Indexing skipped for testing",
         }
 
     # 순차 처리
@@ -317,16 +335,16 @@ async def main():
     logger.info("\n" + "=" * 60)
     logger.info("📊 전체 처리 완료")
     logger.info("=" * 60)
-    
+
     success_count = sum(1 for r in results if r["status"] == "success")
     logger.info(f"성공: {success_count}/{len(results)}")
-    
+
     if success_count < len(results):
         logger.info("\n실패 파일:")
         for r in results:
             if r["status"] != "success":
                 logger.info(f"  - {r['file']}")
-    
+
     if args.save_outputs:
         logger.info(f"\n📁 출력 위치: {OUTPUT_DIR}")
 
