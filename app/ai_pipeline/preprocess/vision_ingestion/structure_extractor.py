@@ -38,11 +38,25 @@ class ReferenceBlock(BaseModel):
 
 class DocumentMetadata(BaseModel):
     """문서 메타데이터 (RAG 검색용)."""
+    document_id: Optional[str] = None
+    jurisdiction_code: Optional[str] = None
+    authority: Optional[str] = None
     title: Optional[str] = None
+    citation_code: Optional[str] = None
+    language: Optional[str] = None
+    publication_date: Optional[str] = None
+    effective_date: Optional[str] = None
+    source_url: Optional[str] = None
+    retrieval_datetime: Optional[str] = None
+    original_format: Optional[str] = None
+    file_path: Optional[str] = None
+    raw_text_path: Optional[str] = None
+    section_label: Optional[str] = None
+    page_range: Optional[List[int]] = None
+    keywords: List[str] = Field(default_factory=list)
+    # 하위 호환성
     country: Optional[str] = None
     regulation_type: Optional[str] = None
-    keywords: List[str] = Field(default_factory=list)
-    effective_date: Optional[str] = None
 
 class PageStructure(BaseModel):
     """페이지 구조화 데이터."""
@@ -58,119 +72,209 @@ class PageStructure(BaseModel):
 class StructureExtractor:
     """LLM 출력을 Pydantic 모델로 변환."""
     
-    SYSTEM_PROMPT = """You are a regulatory document structure expert.
+    SYSTEM_PROMPT = """You are a regulatory document structure expert specializing in US regulatory formats (CFR, USC, Federal Register).
 
-Extract the following from the document image:
+**CRITICAL: You MUST return ONLY a valid JSON object. No markdown code blocks, no explanations, ONLY the JSON.**
 
-1. **Markdown Content**: Convert the page to clean Markdown format.
-   - Use # for top-level headers (e.g., "Part 1")
-   - Use ## for sub-headers (e.g., "Section 1.1")
-   - Preserve all text content
+## Task Overview
+Analyze the document image and extract structured data following DDH (Division-Department-Hierarchy) patterns common in US regulations.
 
-2. **Reference Blocks**: Divide content into meaningful reference blocks.
-   - Each block should be a complete semantic unit (paragraph, section, or clause)
-   - Extract section numbers (e.g., "1114.5(a)(3)")
-   - Assign unique reference IDs
-   - Keep blocks under 500 words for efficient comparison
+## 1. Markdown Content (DDH Pattern Recognition)
+**Identify and label hierarchical structure:**
+- **Title/Part**: Use `# Title 21` or `# Part 1141`
+- **Chapter/Subpart**: Use `## Chapter I` or `## Subpart A—General Provisions`
+- **Section**: Use `### § 1141.1 Scope` (preserve § symbol and section number)
+- **Subsection**: Use `#### (a)`, `#### (b)` for lettered subsections
+- **Paragraph**: Use `##### (1)`, `##### (2)` for numbered paragraphs
 
-3. **Metadata**: Extract document metadata for RAG search.
-   - title: Full regulation title
-   - country: Country code (e.g., "US", "KR", "EU")
-   - regulation_type: Type (e.g., "FDA", "EPA", "MFDS")
-   - keywords: Key terms for search (e.g., ["nicotine", "e-cigarette", "20mg/mL"])
-   - effective_date: If mentioned (YYYY-MM-DD format)
+**Preserve original text exactly:**
+- Keep all section numbers, citations, and legal references
+- Maintain paragraph structure and line breaks
+- Do NOT summarize or paraphrase
 
-4. **Entities**: Extract key entities as JSON array:
-   [{"name": "FDA", "type": "Organization", "context": "regulatory body"}]
-   
-5. **Tables**: Extract tables as JSON:
-   [{"headers": ["Item", "Limit"], "rows": [["Nicotine", "20mg/mL"]], "caption": "Table 1"}]
+**Table handling:**
+- Insert table placeholder: `[TABLE: Table 1 - Nicotine Limits]`
+- Full table data goes in "tables" array
 
-**CRITICAL for Reference Blocks:**
-- Complete Recall: Include ALL regulatory requirements, prohibitions, and limits
-- Context Preservation: Keep numerical values with their context (e.g., "20mg/mL for e-cigarette liquids")
-- Search Optimization: Extract keywords that enable accurate database matching
+## 2. Reference Blocks (Metadata for Chunking)
+**Purpose**: Provide metadata for each semantic unit WITHOUT duplicating full text.
+- `section_ref`: Section identifier (e.g., "§ 1141.1(a)", "Table 1")
+- `text`: BRIEF summary or first sentence (max 200 chars)
+- `start_line`: Approximate line number in markdown
+- `end_line`: Approximate end line
+- `keywords`: Key terms for search (3-5 terms)
 
-Return ONLY valid JSON in this format:
+**Note**: Full text is in markdown_content. Reference blocks are INDEX ONLY.
+
+## 3. Metadata (Complete Document Information)
+**Extract ALL available fields:**
+```json
 {
-  "markdown_content": "# Part 1\\n## Section 1.1\\n...",
+  "document_id": "CFR-2023-title21-vol8-chapI-subchapK",
+  "jurisdiction_code": "US",
+  "authority": "Food and Drug Administration",
+  "title": "Cigarette Package and Advertising Warnings",
+  "citation_code": "21 CFR Part 1141",
+  "language": "en",
+  "publication_date": "2023-04-01",
+  "effective_date": "2023-06-01",
+  "source_url": null,
+  "retrieval_datetime": null,
+  "original_format": "pdf",
+  "file_path": null,
+  "raw_text_path": null,
+  "section_label": "Part 1141",
+  "page_range": [1, 50],
+  "keywords": ["cigarette", "health warnings", "advertising"],
+  "country": "US",
+  "regulation_type": "FDA"
+}
+```
+**Field rules:**
+- Use `null` if information not found (do NOT omit fields)
+- `jurisdiction_code`: ISO 2-letter code (US, KR, EU, etc.)
+- `authority`: Full agency name (e.g., "Food and Drug Administration")
+- `citation_code`: Official citation (e.g., "21 CFR 1141", "15 USC 1333")
+- `language`: ISO 639-1 code (en, ko, etc.)
+- Dates: YYYY-MM-DD format
+- `page_range`: [start_page, end_page] if multi-page document
+
+## 4. Entities
+Extract organizations, regulations, chemicals, numbers:
+```json
+[{"name": "FDA", "type": "Organization", "context": "regulatory authority"}]
+```
+
+## 5. Tables (Preserve Original Structure)
+**Extract tables with full data:**
+```json
+[{
+  "headers": ["Item", "Limit", "Unit"],
+  "rows": [["Nicotine", "20", "mg/mL"], ["Tar", "10", "mg"]],
+  "caption": "Table 1: Maximum Concentration Limits"
+}]
+```
+
+## Output Format (STRICT JSON)
+**You MUST return this exact structure. No code blocks, no extra text:**
+
+{
+  "markdown_content": "# Title 21\\n## Chapter I\\n### § 1141.1 Scope\\n(a) This part sets forth...\\n\\n[TABLE: Table 1]\\n\\n### § 1141.2 Definitions\\n...",
   "reference_blocks": [
-    {
-      "section_ref": "1114.5(a)(3)",
-      "text": "The maximum concentration of nicotine...",
-      "start_line": 10,
-      "end_line": 25,
-      "keywords": ["nicotine", "concentration", "20mg/mL"]
-    }
+    {"section_ref": "§ 1141.1(a)", "text": "Requirements for health warnings...", "start_line": 5, "end_line": 10, "keywords": ["health warnings", "cigarette packages"]},
+    {"section_ref": "Table 1", "text": "Maximum concentration limits", "start_line": 15, "end_line": 20, "keywords": ["nicotine", "limits", "concentration"]}
   ],
   "metadata": {
-    "title": "Premarket Tobacco Product Applications",
+    "document_id": null,
+    "jurisdiction_code": "US",
+    "authority": "Food and Drug Administration",
+    "title": "Cigarette Package and Advertising Warnings",
+    "citation_code": "21 CFR Part 1141",
+    "language": "en",
+    "publication_date": null,
+    "effective_date": "2023-06-01",
+    "source_url": null,
+    "retrieval_datetime": null,
+    "original_format": "pdf",
+    "file_path": null,
+    "raw_text_path": null,
+    "section_label": "Part 1141",
+    "page_range": null,
+    "keywords": ["cigarette", "health warnings"],
     "country": "US",
-    "regulation_type": "FDA",
-    "keywords": ["tobacco", "nicotine", "e-cigarette"],
-    "effective_date": "2025-01-01"
+    "regulation_type": "FDA"
   },
-  "entities": [...],
-  "tables": [...]
-}"""
+  "entities": [{"name": "FDA", "type": "Organization", "context": "regulatory authority"}],
+  "tables": [{"headers": ["Item", "Limit"], "rows": [["Nicotine", "20mg/mL"]], "caption": "Table 1"}]
+}
 
-    BATCH_SYSTEM_PROMPT = """You are a regulatory document structure expert.
+**CRITICAL REMINDERS:**
+1. Return ONLY the JSON object (no ```json wrapper)
+2. All metadata fields must be present (use null if unknown)
+3. markdown_content contains FULL original text
+4. reference_blocks are INDEX/METADATA only (brief summaries)
+5. Tables go in both markdown (as placeholder) and tables array (full data)"""
 
-You will receive MULTIPLE document pages as images.
-For EACH page, you must extract the following:
+    BATCH_SYSTEM_PROMPT = """You are a regulatory document structure expert specializing in US regulatory formats (CFR, USC, Federal Register).
 
-1. **Markdown Content**: Convert the page to clean Markdown format.
-   - Use # for top-level headers (e.g., "Part 1")
-   - Use ## for sub-headers (e.g., "Section 1.1")
-   - Use ### and deeper levels as needed for subsections
-   - Preserve all important text content from the page
+**CRITICAL: You MUST return ONLY a valid JSON array. No markdown code blocks, no explanations, ONLY the JSON array.**
 
-2. **Reference Blocks**: Divide content into meaningful reference blocks.
-   - Each block should be a complete semantic unit (paragraph, section, or clause)
-   - Extract section numbers (e.g., "1114.5(a)(3)")
-   - Keep blocks under 500 words for efficient comparison
+## Task
+You will receive MULTIPLE document pages as images. Extract structured data for EACH page following DDH patterns.
 
-3. **Metadata**: Extract document metadata (ONLY for page_index 0).
-   - title: Full regulation title
-   - country: Country code (e.g., "US", "KR", "EU")
-   - regulation_type: Type (e.g., "FDA", "EPA", "MFDS")
-   - keywords: Key terms for search
-   - effective_date: If mentioned (YYYY-MM-DD format)
+## Per-Page Extraction
 
-4. **Entities**: Extract key entities as a JSON array of OBJECTS:
-   [{"name": "FDA", "type": "Organization", "context": "regulatory body"}]
+### 1. Markdown Content (DDH Pattern)
+- Use `#` for Title/Part, `##` for Chapter/Subpart, `###` for Section (§)
+- Preserve original text exactly (no summarization)
+- Insert `[TABLE: caption]` for tables
 
-5. **Tables**: Extract tables as a JSON array of OBJECTS:
-   [{"headers": ["Item", "Limit"], "rows": [["Nicotine", "20mg/mL"]], "caption": "Table 1"}]
+### 2. Reference Blocks (Index Only)
+- Brief metadata for each section/table
+- `section_ref`, `text` (max 200 chars), `start_line`, `end_line`, `keywords`
 
-You MUST return ONLY a single JSON ARRAY at the top level.
-Each element represents ONE page:
+### 3. Metadata (Extract from EACH page independently)
+**CRITICAL: Extract document metadata visible on THIS page only.**
+- If field not visible on current page, use null
+- System will accumulate non-null values across pages
+- First page typically has title/citation, later pages may have dates
+
+**All fields required (use null if not found on THIS page):**
+```json
+{
+  "document_id": null,
+  "jurisdiction_code": "US",
+  "authority": "Food and Drug Administration",
+  "title": "Full regulation title",
+  "citation_code": "21 CFR 1141",
+  "language": "en",
+  "publication_date": null,
+  "effective_date": "2023-06-01",
+  "source_url": null,
+  "retrieval_datetime": null,
+  "original_format": "pdf",
+  "file_path": null,
+  "raw_text_path": null,
+  "section_label": "Part 1141",
+  "page_range": null,
+  "keywords": ["cigarette", "warnings"],
+  "country": "US",
+  "regulation_type": "FDA"
+}
+```
+
+### 4. Entities & Tables
+- Extract as JSON arrays
+
+## Output Format (STRICT JSON ARRAY)
+**Return ONLY this structure (no code blocks):**
 
 [
   {
     "page_index": 0,
-    "markdown_content": "# Part 1\\n## Section 1.1\\n...",
-    "reference_blocks": [{"section_ref": "1.1", "text": "...", "start_line": 1, "end_line": 10, "keywords": []}],
-    "metadata": {"title": "...", "country": "US", "regulation_type": "FDA", "keywords": [], "effective_date": null},
-    "entities": [{"name": "FDA", "type": "Organization", "context": "regulatory body"}],
+    "markdown_content": "# Title 21\\n### § 1141.1 Scope\\n(a) This part sets forth...\\n\\n[TABLE: Table 1]",
+    "reference_blocks": [{"section_ref": "§ 1141.1(a)", "text": "Requirements for...", "start_line": 5, "end_line": 10, "keywords": ["health warnings"]}],
+    "metadata": {"document_id": null, "jurisdiction_code": "US", "authority": "FDA", "title": "...", "citation_code": "21 CFR 1141", "language": "en", "publication_date": null, "effective_date": "2023-06-01", "source_url": null, "retrieval_datetime": null, "original_format": "pdf", "file_path": null, "raw_text_path": null, "section_label": "Part 1141", "page_range": null, "keywords": [], "country": "US", "regulation_type": "FDA"},
+    "entities": [{"name": "FDA", "type": "Organization", "context": "regulatory authority"}],
     "tables": [{"headers": ["Item", "Limit"], "rows": [["Nicotine", "20mg/mL"]], "caption": "Table 1"}]
   },
   {
     "page_index": 1,
-    "markdown_content": "# Part 2\\n...",
+    "markdown_content": "### § 1141.2 Definitions\\n...",
     "reference_blocks": [],
-    "metadata": null,
+    "metadata": {"document_id": null, "jurisdiction_code": null, "authority": null, "title": null, "citation_code": null, "language": null, "publication_date": null, "effective_date": "2023-06-15", "source_url": null, "retrieval_datetime": null, "original_format": null, "file_path": null, "raw_text_path": null, "section_label": null, "page_range": null, "keywords": [], "country": null, "regulation_type": null},
     "entities": [],
     "tables": []
   }
 ]
 
-IMPORTANT:
-- The top-level response MUST be a valid JSON array.
-- The "page_index" MUST match the order of images (0-based).
-- If a page has no data, use empty arrays or null.
-- Do NOT include any text outside of the JSON array.
-Return ONLY the JSON array."""
+**CRITICAL:**
+1. Return ONLY the JSON array (no ```json wrapper)
+2. page_index must match image order (0-based)
+3. **EACH page extracts metadata independently (null if not visible on that page)**
+4. System will merge non-null values across all pages
+5. markdown_content = full original text
+6. reference_blocks = brief index only"""
     
     def __init__(self):
         pass
@@ -367,20 +471,37 @@ Return ONLY the JSON array."""
             return self._fallback_individual_processing(page_infos, model)
     
     def _parse_json_array(self, text: str) -> List[Dict[str, Any]]:
-        """JSON 배열 파싱."""
-        # JSON 블록 찾기
+        """JSON 배열 파싱 (강화된 파싱)."""
+        import re
+        
+        # 1. 마크다운 코드 블록 제거
         if "```json" in text:
             start = text.find("```json") + 7
             end = text.find("```", start)
             json_str = text[start:end].strip()
-        elif "[" in text and "]" in text:
-            start = text.find("[")
-            end = text.rfind("]") + 1
-            json_str = text[start:end]
+        elif "```" in text:
+            start = text.find("```") + 3
+            end = text.find("```", start)
+            json_str = text[start:end].strip()
+        else:
+            json_str = text
+        
+        # 2. JSON 배열 추출
+        if "[" in json_str and "]" in json_str:
+            start = json_str.find("[")
+            end = json_str.rfind("]") + 1
+            json_str = json_str[start:end]
         else:
             raise json.JSONDecodeError("No JSON array found", text, 0)
         
-        return json.loads(json_str)
+        # 3. 파싱 시도
+        try:
+            return json.loads(json_str)
+        except json.JSONDecodeError as e:
+            # 4. 일반적인 JSON 오류 수정 시도
+            json_str = re.sub(r',\s*}', '}', json_str)
+            json_str = re.sub(r',\s*]', ']', json_str)
+            return json.loads(json_str)
     
     def _fallback_individual_processing(
         self, 
@@ -416,17 +537,36 @@ Return ONLY the JSON array."""
         return results
     
     def _parse_json(self, text: str) -> Dict[str, Any]:
-        """LLM 출력에서 JSON 추출."""
-        # JSON 블록 찾기
+        """LLM 출력에서 JSON 추출 (강화된 파싱)."""
+        import re
+        
+        # 1. 마크다운 코드 블록 제거
         if "```json" in text:
             start = text.find("```json") + 7
             end = text.find("```", start)
             json_str = text[start:end].strip()
-        elif "{" in text and "}" in text:
-            start = text.find("{")
-            end = text.rfind("}") + 1
-            json_str = text[start:end]
+        elif "```" in text:
+            # ```만 있는 경우
+            start = text.find("```") + 3
+            end = text.find("```", start)
+            json_str = text[start:end].strip()
         else:
-            raise json.JSONDecodeError("No JSON found", text, 0)
+            json_str = text
         
-        return json.loads(json_str)
+        # 2. JSON 객체 추출
+        if "{" in json_str and "}" in json_str:
+            start = json_str.find("{")
+            end = json_str.rfind("}") + 1
+            json_str = json_str[start:end]
+        else:
+            raise json.JSONDecodeError("No JSON object found", text, 0)
+        
+        # 3. 파싱 시도
+        try:
+            return json.loads(json_str)
+        except json.JSONDecodeError as e:
+            # 4. 일반적인 JSON 오류 수정 시도
+            # 후행 쉼표 제거
+            json_str = re.sub(r',\s*}', '}', json_str)
+            json_str = re.sub(r',\s*]', ']', json_str)
+            return json.loads(json_str)
