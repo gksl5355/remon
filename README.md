@@ -8,7 +8,7 @@
 - FastAPI (Backend, Python 3.11, uv 환경)
 - Vue3 (Frontend)
 - PostgreSQL (Main DB)
-- Chroma (VectorDB)
+- Qdrant (VectorDB)
 - Redis (옵션: 캐시/세션/비동기 큐)
 - OpenSearch (텍스트 검색, Hybrid Retrieval 예정)
 - LLM: GPT-4o mini  
@@ -71,7 +71,7 @@ DE1 – AI/DATA엔지니어 (수집·전처리 파이프라인)  김민제  /app
 |------|------|------|
 | 임베딩 모델 | ✅ BGE-M3 |
 | LLM | ✅ GPT-4o mini |
-| VectorDB | ✅ Chroma |
+| VectorDB | ✅ Qdrant |
 | OpenSearch | 🕐 Hybrid 실험 예정 |
 | 국가 구분 방식 | ✅ meta_country 필드 기반 |
 | 임베딩 저장 방식 | 🟡 VectorDB만 저장, SQL엔 문서 메타만 저장 권장 |
@@ -155,7 +155,6 @@ DE1 – AI/DATA엔지니어 (수집·전처리 파이프라인)  김민제  /app
 
 
 ---
-
 
 
 

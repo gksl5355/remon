@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol, TYPE_CHECKING
 from collections import defaultdict
+
 # Protocol, TYPE_CHECKING 추가
 
 from sqlalchemy import text
@@ -46,6 +47,7 @@ from app.core.repositories.product_repository import ProductRepository
 
 logger = logging.getLogger(__name__)
 
+
 class MappingNode:
     """
     검색 + 매핑 통합 Node
@@ -66,8 +68,8 @@ class MappingNode:
         self.search_tool = search_tool or get_retrieval_tool()
         self.top_k = top_k
         self.alpha = alpha  # 🔥 dynamic hybrid weight
-    
-    # 수정: Repository 생성 (클래스만 변경)
+
+        # 수정: Repository 생성 (클래스만 변경)
         self.product_repository = product_repository or ProductRepository()
         self.debug_enabled = settings.MAPPING_DEBUG_ENABLED
         self.max_candidates_per_doc = max_candidates_per_doc
@@ -227,20 +229,18 @@ class MappingNode:
         mapping_filters: Dict[str, Any] = state.get("mapping_filters") or {}
         if not product:
             product_id = mapping_filters.get("product_id")
-           
-    # 기존 호출 방식    
+
+            # 기존 호출 방식
             # product = await self.product_repository.fetch_product(
             #     int(product_id) if product_id is not None else None
             # )
             # state["product_info"] = product
-    # 수정: Repository 호출 방식 변경 (session 전달)
+            # 수정: Repository 호출 방식 변경 (session 전달)
             async with AsyncSessionLocal() as session:
                 product = await self.product_repository.fetch_product_for_mapping(
-                    session,
-                    int(product_id) if product_id is not None else None
+                    session, int(product_id) if product_id is not None else None
                 )
             state["product_info"] = product
-
 
         product_id = product["product_id"]
         product_name = product.get("product_name", product.get("name", "unknown"))
@@ -248,7 +248,9 @@ class MappingNode:
         target_state = mapping_spec.get("target") or {}
         present_state = mapping_spec.get("present_state") or {}
         # present_state가 비어있으면 target 혹은 구 버전 features를 활용해 최소한의 매핑을 진행한다.
-        present_features = present_state or target_state or product.get("features", {}) or {}
+        present_features = (
+            present_state or target_state or product.get("features", {}) or {}
+        )
         units = product.get("feature_units", {})
 
         mapping_results: List[MappingItem] = []
@@ -272,7 +274,9 @@ class MappingNode:
                 self.alpha,
             )
             if not present_features:
-                logger.info("💤 매핑 대상 특성이 없습니다. mapping.present_state나 target을 확인하세요.")
+                logger.info(
+                    "💤 매핑 대상 특성이 없습니다. mapping.present_state나 target을 확인하세요."
+                )
 
         # 🔥 feature별로 검색 TOOL → 매핑
         for feature_name, present_value in present_features.items():
@@ -286,7 +290,6 @@ class MappingNode:
                 logger.info(
                     "🔍 Searching feature=%s value=%s unit=%s",
                     feature_name,
-                    value,
                     unit or "-",
                 )
             retrieval: RetrievalResult = await self._run_search(
@@ -354,7 +357,9 @@ class MappingNode:
                         mapping_targets[feature_name] = {
                             "required_value": item.get("required_value"),
                             "chunk_id": item.get("regulation_chunk_id"),
-                            "doc_id": item.get("regulation_meta", {}).get("meta_doc_id"),
+                            "doc_id": item.get("regulation_meta", {}).get(
+                                "meta_doc_id"
+                            ),
                         }
 
                 if self.debug_enabled:
@@ -428,7 +433,7 @@ def _get_default_llm_client():
 
 
 def _get_default_product_repository() -> ProductRepository:
-    """ 수정: Repository 생성 방식 간소화"""
+    """수정: Repository 생성 방식 간소화"""
     global _DEFAULT_PRODUCT_REPOSITORY
     if _DEFAULT_PRODUCT_REPOSITORY is None:
         _DEFAULT_PRODUCT_REPOSITORY = ProductRepository()
@@ -477,7 +482,13 @@ async def map_products_node(state: AppState) -> AppState:
     context: MappingContext = state.get("mapping_context", {}) or {}
     has_override = any(
         key in context
-        for key in ("llm_client", "search_tool", "top_k", "alpha", "max_candidates_per_doc")
+        for key in (
+            "llm_client",
+            "search_tool",
+            "top_k",
+            "alpha",
+            "max_candidates_per_doc",
+        )
     )
     if has_override:
         node = _build_mapping_node(
@@ -503,9 +514,7 @@ def _log_mapping_preview(product_id: str, items: List[MappingItem]) -> None:
         logger.info("📭 Mapping produced no items for product=%s", product_id)
         return
 
-    logger.info(
-        "📒 Mapping preview (showing %d/%d items):", len(preview), len(items)
-    )
+    logger.info("📒 Mapping preview (showing %d/%d items):", len(preview), len(items))
     for idx, item in enumerate(preview, 1):
         logger.info(
             "  %d) feature=%s applies=%s required=%s current=%s chunk=%s",

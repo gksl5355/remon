@@ -57,3 +57,4 @@ alembic.ini
 test_insert.py
 Dockerfile*
 deploy/
+output/
