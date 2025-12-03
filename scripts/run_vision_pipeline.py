@@ -296,10 +296,9 @@ async def main():
         from unittest.mock import MagicMock
         # DualIndexer를 Mock으로 교체
         orchestrator.dual_indexer = MagicMock()
-        orchestrator.dual_indexer.index = lambda chunks, graph_data, source_file, regulation_id=None, vision_results=None: {
+        orchestrator.dual_indexer.index = lambda chunks, graph_data, source_file: {
             "status": "skipped",
             "qdrant_chunks": 0,
-            "reference_blocks_count": 0,
             "graph_nodes": len(graph_data.get("nodes", [])),
             "graph_edges": len(graph_data.get("edges", [])),
             "collection_name": "test_mode",

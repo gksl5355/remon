@@ -174,3 +174,6 @@ class AppState(TypedDict, total=False):
     change_detection_results: List[Dict[str, Any]]  # 변경 감지 상세 결과
     change_summary: Dict[str, Any]  # 변경 감지 요약
     change_detection: Dict[str, Any]
+    #validation
+    validation_result: Optional[Dict[str, Any]]
+    validation_retry_count: int = 0
