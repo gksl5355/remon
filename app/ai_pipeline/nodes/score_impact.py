@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-"""LangGraph node: score_impact"""
-
-
-=======
 """
 score_impact.py
 """
@@ -201,4 +196,3 @@ async def score_impact_node(state: AppState) -> AppState:
         state["refined_score_impact_prompt"] = None
 
     return state
->>>>>>> origin/main

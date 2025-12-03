@@ -1,7 +1,5 @@
 """LangGraph node: translate_report"""
 
-<<<<<<< HEAD
-=======
 from __future__ import annotations
 
 import logging
@@ -24,5 +22,4 @@ async def translate_report_node(state: AppState) -> AppState:
 
 
 __all__ = ["translate_report_node"]
->>>>>>> origin/main
 

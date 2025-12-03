@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-"""LangGraph node: map_products"""
-
-
-=======
 """
 map_products.py
 검색 TOOL + LLM 매핑 Node
@@ -588,4 +583,3 @@ def _json_safe_encoder(value: Any):
     if isinstance(value, Decimal):
         return float(value)
     raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
->>>>>>> origin/main

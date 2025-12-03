@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-"""LangGraph node: compose_report"""
-
-=======
 """
 app/ai_pipeline/nodes/report.py
 ReportAgent – 구조화 JSON 보고서 생성 & RDB 연동 가능 버전
@@ -217,4 +213,3 @@ async def report_node(state: AppState) -> Dict[str, Any]:
     # 4) ⭐ 반드시 state 업데이트 후 return
     state["report"] = report_json
     return state
->>>>>>> origin/main
