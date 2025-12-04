@@ -43,7 +43,7 @@ REMON은 국가별 규제 문서를 자동으로 처리해
 
 ## 3. System Architecture
 
-![Image](./docs/ai.png)
+![Image](./docs/ai.jpg)
 
 ![Image](./docs/the-clean-architecture.png)
 
@@ -243,5 +243,6 @@ npm run dev
 
 
 ---
+
 
 
