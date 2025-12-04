@@ -42,3 +42,8 @@ targets:
     category: "regulation"
     keywords:
       - "site:rospotrebnadzor.ru tobacco regulation control"
+
+
+
+    # ...
+    # code가 'US'로 들어오면 DB 체크 후 정상 처리됨

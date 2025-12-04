@@ -2,13 +2,11 @@ import os
 import aiofiles
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
-from datetime import datetime
 from typing import Optional
 
-# 모델 임포트 (기존 코드 유지)
+# S3 업로더 및 모델 임포트
+from app.utils.s3_uploader import S3Uploader
 from app.core.models.regulation_model import Regulation, RegulationVersion, RegulationChangeHistory
-# 전처리 에이전트 임포트
-from app.ai_pipeline.preprocess.preprocess_agent import PreprocessAgent
 from app.crawler.crawling_regulation.base import UniversalFetcher
 
 class CrawlRepository:
@@ -151,3 +149,7 @@ class CrawlRepository:
         await self.db.commit()
         print(f"🔄 [업데이트] v{new_v_num} (S3 Uploaded)")
         return "updated"
+
+    # (_handle_existing_regulation 메서드도 동일하게 _upload_and_get_path 사용하도록 수정 필요)
+
+    # ... (_handle_existing_regulation 도 동일하게 storage_path 사용하도록 수정) ...

@@ -16,20 +16,8 @@ class ChangeTypeEnum(str, enum.Enum):
     NE = "NE" # New
     R = "R"   # Repeal
 
-# import enum
-
-# class ProductCategoryEnum(str, enum.Enum):
-#     COMBUSTIBLE = "combustible"
-#     HTP = "htp"
-#     E_CIGARETTE = "e_cigarette"
-
-# class RiskLevelEnum(str, enum.Enum):
-#     L = "L"
-#     M = "M"
-#     H = "H"
-
-# class ChangeTypeEnum(str, enum.Enum):
-#     NONE = "none"
-#     APPEND = "append"
-#     NEW = "new"
-#     REPEAL = "repeal"
+class TranslationStatusEnum(str, enum.Enum):
+    queued = "queued"
+    running = "running"
+    done = "done"
+    failed = "failed"

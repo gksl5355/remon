@@ -1,26 +1,90 @@
+from typing import List, Optional, Dict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from typing import List, Optional, Dict, Any
-
+from sqlalchemy.orm import selectinload
 from app.core.models.report_model import Report, ReportItem, ReportSummary
-from app.core.schemas.report_schema import ReportCreate
 from .base_repository import BaseRepository
-class ReportRepository:
-    
-    # --- Report ---
-    async def create_report(self, db: AsyncSession, report_data: ReportCreate) -> Report:
-        db_report = Report(**report_data.model_dump())
-        db.add(db_report)
-        await db.commit()
-        await db.refresh(db_report)
-        return db_report
 
-    async def get_report(self, db: AsyncSession, report_id: int) -> Optional[Report]:
-        # 주의: 예전에는 .options(joinedload(Report.summary)) 등을 썼겠지만
-        # 이제는 summary와 FK 연결이 끊겨서 join이 불가능합니다.
-        query = select(Report).where(Report.report_id == report_id)
+class ReportRepository(BaseRepository[Report]):
+    """리포트 Repository"""
+    
+    def __init__(self):
+        super().__init__(Report)
+    
+    async def get_by_regulation_id(
+        self,
+        db: AsyncSession,
+        regulation_id: int
+    ) -> Optional[Report]:
+        """
+        규제 ID로 리포트 조회
+        (사실 regulation_id가 아니라 translation_id나 change_id로 조회해야 할 수도 있음)
+        """
+        result = await db.execute(
+            select(Report)
+            # 실제 모델 구조에 따라 조건 수정 필요
+            .options(
+                selectinload(Report.items),
+                selectinload(Report.summaries)
+            )
+            .limit(1)  # 임시
+        )
+        return result.scalar_one_or_none()
+    
+    async def get_with_summaries(
+        self,
+        db: AsyncSession,
+        report_id: int
+    ) -> Optional[Report]:
+        """
+        서머리 정보를 포함한 리포트 조회
+        """
+        result = await db.execute(
+            select(Report)
+            .options(selectinload(Report.summaries))
+            .where(Report.report_id == report_id)
+        )
+        return result.scalar_one_or_none()
+    
+    async def get_all_summaries(
+        self,
+        db: AsyncSession,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[Report]:
+        """
+        모든 리포트의 서머리 조회
+        """
+        result = await db.execute(
+            select(Report)
+            .options(selectinload(Report.summaries))
+            .offset(skip)
+            .limit(limit)
+            .order_by(Report.created_at.desc())
+        )
+        return list(result.scalars().all())
+    
+    async def get_combined_reports(
+        self,
+        db: AsyncSession,
+        filters: Optional[Dict] = None
+    ) -> List[Report]:
+        """
+        복합 리포트 조회 (필터링 가능)
+        """
+        query = select(Report).options(
+            selectinload(Report.items),
+            selectinload(Report.summaries)
+        )
+        
+        if filters:
+            if "country_code" in filters:
+                query = query.where(Report.country_code == filters["country_code"])
+            if "product_id" in filters:
+                query = query.where(Report.product_id == filters["product_id"])
+        
         result = await db.execute(query)
-        return result.scalars().first()
+        return list(result.scalars().all())
 
     async def create_with_items(
         self, 
@@ -88,4 +152,4 @@ class ReportSummaryRepository(BaseRepository[ReportSummary]):
             select(ReportSummary)
             .where(ReportSummary.summary_id == summary_id)
         )
-        return result.scalars().first()
+        return result.scalar_one_or_none()

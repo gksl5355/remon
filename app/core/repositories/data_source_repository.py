@@ -1,5 +1,3 @@
-# from app.core.models import DataSource, CrawlJob, CrawlLog
-# from .base_repository import BaseRepository
 
 from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,9 +5,6 @@ from sqlalchemy import select
 from app.core.models.data_source_model import DataSource, CrawlJob, CrawlLog
 from .base_repository import BaseRepository
 
-# class DataSourceRepository(BaseRepository[DataSource]):
-#     def __init__(self):
-#         super().__init__(DataSource)
 
 class DataSourceRepository(BaseRepository[DataSource]):
     """데이터 소스 Repository"""
