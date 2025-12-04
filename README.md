@@ -181,7 +181,7 @@ npm run dev
       <b>조영우</b><br/>
       <sub>Backend Lead</sub><br/>
       <sub>API Gateway · Transaction · Service Orchestration</sub><br/>
-      <a href="https://github.com/dreamFORcreative">@bofoto</a>
+      <a href="https://github.com/bofoto">@bofoto</a>
     </td>
     <td align="center">
       <img src="https://avatars.githubusercontent.com/Nam707" width="120" style="border-radius: 50%;" alt="남지수"/><br/>
@@ -211,7 +211,7 @@ npm run dev
       <b>김민제</b><br/>
       <sub>Data/Collect Engineer</sub><br/>
       <sub>Crawling · Preprocessing · Collect/Refine Pipelines</sub><br/>
-      <a href="https://github.com/dreamFORcreative">@DWECK</a>
+      <a href="https://github.com/dreamFORcreative">@dreamFORcreative</a>
     </td>
   </tr>
 </table>
@@ -229,6 +229,7 @@ npm run dev
 
 
 ---
+
 
 
 
