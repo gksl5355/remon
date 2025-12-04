@@ -16,7 +16,8 @@ class Regulation(Base):
     # effective_date = Column(Date)
     # language = Column(String(10))
     # status = Column(String(20))
-    regul_data = Column(JSONB)
+    regul_data = Column(JSONB)  # Vision Pipeline 전체 결과 저장
+    citation_code = Column(String(200), index=True, nullable=True)  # 변경 감지 대상 검색용
     created_at = Column(DateTime, server_default=func.now())
 
     # Relationships
