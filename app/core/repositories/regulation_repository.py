@@ -95,8 +95,8 @@ class RegulationRepository(BaseRepository[Regulation]):
         # 실제 로직은 비즈니스 요구사항에 따라 다름
         
         from sqlalchemy import func, select
-        from core.models.product_model import Product
-        from core.models.regulation_model import RegulationTranslation
+        from app.core.models.product_model import Product
+        from app.core.models.regulation_model import RegulationTranslation
         
         # 전체 제품 수
         total_products = await db.execute(select(func.count(Product.product_id)))

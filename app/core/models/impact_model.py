@@ -16,5 +16,7 @@ class ImpactScore(Base):
     evaluated_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
-    translation = relationship("RegulationTranslation", back_populates="impact_scores")
-    product = relationship("Product", back_populates="impact_scores")
+    translations = relationship("RegulationTranslation", back_populates="impact_scores")
+    products = relationship("Product", back_populates="impact_scores")
+   
+    
