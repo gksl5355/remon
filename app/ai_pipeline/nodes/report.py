@@ -3,6 +3,9 @@ app/ai_pipeline/nodes/report.py
 ReportAgent – 구조화 JSON 보고서 생성 & RDB 연동 가능 버전
 """
 
+import os
+import json
+import re
 import logging
 import json
 import re
@@ -21,8 +24,15 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 client = OpenAI()
 
-# 전략 LLM 재사용
-try:
+# DB 연동 예시 (각 환경에 맞게 주석 해제/구현)
+# from app.core.repositories.report_repository import ReportRepository
+# from app.core.database import get_db_session
+
+load_dotenv()
+os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "")
+
+# 전략 LLM 재사용 (실패 시 None으로 두고 fallback 사용)
+try:  # pragma: no cover - import guard
     from app.ai_pipeline.nodes.llm import llm as strategy_llm
 except Exception:
     strategy_llm = None

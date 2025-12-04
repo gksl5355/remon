@@ -1,5 +1,3 @@
-# from app.core.models import GlossaryTerm
-# from .base_repository import BaseRepository
 
 # 임포트 추가
 from typing import List, Optional

@@ -28,6 +28,5 @@ class Product(Base):
     # Relationships
     country = relationship("Country", back_populates="products")
     impact_scores = relationship("ImpactScore", back_populates="products")
-    # reports = relationship("Report", back_populates="products")
-
+    reports = relationship("Report", back_populates="products")
 
