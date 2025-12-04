@@ -16,7 +16,7 @@ from .country_schema import (
 
 from .product_schema import (
     ProductCreate,
-    ProductUpdate,
+    # ProductUpdate,
     ProductResponse
 )
 
