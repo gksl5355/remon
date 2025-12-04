@@ -12,8 +12,11 @@ import json
 # from ... import ...
 
 # 언어 탐지 관련 임포트 추가
-from app.crawler.cleaner import get_language_detector, get_text_cleaner
-from utils.text_utils import save_metadata
+from crawler.cleaner import get_language_detector, get_text_cleaner
+
+# 크롤링 에이전트 임포트
+from crawler.discovery_agent import DiscoveryAgent
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -167,8 +170,45 @@ class CollectService:
         
         return metadata
     
-    # 기존 메서드들 유지
-    # def _extract_text_from_pdf(self, pdf_path: str) -> str:
-    #     ...
-    # def _generate_document_id(self, pdf_path: str) -> str:
-    #     ...
+    async def crawl_regulation(
+        self,
+        country: str,
+        keywords: list[str],
+        category: str,
+        db_session
+    ) -> dict:
+        """
+        DiscoveryAgent를 사용하여 규제 문서 크롤링
+        
+        Args:
+            country: 국가명 (예: "USA", "Russia")
+            keywords: 검색 키워드 리스트
+            category: "regulation" 또는 "news"
+            db_session: DB 세션
+            
+        Returns:
+            크롤링 결과
+        """
+        logger.info(f"크롤링 시작: country={country}, keywords={keywords}, category={category}")
+        
+        try:
+            # DiscoveryAgent 초기화
+            tavily_api_key = getattr(settings, 'TAVILY_API_KEY', None)
+            agent = DiscoveryAgent(db_session, tavily_api_key)
+            
+            # 크롤링 실행
+            await agent.run(country, keywords, category)
+            
+            logger.info(f"크롤링 완료: country={country}")
+            return {
+                "status": "success",
+                "message": f"{country} 규제 문서 크롤링 완료",
+                "country": country,
+                "keywords": keywords,
+                "category": category
+            }
+            
+        except Exception as e:
+            logger.error(f"크롤링 실패: {str(e)}")
+            raise
+    

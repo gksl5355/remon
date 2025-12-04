@@ -9,19 +9,20 @@ class Regulation(Base):
     __tablename__ = "regulations"
 
     regulation_id = Column(Integer, primary_key=True, index=True)
-    source_id = Column(Integer, ForeignKey("data_sources.source_id"), nullable=False)
-    country_code = Column(String(2), ForeignKey("countries.country_code"), nullable=False)
-    external_id = Column(String(200))
-    title = Column(String(200))
-    proclaimed_date = Column(Date)
-    effective_date = Column(Date)
-    language = Column(String(10))
-    status = Column(String(20))
+    # source_id = Column(Integer, ForeignKey("data_sources.source_id"), nullable=False)
+    # country_code = Column(String(2), ForeignKey("countries.country_code"), nullable=False)
+    # external_id = Column(String(200))
+    # title = Column(String(200))
+    # proclaimed_date = Column(Date)
+    # effective_date = Column(Date)
+    # language = Column(String(10))
+    # status = Column(String(20))
+    regul_data = Column(JSONB)
     created_at = Column(DateTime, server_default=func.now())
 
     # Relationships
-    data_source = relationship("DataSource", back_populates="regulations")
-    country = relationship("Country", back_populates="regulations")
+    # data_source = relationship("DataSource", back_populates="regulations")
+    # country = relationship("Country", back_populates="regulations")
     version = relationship("RegulationVersion", back_populates="regulations", cascade="all, delete-orphan")
 
 
@@ -79,4 +80,4 @@ class RegulationChangeHistory(Base):
 
     # Relationships
     version = relationship("RegulationVersion", back_populates="changes")
-    reports = relationship("Report", back_populates="change")
+    # reports = relationship("Report", back_populates="changes")
