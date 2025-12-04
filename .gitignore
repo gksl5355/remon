@@ -56,3 +56,4 @@ test_insert.py
 Dockerfile*
 deploy/
 output/
+regulation_file/
