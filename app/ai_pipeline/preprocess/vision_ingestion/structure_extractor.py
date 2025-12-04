@@ -102,7 +102,6 @@ Analyze the document image and extract structured data following DDH (Division-D
 
 **Table handling:**
 - Extract tables as markdown directly in markdown_content
-- Also include structured data in "tables" array for metadata
 - Example:
   ```markdown
   **Table 1: Nicotine Limits**
@@ -160,16 +159,6 @@ Extract organizations, regulations, chemicals, numbers:
 [{"name": "FDA", "type": "Organization", "context": "regulatory authority"}]
 ```
 
-## 5. Tables (Preserve Original Structure)
-**Extract tables with full data:**
-```json
-[{
-  "headers": ["Item", "Limit", "Unit"],
-  "rows": [["Nicotine", "20", "mg/mL"], ["Tar", "10", "mg"]],
-  "caption": "Table 1: Maximum Concentration Limits"
-}]
-```
-
 ## Output Format (STRICT JSON)
 **You MUST return this exact structure. No code blocks, no extra text:**
 
@@ -200,7 +189,7 @@ Extract organizations, regulations, chemicals, numbers:
     "regulation_type": "FDA"
   },
   "entities": [{"name": "FDA", "type": "Organization", "context": "regulatory authority"}],
-  "tables": [{"headers": ["Item", "Limit"], "rows": [["Nicotine", "20mg/mL"]], "caption": "Table 1"}]
+  "tables": []
 }
 
 **CRITICAL REMINDERS:**
@@ -236,7 +225,6 @@ Analyze the Russian regulatory document image and extract structured data follow
 
 **Table handling:**
 - Extract tables as markdown directly in markdown_content
-- Also include structured data in "tables" array for metadata
 
 ## 2. Reference Blocks (Index for Chunking)
 **Purpose**: Provide section index and keywords WITHOUT duplicating text.
@@ -294,16 +282,6 @@ Extract organizations, standards, terms:
 [{"name": "Росстандарт", "type": "Organization", "context": "regulatory authority"}]
 ```
 
-## 5. Tables (Preserve Original Structure)
-**Extract tables with full data:**
-```json
-[{
-  "headers": ["Реквизит", "Описание"],
-  "rows": [["Дата", "Дата документа"]],
-  "caption": "Таблица 1: Реквизиты документа"
-}]
-```
-
 ## Output Format (STRICT JSON)
 **You MUST return this exact structure. No code blocks, no extra text:**
 
@@ -334,7 +312,7 @@ Extract organizations, standards, terms:
     "regulation_type": "GOST"
   },
   "entities": [{"name": "Росстандарт", "type": "Organization", "context": "regulatory authority"}],
-  "tables": [{"headers": ["Реквизит", "Описание"], "rows": [["Дата", "Дата документа"]], "caption": "Таблица 1"}]
+  "tables": []
 }
 
 **CRITICAL REMINDERS:**
@@ -369,7 +347,6 @@ Analyze the Indonesian regulatory document image and extract structured data fol
 
 **Table handling:**
 - Extract tables as markdown directly in markdown_content
-- Also include structured data in "tables" array for metadata
 
 ## 2. Reference Blocks (Index for Chunking)
 **Purpose**: Provide section index and keywords WITHOUT duplicating text.
@@ -424,16 +401,6 @@ Extract organizations, regulations, legal terms:
 [{"name": "Kementerian Hukum dan HAM", "type": "Organization", "context": "regulatory authority"}]
 ```
 
-## 5. Tables (Preserve Original Structure)
-**Extract tables with full data:**
-```json
-[{
-  "headers": ["Jenis Peraturan", "Pembentuk"],
-  "rows": [["Undang-Undang", "DPR dengan Presiden"]],
-  "caption": "Tabel 1: Hierarki Peraturan Perundang-undangan"
-}]
-```
-
 ## Output Format (STRICT JSON)
 **You MUST return this exact structure. No code blocks, no extra text:**
 
@@ -463,7 +430,7 @@ Extract organizations, regulations, legal terms:
     "regulation_type": "UU"
   },
   "entities": [{"name": "Kementerian Hukum dan HAM", "type": "Organization", "context": "regulatory authority"}],
-  "tables": [{"headers": ["Jenis", "Pembentuk"], "rows": [["UU", "DPR dengan Presiden"]], "caption": "Tabel 1"}]
+  "tables": []
 }
 
 **CRITICAL REMINDERS:**
@@ -483,6 +450,12 @@ Extract organizations, regulations, legal terms:
 
 ## Task
 You will receive MULTIPLE document pages as images. Extract structured data for EACH page following DDH patterns.
+
+**IMPORTANT: Cross-Page Table Handling**
+- If a table starts on one page and continues on the next page, recognize it as ONE continuous table
+- Merge table rows across pages when the table structure continues
+- Use table headers from the first page if subsequent pages do not repeat them
+- Example: Page 2 has "Table 1 (continued)" → merge with Table 1 from Page 1
 
 ## Per-Page Extraction
 
@@ -538,7 +511,7 @@ You will receive MULTIPLE document pages as images. Extract structured data for 
     "reference_blocks": [{"section_ref": "§ 1141.1(a)", "start_line": 5, "end_line": 10, "keywords": ["health warnings"]}],
     "metadata": {"document_id": null, "jurisdiction_code": "US", "authority": "FDA", "title": "...", "citation_code": "21 CFR 1141", "language": "en", "publication_date": null, "effective_date": "2023-06-01", "source_url": null, "retrieval_datetime": null, "original_format": "pdf", "file_path": null, "raw_text_path": null, "section_label": "Part 1141", "page_range": null, "keywords": [], "country": "US", "regulation_type": "FDA"},
     "entities": [{"name": "FDA", "type": "Organization", "context": "regulatory authority"}],
-    "tables": [{"headers": ["Item", "Limit"], "rows": [["Nicotine", "20mg/mL"]], "caption": "Table 1"}]
+    "tables": []
   },
   {
     "page_index": 1,
@@ -564,6 +537,12 @@ You will receive MULTIPLE document pages as images. Extract structured data for 
 
 ## Task
 You will receive MULTIPLE Russian document pages as images. Extract structured data for EACH page following GOST patterns.
+
+**IMPORTANT: Cross-Page Table Handling**
+- If a table starts on one page and continues on the next page, recognize it as ONE continuous table
+- Merge table rows across pages when the table structure continues
+- Use table headers from the first page if subsequent pages do not repeat them
+- Example: Page 2 has "Table 1 (continued)" → merge with Table 1 from Page 1
 
 ## Per-Page Extraction
 
@@ -622,7 +601,7 @@ You will receive MULTIPLE Russian document pages as images. Extract structured d
     "reference_blocks": [{"section_ref": "1.1", "start_line": 5, "end_line": 10, "keywords": ["документ", "поля-20mm"]}],
     "metadata": {"document_id": null, "jurisdiction_code": "RU", "authority": "Росстандарт", "title": "...", "citation_code": "ГОСТ Р 7.0.97-2025", "language": "ru", "publication_date": null, "effective_date": "2025-07-01", "source_url": null, "retrieval_datetime": null, "original_format": "pdf", "file_path": null, "raw_text_path": null, "section_label": "Раздел 1", "page_range": null, "keywords": [], "country": "RU", "regulation_type": "GOST"},
     "entities": [{"name": "Росстандарт", "type": "Organization", "context": "regulatory authority"}],
-    "tables": [{"headers": ["Реквизит", "Описание"], "rows": [["Дата", "Дата документа"]], "caption": "Таблица 1"}]
+    "tables": []
   },
   {
     "page_index": 1,
@@ -651,6 +630,12 @@ You will receive MULTIPLE Russian document pages as images. Extract structured d
 
 ## Task
 You will receive MULTIPLE Indonesian document pages as images. Extract structured data for EACH page following Indonesian legal drafting patterns.
+
+**IMPORTANT: Cross-Page Table Handling**
+- If a table starts on one page and continues on the next page, recognize it as ONE continuous table
+- Merge table rows across pages when the table structure continues
+- Use table headers from the first page if subsequent pages do not repeat them
+- Example: Page 2 has "Table 1 (continued)" → merge with Table 1 from Page 1
 
 ## Per-Page Extraction
 
@@ -706,7 +691,7 @@ You will receive MULTIPLE Indonesian document pages as images. Extract structure
     "reference_blocks": [{"section_ref": "Pasal 1", "start_line": 5, "end_line": 10, "keywords": ["ketentuan"]}],
     "metadata": {"document_id": null, "jurisdiction_code": "ID", "authority": "Pemerintah RI", "title": "...", "citation_code": "UU No. 12 Tahun 2011", "language": "id", "publication_date": null, "effective_date": "2011-08-12", "source_url": null, "retrieval_datetime": null, "original_format": "pdf", "file_path": null, "raw_text_path": null, "section_label": "BAB I", "page_range": null, "keywords": [], "country": "ID", "regulation_type": "UU"},
     "entities": [{"name": "Kementerian Hukum dan HAM", "type": "Organization", "context": "regulatory authority"}],
-    "tables": [{"headers": ["Jenis", "Pembentuk"], "rows": [["UU", "DPR"]], "caption": "Tabel 1"}]
+    "tables": []
   },
   {
     "page_index": 1,
