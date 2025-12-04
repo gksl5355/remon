@@ -1,5 +1,4 @@
 """Small helper to read an object from S3 (Access Point) using .env values."""
-
 import argparse
 import os
 
@@ -21,10 +20,10 @@ def read_object(bucket_arn: str, key: str, region: str | None = None) -> str:
 def main() -> None:
     load_dotenv()
 
-    bucket_arn = os.environ.get("AWS_S3_ACCESS_POINT_ARN", "arn:aws:s3:ap-northeast-2:881490135253:accesspoint/sk-team-storage")
+    bucket_arn = os.environ["AWS_S3_ACCESS_POINT_ARN"]
     base_prefix = os.environ.get("S3_BASE_PREFIX", "skala2")
     app_prefix = os.environ.get("S3_APP_PREFIX", "skala-2.4.17")
-    region = os.environ.get("AWS_DEFAULT_REGION", "ap-northeast-2")
+    region = os.environ.get("AWS_DEFAULT_REGION")
 
     parser = argparse.ArgumentParser(description="Read a file from S3 Access Point")
     parser.add_argument(
