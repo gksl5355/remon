@@ -30,8 +30,8 @@ REMON은 국가별 규제 문서를 자동으로 처리해
 
 ## 3. System Architecture
 
-<img src="./docs/ai.jpg" style="width:200px;">
-<img src="./docs/the-clean-architecture.png" style="width:200px;">
+<img src="./docs/ai.jpg" style="width:50px;">
+<img src="./docs/the-clean-architecture.png" style="width:100px;">
 
 **Backend(FastAPI)**
 
@@ -229,6 +229,7 @@ npm run dev
 
 
 ---
+
 
 
 
