@@ -141,6 +141,7 @@ async def update_summary(report_id: int, body: dict):
         raise HTTPException(status_code=404, detail="리포트를 찾을 수 없습니다.")
     REPORTS[report_id]["sections"] = body.get("sections", REPORTS[report_id]["sections"])
     REPORTS[report_id]["last_updated"] = str(date.today())
+    # 캐시 무효화는 실제 DB/서비스 연동 시 report_service.update_report에서 처리됨
     return {"message": "리포트가 수정되었습니다.", "report": REPORTS[report_id]}
 
 

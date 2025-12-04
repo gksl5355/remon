@@ -59,18 +59,12 @@ class RegulationTranslation(Base):
 
     translation_id = Column(Integer, primary_key=True, index=True) # SERIAL
     regulation_version_id = Column(Integer, ForeignKey("regulation_versions.regulation_version_id"), nullable=False)
-    language_code = Column(String(10), nullable=False)
-    translated_text = Column(Text, nullable=True)
-    glossary_term_id = Column(Integer, ForeignKey("glossary_terms.glossary_term_id"))
-    # glossary_term_id = Column(UUID(as_uuid=True), ForeignKey("glossary_terms.glossary_term_id"), nullable=True)
-    
-    # [변경] 상태 Enum 및 기본값 적용
-    translation_status = Column(Enum(TranslationStatusEnum), default=TranslationStatusEnum.queued, nullable=False)
-    
-    # [신규] S3 Key 및 타임스탬프
-    s3_key = Column(String(500), nullable=True)
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    language_code = Column(String(10))
+    translated_text = Column(Text)
+    glossary_term_id = Column(String, ForeignKey("glossary_terms.glossary_term_id")) # UUID 타입이면 DB에 맞게 조정
+    translation_status = Column(String(20))
+    s3_key = Column(String(500))
+    created_at = Column(DateTime, server_default=func.now())
 
 
 
@@ -84,5 +78,5 @@ class RegulationChangeHistory(Base):
     detected_at = Column(DateTime, server_default=func.now())
 
     # Relationships
-    version = relationship("RegulationVersion", back_populates="translations")
-    # reports = relationship("Report", back_populates="changes")
+    version = relationship("RegulationVersion", back_populates="changes")
+    reports = relationship("Report", back_populates="change")
