@@ -1,19 +1,6 @@
-아래는 **REMON 프로젝트 README 최종본**이다.
+# REMON – Regulation Monitoring AI System
 
-* 불필요한 미사여구 없이 구조적으로 명확
-* 설치/실행 중심의 실용적 구성
-* 팀 소개 포함
-* 아키텍처/기능/기술스택은 “요약만”
-* 상세 문서는 `/docs` 로 분리하는 구조
-
-바로 `README.md`에 붙여 넣어도 된다.
-
----
-
-# REMON – Regulation Monitoring & Mapping System
-
-AI 기반 해외 규제 문서를 자동 수집·정제·분석·매핑하여
-제품 영향도와 대응 전략을 생성하는 규제 분석 자동화 플랫폼.
+AI 기반 해외 규제 문서를 자동 수집·정제·분석·매핑하여 제품 영향도와 대응 전략을 생성하는 규제 분석 자동화 플랫폼.
 
 PDF/HTML 규제 문서를 업로드하면 **번역 → 임베딩 → 매핑 → 영향도 → 리포트**까지 단일 파이프라인에서 처리한다.
 
@@ -43,9 +30,8 @@ REMON은 국가별 규제 문서를 자동으로 처리해
 
 ## 3. System Architecture
 
-![Image](./docs/ai.jpg)
-
-![Image](./docs/the-clean-architecture.png)
+<img src="./docs/ai.jpg" style="width:200px;">
+<img src="./docs/the-clean-architecture.png" style="width:200px;">
 
 **Backend(FastAPI)**
 
@@ -191,11 +177,11 @@ npm run dev
       <a href="https://github.com/SunYoung710">@SunYoung710</a>
     </td>
     <td align="center">
-      <img src="https://avatars.githubusercontent.com/dreamFORcreative" width="120" style="border-radius: 50%;" alt="조영우"/><br/>
+      <img src="https://avatars.githubusercontent.com/bofoto" width="120" style="border-radius: 50%;" alt="조영우"/><br/>
       <b>조영우</b><br/>
       <sub>Backend Lead</sub><br/>
       <sub>API Gateway · Transaction · Service Orchestration</sub><br/>
-      <a href="https://github.com/dreamFORcreative">@dreamFORcreative</a>
+      <a href="https://github.com/dreamFORcreative">@bofoto</a>
     </td>
     <td align="center">
       <img src="https://avatars.githubusercontent.com/Nam707" width="120" style="border-radius: 50%;" alt="남지수"/><br/>
@@ -221,11 +207,11 @@ npm run dev
       <a href="https://github.com/gksl5355">@gksl5355</a>
     </td>
     <td align="center">
-      <img src="https://avatars.githubusercontent.com/DWECK" width="120" style="border-radius: 50%;" alt="김민제"/><br/>
+      <img src="https://avatars.githubusercontent.com/dreamFORcreative" width="120" style="border-radius: 50%;" alt="김민제"/><br/>
       <b>김민제</b><br/>
       <sub>Data/Collect Engineer</sub><br/>
       <sub>Crawling · Preprocessing · Collect/Refine Pipelines</sub><br/>
-      <a href="https://github.com/DWECK">@DWECK</a>
+      <a href="https://github.com/dreamFORcreative">@DWECK</a>
     </td>
   </tr>
 </table>
@@ -243,6 +229,7 @@ npm run dev
 
 
 ---
+
 
 
 
