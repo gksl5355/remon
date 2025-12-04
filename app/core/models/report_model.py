@@ -23,12 +23,9 @@ class Report(Base):
 
 
     # Relationships
-    translations = relationship("RegulationTranslation", back_populates="reports")
-    changes = relationship("RegulationChangeHistory", back_populates="reports")
-    products = relationship("Product", back_populates="reports")
-    country = relationship("Country", back_populates="reports")
-    
-    items = relationship("ReportItem", back_populates="reports", cascade="all, delete-orphan")
+    # translation = relationship("RegulationTranslation", back_populates="reports")
+    # change = relationship("RegulationChangeHistory", back_populates="reports")
+    # items = relationship("ReportItem", back_populates="report", cascade="all, delete-orphan")
     # [삭제됨] ReportSummary와의 관계 제거 (1:1 or 1:N 관계가 FK 삭제로 끊어짐)
 
 
@@ -42,7 +39,7 @@ class ReportItem(Base):
     order_no = Column(Integer)
 
     # Relationships
-    reports = relationship("Report", back_populates="items")
+    # reports = relationship("Report", back_populates="items")
     version = relationship("RegulationVersion")
     impact_scores = relationship("ImpactScore")
 
@@ -51,13 +48,10 @@ class ReportSummary(Base):
     __tablename__ = "report_summaries"
 
     summary_id = Column(Integer, primary_key=True, index=True)
-    
-    # [변경] report_id, impact_score_id 제거 및 JSONB 컬럼으로 변경
+
     summary_text = Column(JSONB)
     
     created_at = Column(DateTime, server_default=func.now())
-
-    # [변경] FK 제거로 인해 모든 Relationship 삭제됨
 
     # [신규] 수정 시간 (캐시 신선도 체크용)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)

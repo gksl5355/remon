@@ -70,3 +70,115 @@ class UniversalFetcher:
         """세션 종료"""
         await self.session.close()
 
+# import hashlib
+# from abc import ABC, abstractmethod
+# from typing import Optional, Dict, Any
+# from curl_cffi.requests import AsyncSession
+
+# class BaseCrawler(ABC):
+#     # headers 인자를 받을 수 있도록 수정
+#     def __init__(self, headers: Optional[Dict[str, str]] = None):
+#         # 기본 헤더 (모든 크롤러 공통)
+#         default_headers = {
+#             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+#             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+#             "Accept-Language": "en-US,en;q=0.9",
+#         }
+        
+#         # 특정 크롤러에서 헤더를 추가했으면 병합 (Update)
+#         if headers:
+#             default_headers.update(headers)
+
+#         # [유지] impersonate 버전은 최신(chrome120)으로 유지해도 다른 사이트에 해가 되지 않습니다.
+#         self.session = AsyncSession(
+#             impersonate="chrome120", 
+#             headers=default_headers,
+#             timeout=30
+#         )
+
+#     def generate_hash(self, content: str) -> str:
+#         return hashlib.sha256(content.encode('utf-8')).hexdigest()
+
+#     async def fetch(self, url: str) -> Optional[str]:
+#         """HTML 텍스트 가져오기"""
+#         try:
+#             response = await self.session.get(url)
+            
+#             if response.status_code in [403, 404, 406, 429]:
+#                 print(f"❌ Blocked or Not Found [{url}] (Status: {response.status_code})")
+#                 return None
+            
+#             # [일반화] 특정 사이트 에러 체크 로직 제거 (각 크롤러에서 처리 권장)
+#             return response.text
+#         except Exception as e:
+#             print(f"❌ Fetch Error [{url}]: {e}")
+#             return None
+
+#     async def fetch_binary(self, url: str) -> Optional[bytes]:
+#         try:
+#             print(f"⬇️ Downloading: {url}")
+#             response = await self.session.get(url)
+#             if response.status_code == 200:
+#                 return response.content
+#             else:
+#                 print(f"❌ Download Failed Status: {response.status_code}")
+#                 return None
+#         except Exception as e:
+#             print(f"❌ Binary Fetch Error: {e}")
+#             return None
+
+#     @abstractmethod
+#     async def parse(self, html: str, url: str) -> Dict[str, Any]:
+#         pass
+
+#     async def close(self):
+#         await self.session.close()
+
+# # app/crawler/base.py
+
+# import hashlib
+# from abc import ABC, abstractmethod
+# from typing import Optional, Dict, Any
+# from curl_cffi.requests import AsyncSession
+
+# class BaseCrawler(ABC):
+#     def __init__(self):
+#         # 파일 다운로드를 위해 impersonate 유지
+#         self.session = AsyncSession(impersonate="chrome110") 
+
+#     def generate_hash(self, content: str) -> str:
+#         return hashlib.sha256(content.encode('utf-8')).hexdigest()
+
+#     async def fetch(self, url: str) -> Optional[str]:
+#         """HTML 텍스트 가져오기"""
+#         try:
+#             response = await self.session.get(url)
+#             if response.status_code in [403, 404]:
+#                 print(f"❌ Blocked or Not Found [{url}]")
+#                 return None
+#             return response.text
+#         except Exception as e:
+#             print(f"❌ Fetch Error [{url}]: {e}")
+#             return None
+
+#     # [추가됨] 파일 다운로드를 위한 메서드
+#     async def fetch_binary(self, url: str) -> Optional[bytes]:
+#         """PDF 등 바이너리 데이터 가져오기"""
+#         try:
+#             print(f"⬇️ Downloading: {url}")
+#             response = await self.session.get(url)
+#             if response.status_code == 200:
+#                 return response.content
+#             else:
+#                 print(f"❌ Download Failed Status: {response.status_code}")
+#                 return None
+#         except Exception as e:
+#             print(f"❌ Binary Fetch Error: {e}")
+#             return None
+
+#     @abstractmethod
+#     async def parse(self, html: str, url: str) -> Dict[str, Any]:
+#         pass
+
+#     async def close(self):
+#         await self.session.close()
