@@ -32,6 +32,7 @@ load_dotenv(project_root / ".env")
 
 from app.ai_pipeline.preprocess.config import PreprocessConfig
 from app.ai_pipeline.preprocess.vision_orchestrator import VisionOrchestrator
+from app.ai_pipeline.preprocess.vision_batch import VisionBatchProcessor
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
@@ -382,32 +383,16 @@ async def main():
         await compare_json_files(args)
         return
 
+    # 배치 프로세서 생성
+    batch_processor = VisionBatchProcessor(orchestrator)
+    
     # PDF 목록 수집
-    pdf_files = []
-
-    if args.pdf:
-        # 단일 파일 지정
-        pdf_path = Path(args.pdf)
-        if not pdf_path.is_absolute():
-            pdf_path = project_root / pdf_path
-        if pdf_path.exists():
-            pdf_files = [pdf_path]
-        else:
-            logger.error(f"❌ PDF 파일 없음: {pdf_path}")
-            return
-    else:
-        # 폴더 전체 처리
-        folder_path = Path(args.folder)
-        if not folder_path.is_absolute():
-            folder_path = project_root / folder_path
-
-        if not folder_path.exists():
-            logger.error(f"❌ 폴더 없음: {folder_path}")
-            return
-
-        pdf_files = sorted(folder_path.glob("*.pdf"))
-        pdf_files = [p for p in pdf_files if not p.name.startswith(".")]
-
+    pdf_files = batch_processor.collect_pdf_files(
+        pdf_path=args.pdf,
+        folder_path=args.folder if not args.pdf else None,
+        project_root=project_root
+    )
+    
     if not pdf_files:
         logger.error("❌ 처리할 PDF 파일이 없습니다")
         return
@@ -472,28 +457,25 @@ async def main():
             "processed_at": "test_mode",
         }
 
-    # 순차 처리
-    results = []
-    for idx, pdf_path in enumerate(pdf_files, 1):
-        logger.info(f"\n[{idx}/{len(pdf_files)}] {pdf_path.name}")
-        result = await process_single_pdf(pdf_path, args, orchestrator)
-        results.append({"file": pdf_path.name, "status": result["status"]})
-
-    # 전체 요약
-    logger.info("\n" + "=" * 60)
-    logger.info("📊 전체 처리 완료")
-    logger.info("=" * 60)
-
-    success_count = sum(1 for r in results if r["status"] == "success")
-    logger.info(f"성공: {success_count}/{len(results)}")
-
-    if success_count < len(results):
-        logger.info("\n실패 파일:")
-        for r in results:
-            if r["status"] != "success":
-                logger.info(f"  - {r['file']}")
-    if args.save_outputs:
-        logger.info(f"\n📁 출력 위치: {OUTPUT_DIR}")
+    # 단일 파일 vs 배치 처리
+    if len(pdf_files) == 1:
+        # 단일 파일: 기존 상세 출력 유지
+        result = await process_single_pdf(pdf_files[0], args, orchestrator)
+    else:
+        # 배치 처리: VisionBatchProcessor 사용
+        def progress_callback(current: int, total: int, file_name: str):
+            logger.info(f"[{current}/{total}] {file_name}")
+        
+        use_parallel = not args.no_parallel
+        batch_result = await batch_processor.process_batch(
+            pdf_files, use_parallel, progress_callback
+        )
+        
+        # 배치 요약 출력
+        batch_processor.print_batch_summary(
+            batch_result, 
+            OUTPUT_DIR if args.save_outputs else None
+        )
 
 
 async def compare_json_files(args) -> None:

@@ -26,6 +26,7 @@ load_dotenv(project_root / ".env")
 
 from app.ai_pipeline.preprocess.config import PreprocessConfig
 from app.ai_pipeline.preprocess.vision_orchestrator import VisionOrchestrator
+from app.ai_pipeline.preprocess.vision_batch import VisionBatchProcessor
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
@@ -151,37 +152,29 @@ def save_llm_outputs(result: dict, pdf_name: str, timestamp: str) -> None:
     logger.info(f"💾 LLM 출력 저장 완료: {OUTPUT_DIR} ({len(vision_results)}개 파일)")
 
 
-async def process_single_pdf(pdf_path: Path, args, orchestrator) -> dict:
-    """단일 PDF 처리."""
+async def process_single_pdf_with_outputs(pdf_path: Path, args, batch_processor) -> dict:
+    """단일 PDF 처리 + 출력 저장 (스크립트 전용)."""
     pdf_name = pdf_path.stem
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    logger.info("=" * 60)
-    logger.info(f"🚀 처리 시작: {pdf_path.name}")
-    logger.info("=" * 60)
-
+    
     # 병렬 처리 여부 설정
     use_parallel = not args.no_parallel
-    result = await asyncio.to_thread(
-        orchestrator.process_pdf, str(pdf_path), use_parallel
-    )
-
+    result = await batch_processor.process_single_pdf(pdf_path, use_parallel)
+    
     # 테스트 모드: 콘솔에 상세 결과 출력
     if args.skip_indexing and result["status"] == "success":
         _print_detailed_results(result)
-
+    
     # LLM 출력 저장
     if args.save_outputs and result["status"] == "success":
         save_llm_outputs(result, pdf_name, timestamp)
-
-    # 결과 출력
+    
+    # 상세 결과 출력 (기존 로직 유지)
     if result["status"] == "success":
         vision_results = result.get("vision_extraction_result", [])
         index_summary = result.get("dual_index_summary", {})
-
-        gpt4o_count = sum(1 for p in vision_results if p.get("model_used") == "gpt-4o")
         total_tokens = sum(p.get("tokens_used", 0) for p in vision_results)
-
+        
         if args.skip_indexing:
             logger.info(
                 f"✅ 완료: {len(vision_results)}페이지, {total_tokens:,}토큰 (Qdrant 저장 건너뜀)"
@@ -190,9 +183,7 @@ async def process_single_pdf(pdf_path: Path, args, orchestrator) -> dict:
             logger.info(
                 f"✅ 완료: {len(vision_results)}페이지, {index_summary.get('qdrant_chunks', 0)}청크, {total_tokens:,}토큰"
             )
-    else:
-        logger.error(f"❌ 실패: {result.get('error')}")
-
+    
     return result
 
 
@@ -243,32 +234,16 @@ async def main():
     if not args.disable_langsmith:
         PreprocessConfig.setup_langsmith()
 
+    # 배치 프로세서 생성
+    batch_processor = VisionBatchProcessor(orchestrator)
+    
     # PDF 목록 수집
-    pdf_files = []
-
-    if args.pdf:
-        # 단일 파일 지정
-        pdf_path = Path(args.pdf)
-        if not pdf_path.is_absolute():
-            pdf_path = project_root / pdf_path
-        if pdf_path.exists():
-            pdf_files = [pdf_path]
-        else:
-            logger.error(f"❌ PDF 파일 없음: {pdf_path}")
-            return
-    else:
-        # 폴더 전체 처리
-        folder_path = Path(args.folder)
-        if not folder_path.is_absolute():
-            folder_path = project_root / folder_path
-
-        if not folder_path.exists():
-            logger.error(f"❌ 폴더 없음: {folder_path}")
-            return
-
-        pdf_files = sorted(folder_path.glob("*.pdf"))
-        pdf_files = [p for p in pdf_files if not p.name.startswith(".")]
-
+    pdf_files = batch_processor.collect_pdf_files(
+        pdf_path=args.pdf,
+        folder_path=args.folder if not args.pdf else None,
+        project_root=project_root
+    )
+    
     if not pdf_files:
         logger.error("❌ 처리할 PDF 파일이 없습니다")
         return
@@ -284,6 +259,9 @@ async def main():
     )
     logger.info(
         f"🗄️  Qdrant 저장: {'건너뛰기 (테스트 모드)' if args.skip_indexing else '활성화'}"
+    )
+    logger.info(
+        f"📦 처리 모드: {'단일 파일' if len(pdf_files) == 1 else '배치 처리'}"
     )
 
     # Orchestrator 생성 (config 기본값, CLI로 오버라이드)
@@ -324,29 +302,37 @@ async def main():
             "message": "Indexing skipped for testing",
         }
 
-    # 순차 처리
-    results = []
-    for idx, pdf_path in enumerate(pdf_files, 1):
-        logger.info(f"\n[{idx}/{len(pdf_files)}] {pdf_path.name}")
-        result = await process_single_pdf(pdf_path, args, orchestrator)
-        results.append({"file": pdf_path.name, "status": result["status"]})
-
-    # 전체 요약
-    logger.info("\n" + "=" * 60)
-    logger.info("📊 전체 처리 완료")
-    logger.info("=" * 60)
-
-    success_count = sum(1 for r in results if r["status"] == "success")
-    logger.info(f"성공: {success_count}/{len(results)}")
-
-    if success_count < len(results):
-        logger.info("\n실패 파일:")
-        for r in results:
-            if r["status"] != "success":
-                logger.info(f"  - {r['file']}")
-
-    if args.save_outputs:
-        logger.info(f"\n📁 출력 위치: {OUTPUT_DIR}")
+    # 단일 파일 처리 vs 배치 처리
+    if len(pdf_files) == 1:
+        # 단일 파일: 기존 상세 출력 유지
+        result = await process_single_pdf_with_outputs(pdf_files[0], args, batch_processor)
+    else:
+        # 배치 처리: 새로운 배치 프로세서 사용
+        def progress_callback(current: int, total: int, file_name: str):
+            """진행 상황 출력."""
+            logger.info(f"[{current}/{total}] {file_name}")
+        
+        # 배치 처리 실행
+        use_parallel = not args.no_parallel
+        batch_result = await batch_processor.process_batch(
+            pdf_files, use_parallel, progress_callback
+        )
+        
+        # 개별 파일 출력 저장 (배치 모드에서도 지원)
+        if args.save_outputs:
+            for pdf_path in pdf_files:
+                # 각 파일별로 다시 처리해서 출력 저장 (비효율적이지만 기존 로직 유지)
+                result = await batch_processor.process_single_pdf(pdf_path, use_parallel)
+                if result["status"] == "success":
+                    pdf_name = pdf_path.stem
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    save_llm_outputs(result, pdf_name, timestamp)
+        
+        # 배치 요약 출력
+        batch_processor.print_batch_summary(
+            batch_result, 
+            OUTPUT_DIR if args.save_outputs else None
+        )
 
 
 if __name__ == "__main__":
