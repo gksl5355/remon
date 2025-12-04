@@ -76,6 +76,20 @@ class S3Client:
             logger.error(f"❌ S3 다운로드 실패: {e}")
             raise
 
+    def generate_presigned_url(self, s3_key: str, expires_in: int = 3600) -> str:
+        """S3 객체에 대한 presigned URL 생성"""
+        try:
+            url = self.s3.generate_presigned_url(
+                ClientMethod="get_object",
+                Params={"Bucket": self.bucket_arn, "Key": s3_key},
+                ExpiresIn=expires_in,
+            )
+            logger.info(f"✅ presigned URL 생성: {s3_key}")
+            return url
+        except Exception as e:
+            logger.error(f"❌ presigned URL 생성 실패: {e}")
+            raise
+
     def search_json_by_metadata(
         self,
         title: Optional[str] = None,

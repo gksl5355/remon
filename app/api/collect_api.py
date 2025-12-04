@@ -3,7 +3,7 @@ module: collect_api.py
 description: 규제 문서 업로드 및 조회 API
 author: 조영우
 created: 2025-11-10
-updated: 2025-11-11
+updated: 2025-12-02
 dependencies:
     - fastapi
     - services.collect_service
@@ -18,7 +18,7 @@ from services.collect_service import CollectService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/regulations", tags=["Regulations"])
+router = APIRouter(prefix="/collect", tags=["collect"])
 service = CollectService()
 
 
@@ -62,46 +62,29 @@ async def collect_from_url(
     return await service.process_url(url, country, db)
 
 
-@router.get("/")
-async def list_regulations(
-    country: str | None = Query(None, description="국가 필터"),
-    status: str | None = Query(None, description="상태 필터 (active/repealed)"),
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+@router.post("/crawl", status_code=201)
+async def crawl_regulation(
+    country: str = Query(..., description="국가명 (예: USA, Russia, Indonesia)"),
+    keywords: list[str] = Query(..., description="검색 키워드 리스트"),
+    category: str = Query("regulation", description="카테고리 (regulation 또는 news)"),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    규제 문서 목록을 조회한다.
-
-    Returns:
-        dict: 규제 문서 목록 및 페이지네이션 정보.
-    """
-    logger.info(f"GET /regulations - country={country}, status={status}, page={page}")
-    return await service.get_regulations(country, status, page, page_size, db)
-
-
-@router.get("/{regulation_id}")
-async def get_regulation(
-    regulation_id: int,
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    규제 문서 상세 정보를 조회한다.
+    DiscoveryAgent를 사용하여 규제 문서를 크롤링한다.
 
     Args:
-        regulation_id (int): 규제 문서 ID.
+        country (str): 국가명.
+        keywords (list[str]): 검색 키워드 리스트.
+        category (str): 카테고리 (regulation 또는 news).
 
     Returns:
-        dict: 규제 문서 상세 정보.
-
-    Raises:
-        HTTPException: 규제 문서를 찾을 수 없는 경우 404.
+        dict: 크롤링 결과.
     """
-    logger.info(f"GET /regulations/{regulation_id}")
-    regulation = await service.get_regulation_detail(regulation_id, db)
+    logger.info(f"POST /collect/crawl - country={country}, keywords={keywords}, category={category}")
     
-    if not regulation:
-        logger.warning(f"Regulation not found: regulation_id={regulation_id}")
-        raise HTTPException(status_code=404, detail="Regulation not found")
-    
-    return regulation
+    try:
+        result = await service.crawl_regulation(country, keywords, category, db)
+        return result
+    except Exception as e:
+        logger.error(f"크롤링 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"크롤링 실패: {str(e)}")

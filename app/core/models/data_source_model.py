@@ -12,7 +12,7 @@ class DataSource(Base):
     source_type = Column(String(50), nullable=True)
     
     # Relationships
-    regulations = relationship("Regulation", back_populates="data_source")
+    # regulations = relationship("Regulation", back_populates="data_source")
     crawl_logs = relationship("CrawlLog", back_populates="data_source")
 
 class CrawlJob(Base):

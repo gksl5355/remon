@@ -2,7 +2,7 @@ from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel, Field
 from decimal import Decimal
-from core.models.enums import ProductCategoryEnum
+from app.core.models.enums import ProductCategoryEnum
 
 class ProductBase(BaseModel):
     product_name: str

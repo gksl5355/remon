@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>{{ title | default("번역본") }}</title>
+  <style>
+    :root {
+      --main: #1f3a60;
+      --accent: #d2d7e0;
+      --text: #1a1a1a;
+      --muted: #666;
+    }
+    @page { margin: 25mm 20mm 20mm 20mm; }
+    body {
+      font-family: 'Noto Sans KR', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+      line-height: 1.6;
+      color: var(--text);
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20mm 10mm 10mm 10mm;
+    }
+    header {
+      border-bottom: 2px solid var(--accent);
+      padding-bottom: 12px;
+      margin-bottom: 18px;
+    }
+    h1 {
+      font-size: 26px;
+      color: var(--main);
+      margin: 0 0 6px 0;
+      letter-spacing: 0.5px;
+    }
+    .meta { color: var(--muted); font-size: 12px; }
+
+    h2 {
+      font-size: 18px;
+      margin: 22px 0 10px 0;
+      padding-left: 12px;
+      border-left: 6px solid var(--main);
+      background: #f6f7fb;
+    }
+    h3 {
+      font-size: 15px;
+      margin: 16px 0 8px 0;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--accent);
+    }
+    p { margin: 6px 0; }
+    ul { padding-left: 20px; margin: 6px 0 10px 0; }
+    a { color: #0b62d6; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 18px 0;
+      page-break-inside: avoid;
+      font-size: 13px;
+    }
+    th, td {
+      border: 1px solid var(--accent);
+      padding: 8px 10px;
+      text-align: left;
+    }
+    th { background: #eef1f7; font-weight: 600; }
+
+    code, pre {
+      font-family: "Source Code Pro", monospace;
+      background: #f4f4f6;
+      border: 1px solid var(--accent);
+      padding: 6px;
+      display: block;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .divider { margin: 30px 0; border: 0; border-top: 1px solid var(--accent); }
+    .footer { text-align: center; font-size: 11px; color: var(--muted); margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>{{ title | default("번역본") }}</h1>
+      <div class="meta">
+        {% set current_year = (datetime.now().year) %}
+        <span>{{ current_year }}</span>
+      </div>
+    </header>
+
+    <div>
+      {{ body | safe }}
+    </div>
+
+    <hr class="divider">
+    <p class="footer">
+      {% set current_year = (datetime.now().year) %}
+      © {{ current_year }} 번역문서. All Rights Reserved.
+    </p>
+  </div>
+</body>
+</html>

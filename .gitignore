@@ -58,3 +58,4 @@ test_insert.py
 Dockerfile*
 deploy/
 output/
+*.pdf
