@@ -207,7 +207,7 @@ npm run dev
       <a href="https://github.com/gksl5355">@gksl5355</a>
     </td>
     <td align="center">
-      <img src="https://avatars.githubusercontent.com/dreamFORcreative" width="120" style="border-radius: 50%;" alt="김민제"/><br/>
+      <img src="./docs/andong.jpg" width="120" style="border-radius: 50%;" alt="김민제"/><br/>
       <b>김민제</b><br/>
       <sub>Data/Collect Engineer</sub><br/>
       <sub>Crawling · Preprocessing · Collect/Refine Pipelines</sub><br/>
@@ -229,6 +229,7 @@ npm run dev
 
 
 ---
+
 
 
 
