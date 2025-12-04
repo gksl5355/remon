@@ -4,7 +4,7 @@ from typing import List, Optional, Dict, Any
 
 from app.core.models.report_model import Report, ReportItem, ReportSummary
 from app.core.schemas.report_schema import ReportCreate
-
+from .base_repository import BaseRepository
 class ReportRepository:
     
     # --- Report ---
