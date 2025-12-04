@@ -43,9 +43,10 @@ REMON은 국가별 규제 문서를 자동으로 처리해
 
 ## 3. System Architecture
 
-![Image](./docs/architecture/ai.png)
+![Image](./docs/ai.png)
 
-![Image](./docs/architecture/the-clean-architecture.png)
+![Image](./docs/the-clean-architecture.png)
+
 **Backend(FastAPI)**
 
 * CollectService: 규제 파일 수집 및 메타데이터
@@ -242,4 +243,5 @@ npm run dev
 
 
 ---
+
 
