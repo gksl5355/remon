@@ -234,6 +234,16 @@ async def main():
     if not args.disable_langsmith:
         PreprocessConfig.setup_langsmith()
 
+    # Orchestrator 생성 (config 기본값, CLI로 오버라이드)
+    orchestrator = VisionOrchestrator(
+        max_concurrency=args.max_concurrency,
+        token_budget=args.token_budget,
+        request_timeout=args.request_timeout,
+        retry_max_attempts=args.retry_max_attempts,
+        retry_backoff_seconds=args.retry_backoff_seconds,
+        enable_graph=args.enable_graph if args.enable_graph else None,
+    )
+
     # 배치 프로세서 생성
     batch_processor = VisionBatchProcessor(orchestrator)
     
@@ -262,16 +272,6 @@ async def main():
     )
     logger.info(
         f"📦 처리 모드: {'단일 파일' if len(pdf_files) == 1 else '배치 처리'}"
-    )
-
-    # Orchestrator 생성 (config 기본값, CLI로 오버라이드)
-    orchestrator = VisionOrchestrator(
-        max_concurrency=args.max_concurrency,
-        token_budget=args.token_budget,
-        request_timeout=args.request_timeout,
-        retry_max_attempts=args.retry_max_attempts,
-        retry_backoff_seconds=args.retry_backoff_seconds,
-        enable_graph=args.enable_graph if args.enable_graph else None,
     )
 
     # 컬렉션명 설정
