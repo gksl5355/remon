@@ -43,10 +43,9 @@ REMON은 국가별 규제 문서를 자동으로 처리해
 
 ## 3. System Architecture
 
-![Image]([https://www.researchgate.net/publication/370049461/figure/fig21/AS%3A11431281271367254%401723600292438/Illustration-of-the-AI-pipeline-architecture.png?utm_source=chatgpt.com](https://www.google.com/imgres?q=%EA%B7%80%EC%97%AC%EC%9A%B4%20%EC%95%84%ED%82%A4%ED%85%8D%EC%B3%90&imgurl=https%3A%2F%2Fpng.pngtree.com%2Fpng-vector%2F20250808%2Fourlarge%2Fpngtree-cute-construction-brick-mascot-with-hard-hat-smiling-isolated-image-png-image_16699102.webp&imgrefurl=https%3A%2F%2Fkor.pngtree.com%2Ffreepng%2Fcute-construction-brick-mascot-with-hard-hat-smiling-isolated-image_21702270.html&docid=ejO7P-9vY_lMmM&tbnid=Cu-T7GQ098sL_M&vet=12ahUKEwjB--DDgKORAxUV1DQHHUArKisQM3oECBgQAA..i&w=640&h=640&hcb=2&itg=1&ved=2ahUKEwjB--DDgKORAxUV1DQHHUArKisQM3oECBgQAA))
+![Image](./docs/architecture/ai.png)
 
-![Image]([https://github.blog/wp-content/uploads/2023/10/LLMapparchitecturediagram.png?fit=4088%2C2148\&utm_source=chatgpt.com](https://www.google.com/url?sa=i&url=https%3A%2F%2Fseries.naver.com%2Fnovel%2Fdetail.series%3FproductNo%3D8155581&psig=AOvVaw1_LwDTFSQhB40zJonPY3pq&ust=1764905804422000&source=images&cd=vfe&opi=89978449&ved=0CBUQjRxqFwoTCOj73c6Ao5EDFQAAAAAdAAAAABAE))
-
+![Image](./docs/architecture/the-clean-architecture.png)
 **Backend(FastAPI)**
 
 * CollectService: 규제 파일 수집 및 메타데이터
@@ -243,3 +242,4 @@ npm run dev
 
 
 ---
+
