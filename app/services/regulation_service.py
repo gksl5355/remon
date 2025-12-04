@@ -74,3 +74,6 @@ class RegulationService:
                 "today_count": 0,
                 "regulations": []
             }
+
+
+

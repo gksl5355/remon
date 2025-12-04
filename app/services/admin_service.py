@@ -39,6 +39,7 @@ class AdminService:
         logger.info(f"Admin: Fetching regulations - country={country}, page={page}")
         
         # TODO: BE2(남지수) - RegulationRepository.get_list() 구현 후 연동
+        # TODO: SQL: SELECT * FROM regulations WHERE country_code=? ORDER BY created_at DESC
         
         return {
             "items": [],
@@ -89,6 +90,7 @@ class AdminService:
         logger.info(f"Admin: Fetching reports - country={country}, page={page}")
         
         # TODO: BE2(남지수) - ReportRepository.get_list() 구현 후 연동
+        # TODO: SQL: SELECT * FROM reports WHERE country_code=? ORDER BY created_at DESC
         
         return {
             "items": [],
