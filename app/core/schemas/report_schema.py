@@ -11,6 +11,8 @@ class ReportBase(BaseModel):
     change_id: Optional[int] = None
     created_reason: Optional[str] = None
     file_path: Optional[str] = None
+    s3_key: Optional[str] = None
+    pdf_updated_at: Optional[datetime] = None
 
 class ReportCreate(ReportBase):
     pass

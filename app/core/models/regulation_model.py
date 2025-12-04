@@ -63,6 +63,7 @@ class RegulationTranslation(Base):
     translated_text = Column(Text)
     glossary_term_id = Column(String, ForeignKey("glossary_terms.glossary_term_id")) # UUID 타입이면 DB에 맞게 조정
     translation_status = Column(String(20))
+    s3_key = Column(String(500))
     created_at = Column(DateTime, server_default=func.now())
 
     # Relationships

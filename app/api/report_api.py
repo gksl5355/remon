@@ -7,8 +7,9 @@ merge_dated: 2025-11-12
 """
 
 import logging
+import io
 from fastapi import APIRouter, Request, HTTPException, Depends, Query
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.services.report_service import ReportService
@@ -24,15 +25,17 @@ service = ReportService()
 @router.get("/reports/combined/download")
 async def download_combined_report(
     start_date: str,
-    end_date: str
+    end_date: str,
+    db: AsyncSession = Depends(get_db)
 ):
-    print(f"✅ 요청된 기간: {start_date} ~ {end_date}")
-
-    return JSONResponse({
-        "status": "ok",
-        "message": "요청 정상 수신",
-        "requested_period": f"{start_date} ~ {end_date}",
-    })
+    data = await service.download_combined_report(start_date, end_date, db)
+    content = data["content"]
+    filename = data["filename"]
+    return StreamingResponse(
+        io.BytesIO(content),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 # 규제별 요약 리포트 조회
 @router.get("/reports/{regulation_id}")
@@ -82,18 +85,17 @@ async def download_report(
     """
     logger.info(f"GET /reports/{regulation_id}/download")
     
-    # TODO: 실제 PDF 생성 로직 구현
-    file_data = await service.download_report(db, regulation_id)
+    pdf_bytes = await service.download_report(db, regulation_id)
     
-    if not file_data:
+    if not pdf_bytes:
         raise HTTPException(status_code=404, detail="Report not found")
     
-    # 임시: 더미 PDF 생성
-    dummy_path = f"report_{regulation_id}.pdf"
-    with open(dummy_path, "wb") as f:
-        f.write(b"%PDF-1.4\n% Demo report PDF content\n")
-    
-    return FileResponse(dummy_path, media_type="application/pdf", filename=f"report_{regulation_id}.pdf")
+    filename = f"report_{regulation_id}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 @router.delete("/reports/{report_id}", status_code=204)
 async def delete_report(

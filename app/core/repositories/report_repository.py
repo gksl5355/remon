@@ -4,12 +4,54 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from app.core.models.report_model import Report, ReportItem, ReportSummary
 from .base_repository import BaseRepository
+from datetime import datetime
 
 class ReportRepository(BaseRepository[Report]):
     """리포트 Repository"""
     
     def __init__(self):
         super().__init__(Report)
+    
+    async def get_with_summary(
+        self, db: AsyncSession, report_id: int
+    ) -> Optional[ReportSummary]:
+        """
+        report_id를 summary_id로 간주하고 ReportSummary 조회
+        """
+        result = await db.execute(
+            select(ReportSummary).where(ReportSummary.summary_id == report_id)
+        )
+        return result.scalar_one_or_none()
+    
+    async def update_pdf_meta(
+        self, db: AsyncSession, report_id: int, s3_key: Optional[str]
+    ) -> Optional[Report]:
+        """
+        PDF 캐시 메타데이터 업데이트
+        """
+        report = await db.get(Report, report_id)
+        if not report:
+            return None
+        report.s3_key = s3_key
+        report.pdf_updated_at = datetime.utcnow()
+        await db.flush()
+        await db.refresh(report)
+        return report
+
+    async def invalidate_pdf_cache(
+        self, db: AsyncSession, report_id: int
+    ) -> Optional[Report]:
+        """
+        PDF 캐시 무효화 (s3_key/pdf_updated_at 초기화)
+        """
+        report = await db.get(Report, report_id)
+        if not report:
+            return None
+        report.s3_key = None
+        report.pdf_updated_at = None
+        await db.flush()
+        await db.refresh(report)
+        return report
     
     async def get_by_regulation_id(
         self,
@@ -153,3 +195,17 @@ class ReportSummaryRepository(BaseRepository[ReportSummary]):
             .where(ReportSummary.summary_id == summary_id)
         )
         return result.scalar_one_or_none()
+
+    async def get_by_date_range(
+        self, db: AsyncSession, start_dt: datetime, end_dt: datetime
+    ) -> List[ReportSummary]:
+        """
+        created_at 기준으로 기간 내 summary 조회
+        """
+        result = await db.execute(
+            select(ReportSummary).where(
+                ReportSummary.created_at >= start_dt,
+                ReportSummary.created_at <= end_dt,
+            )
+        )
+        return list(result.scalars().all())

@@ -10,6 +10,8 @@ class Report(Base):
     created_reason = Column(String(30))
     created_at = Column(DateTime, server_default=func.now())
     file_path = Column(String(500))
+    s3_key = Column(String(500))
+    pdf_updated_at = Column(DateTime)
     
     translation_id = Column(Integer, ForeignKey("regulation_translations.translation_id"), nullable=False)
     change_id = Column(Integer, ForeignKey("regulation_change_history.change_id"))
