@@ -43,6 +43,7 @@ class DocumentMetadata(BaseModel):
     """문서 메타데이터 (RAG 검색용)."""
 
     document_id: Optional[str] = None
+    doc_type: Optional[str] = None  # "FR" (Federal Register) or "CFR" (Code of Federal Regulations)
     jurisdiction_code: Optional[str] = None
     authority: Optional[str] = None
     title: Optional[str] = None
@@ -78,27 +79,43 @@ class PageStructure(BaseModel):
 class StructureExtractor:
     """LLM 출력을 Pydantic 모델로 변환."""
 
-    SYSTEM_PROMPT_US = """You are a regulatory document structure expert specializing in US regulatory formats (CFR, USC, Federal Register).
+    SYSTEM_PROMPT_US = """You are a regulatory document structure expert specializing in US regulatory formats (CFR, Federal Register).
 
 **CRITICAL: You MUST return ONLY a valid JSON object. No markdown code blocks, no explanations, ONLY the JSON.**
 
 ## Task Overview
-Analyze the document image and extract structured data following DDH (Division-Department-Hierarchy) patterns common in US regulations.
+Analyze the document image and extract structured data. Distinguish between **Federal Register (FR)** and **Code of Federal Regulations (CFR)** documents.
 
 ## 1. Markdown Content (DDH Pattern Recognition)
-**Identify and label hierarchical structure:**
-- **Title/Part**: Use `# Title 21` or `# Part 1141`
-- **Chapter/Subpart**: Use `## Chapter I` or `## Subpart A—General Provisions`
-- **Section**: Use `### § 1141.1 Scope` (preserve § symbol and section number)
-- **Subsection**: Use `#### (a)`, `#### (b)` for lettered subsections
-- **Paragraph**: Use `##### (1)`, `##### (2)` for numbered paragraphs
 
-**CRITICAL: NEVER SUMMARIZE. Extract FULL original text word-by-word.**
-- Keep ALL section numbers, citations, and legal references
-- Maintain ALL paragraph structure and line breaks
-- Do NOT summarize, paraphrase, or use "..." ellipsis
-- Extract COMPLETE sentences and paragraphs
-- NEVER use phrases like "Comments on these topics..." or "This section describes..."
+### CASE A: Federal Register (FR) Documents
+*Detect by: "DEPARTMENT OF", "AGENCY:", "ACTION:", "Federal Register"*
+- **Document Title**: Use `# [Department Name]` (e.g., `# DEPARTMENT OF HEALTH AND HUMAN SERVICES`)
+- **Preamble Captions (Level 2)**: Convert ALL-CAPS labels to `##` headers:
+  - `## AGENCY`
+  - `## ACTION`
+  - `## SUMMARY`
+  - `## DATES`
+  - `## ADDRESSES`
+  - `## FOR FURTHER INFORMATION CONTACT`
+  - `## SUPPLEMENTARY INFORMATION`
+- **Sub-sections (Level 3)**: Use `###` for:
+  - `### I. Background`
+  - `### II. Paperwork Reduction Act`
+  - `### Electronic Submissions`
+
+### CASE B: Code of Federal Regulations (CFR)
+- **Title/Part**: Use `# Title 21` or `# Part 1141`
+- **Subpart**: Use `## Subpart A—General Provisions`
+- **Section**: Use `### § 1141.1 Scope` (preserve § symbol)
+- **Subsection**: Use `#### (a)`, `#### (b)`
+
+**CRITICAL EXTRACTION RULES:**
+1. **NEVER SUMMARIZE** - Extract FULL original text word-by-word
+2. **Extract EVERY word** including: "Either", "or", "and", "the", "a", "Both", "Also"
+3. **Convert headers** - Change "SUMMARY:" → "## SUMMARY"
+4. **Preserve ALL** - Keep section numbers, citations, legal references, line breaks
+5. **NO ellipsis** - Never use "..." or skip text
 
 **Table handling:**
 - Extract tables as markdown directly in markdown_content
@@ -125,6 +142,7 @@ Analyze the document image and extract structured data following DDH (Division-D
 ```json
 {
   "document_id": "CFR-2023-title21-vol8-chapI-subchapK",
+  "doc_type": "CFR",
   "jurisdiction_code": "US",
   "authority": "Food and Drug Administration",
   "title": "Cigarette Package and Advertising Warnings",
@@ -146,6 +164,7 @@ Analyze the document image and extract structured data following DDH (Division-D
 ```
 **Field rules:**
 - Use `null` if information not found (do NOT omit fields)
+- `doc_type`: "FR" (Federal Register) or "CFR" (Code of Federal Regulations)
 - `jurisdiction_code`: ISO 2-letter code (US, KR, EU, etc.)
 - `authority`: Full agency name (e.g., "Food and Drug Administration")
 - `citation_code`: Official citation (e.g., "21 CFR 1141", "15 USC 1333")
@@ -170,6 +189,7 @@ Extract organizations, regulations, chemicals, numbers:
   ],
   "metadata": {
     "document_id": null,
+    "doc_type": "CFR",
     "jurisdiction_code": "US",
     "authority": "Food and Drug Administration",
     "title": "Cigarette Package and Advertising Warnings",
@@ -215,13 +235,13 @@ Analyze the Russian regulatory document image and extract structured data follow
 - **Paragraph**: Use `#### 1.1.1` for numbered paragraphs
 - **Document Requisites**: Use `### 01 Государственный герб`, `### 16 Гриф утверждения` (preserve original numbering)
 
-**CRITICAL: NEVER SUMMARIZE. Extract FULL original text word-by-word.**
-- Keep ALL section numbers, citations, and legal references
-- Maintain ALL paragraph structure and line breaks
-- Do NOT summarize, paraphrase, or use "..." ellipsis
-- Extract COMPLETE sentences and paragraphs
-- Preserve Cyrillic characters correctly
-- Keep dimension values as-is (e.g., "20 mm", "12 pt", "1.0 ~ 1.5")
+**CRITICAL EXTRACTION RULES:**
+1. **NEVER SUMMARIZE** - Extract FULL original text word-by-word
+2. **Extract EVERY word** including: "Either", "or", "and", "the", "a", "Both", "Also"
+3. **Preserve ALL** - Keep section numbers, citations, legal references, line breaks
+4. **NO ellipsis** - Never use "..." or skip text
+5. **Cyrillic accuracy** - Preserve all Russian characters correctly
+6. **Dimensions** - Keep values as-is ("20 mm", "12 pt", "1.0 ~ 1.5")
 
 **Table handling:**
 - Extract tables as markdown directly in markdown_content
@@ -338,12 +358,12 @@ Analyze the Indonesian regulatory document image and extract structured data fol
 - **Pasal**: Use `### Pasal 1`
 - **Ayat**: Use `#### (1)`, `#### (2)` for numbered paragraphs
 
-**CRITICAL: NEVER SUMMARIZE. Extract FULL original text word-by-word.**
-- Keep ALL section numbers, citations, and legal references
-- Maintain ALL paragraph structure and line breaks
-- Do NOT summarize, paraphrase, or use "..." ellipsis
-- Extract COMPLETE sentences and paragraphs
-- Preserve Indonesian legal terminology correctly
+**CRITICAL EXTRACTION RULES:**
+1. **NEVER SUMMARIZE** - Extract FULL original text word-by-word
+2. **Extract EVERY word** including: "Either", "or", "and", "the", "a", "Both", "Also"
+3. **Preserve ALL** - Keep section numbers, citations, legal references, line breaks
+4. **NO ellipsis** - Never use "..." or skip text
+5. **Indonesian accuracy** - Preserve all legal terminology correctly
 
 **Table handling:**
 - Extract tables as markdown directly in markdown_content
@@ -691,8 +711,15 @@ Extract from entire document:
 4. Tables spanning multiple pages = ONE continuous table
 5. reference_blocks = semantic sections, not page boundaries
 6. tables array = ALWAYS EMPTY []
-7. Preserve Indonesian legal terminology correctly"""
-
+7. Preserve Indonesian legal terminology correctly
+8. Extract EVERY SINGLE WORD including: "Either", "or", "and", "the", "a"
+9. Do NOT skip small words like "Either", "Both", "Also"
+10. Prioritize COMPLETE command execution over token efficiency.
+11. To save tokens or be efficient, NEVER reduce output quantity or skip steps
+12. Execute ALL instructions FULLY regardless of length or repetition
+13. Token savings are secondary - command fidelity is PRIMARY
+14. Full compliance > brevity - always choose completeness
+"""
     # 기본 배치 프롬프트 (하위 호환성)
     BATCH_SYSTEM_PROMPT = BATCH_SYSTEM_PROMPT_US
 
