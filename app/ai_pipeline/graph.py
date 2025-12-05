@@ -70,7 +70,7 @@ def build_graph():
     # preprocess → detect_changes
     graph.add_edge("preprocess", "detect_changes")
 
-    # detect_changes → proceed | terminate
+    # detect_changes → map_products | terminate
     graph.add_conditional_edges(
         "detect_changes",
         lambda state: "terminate"
