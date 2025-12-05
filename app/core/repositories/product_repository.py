@@ -24,6 +24,7 @@ FEATURE_UNIT_MAP: Dict[str, str] = {
     "certifying_agencies": "text", # New
     "revenue": "currency",       # New (Integer)
     "supply_partner": "text",    # New
+    "effective": "json"          # New (JSONB)
 }
 
 # Boolean 타입 컬럼 목록 업데이트
@@ -48,6 +49,7 @@ SELECT
     p.revenue,
     p.supply_partner,
     p.country_code
+    p.effective
 FROM products p
 """
 
@@ -158,5 +160,6 @@ class ProductRepository(BaseRepository[Product]):
                 "present_state": features,
             },
             "feature_units": feature_units,
+            "effective": row.get("effective") or {}
         }
 
