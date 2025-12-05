@@ -14,36 +14,41 @@ from .base_repository import BaseRepository
 # ========================================
 # 도메인 상수
 # ========================================
+# 새로운 스키마에 맞춰 특성과 단위를 재정의
 FEATURE_UNIT_MAP: Dict[str, str] = {
-    "nicotin": "mg",
-    "tarr": "mg",
-    "battery": "mAh",
-    "label_size": "mm^2",
-    "image": "text",
+    "nicotine": "mg",            # nicotin -> nicotine
+    "tar": "mg",                 # tarr -> tar
+    "label_size": "text",        # varchar(50)
+    "images_size": "text",       # New
+    "package": "text",           # New
+    "certifying_agencies": "text", # New
+    "revenue": "currency",       # New (Integer)
+    "supply_partner": "text",    # New
 }
 
-BOOLEAN_FEATURES: Set[str] = {"menthol", "incense", "security_auth"}
+# Boolean 타입 컬럼 목록 업데이트
+BOOLEAN_FEATURES: Set[str] = {"menthol", "flavor"} # incense -> flavor
 
 DEFAULT_EXPORT_COUNTRY: str = "US"
 
-# Raw SQL 쿼리
+# Raw SQL 쿼리 (JOIN 제거 및 컬럼 최신화)
 PRODUCT_SELECT_BASE = """
 SELECT
     p.product_id,
     p.product_name,
     p.product_category,
-    p.nicotin,
-    p.tarr,
+    p.nicotine,
+    p.tar,
     p.menthol,
-    p.incense,
-    p.battery,
+    p.flavor,
     p.label_size,
-    p.security_auth,
-    p.image,
-    COALESCE(pec.country_code, :default_country) AS export_country
+    p.images_size,
+    p.package,
+    p.certifying_agencies,
+    p.revenue,
+    p.supply_partner,
+    p.country_code
 FROM products p
-LEFT JOIN product_export_countries pec
-    ON pec.product_id = p.product_id
 """
 
 
@@ -53,7 +58,7 @@ class ProductRepository(BaseRepository[Product]):
     
     책임:
     - 제품 CRUD
-    - 복잡한 조인 쿼리
+    - 복잡한 조인 쿼리 (현재는 단일 테이블로 간소화됨)
     - DB Row → State.ProductInfo 변환 (기술적 변환)
     - 제품 특성 직렬화
     """
@@ -75,21 +80,12 @@ class ProductRepository(BaseRepository[Product]):
         
         Returns:
             State.ProductInfo 형식 딕셔너리
-            {
-                "product_id": "123",
-                "product_name": "제품명",
-                "mapping": {
-                    "target": {...},
-                    "present_state": {"nicotin": 3.0, "battery": 3000},
-                },
-                "feature_units": {"nicotin": "mg", "battery": "mAh"}
-            }
         
         Raises:
             ValueError: 제품을 찾을 수 없을 때
         """
-        # 복잡한 조인 쿼리 (Repository 책임)
-        params = {"default_country": DEFAULT_EXPORT_COUNTRY}
+        # params는 이제 단순히 ID 바인딩용으로만 사용 (default_country 조인 불필요)
+        params = {}
         
         if product_id is not None:
             query = text(
@@ -128,13 +124,15 @@ class ProductRepository(BaseRepository[Product]):
         # 1. 단위가 있는 특성 처리
         for field, unit in FEATURE_UNIT_MAP.items():
             value = row.get(field)
-            if value in (None, ""):
+            
+            # None이거나 빈 문자열인 경우 스킵 (revenue가 0인 경우는 포함해야 하므로 주의)
+            if value is None or value == "":
                 continue
 
-            # Decimal 등 JSON 직렬화가 어려운 값은 미리 float로 변환한다.
+            # Decimal 등 JSON 직렬화가 어려운 값은 미리 float/int로 변환한다.
             if isinstance(value, Decimal):
                 value = float(value)
-
+            
             features[field] = value
             feature_units[field] = unit
         
@@ -147,10 +145,13 @@ class ProductRepository(BaseRepository[Product]):
             feature_units[field] = "boolean"
         
         # 3. State.ProductInfo 형식 반환
+        # export_country 컬럼이 사라지고 country_code가 직접 존재함
+        country_code = row.get("country_code")
+        
         return {
             "product_id": str(row["product_id"]),
             "product_name": row.get("product_name") or "Unknown Product",
-            "country": row.get("export_country") or DEFAULT_EXPORT_COUNTRY,
+            "country": country_code or DEFAULT_EXPORT_COUNTRY,
             "category": row.get("product_category") or "Unknown",
             "mapping": {
                 "target": {},
@@ -158,3 +159,4 @@ class ProductRepository(BaseRepository[Product]):
             },
             "feature_units": feature_units,
         }
+

@@ -1,17 +1,23 @@
 import enum
 
 class ProductCategoryEnum(str, enum.Enum):
-    COMBUSTIBLE = "combustible"
-    HTP = "htp"
-    E_CIGARETTE = "e_cigarette"
+    C = "C"  # Combustible
+    H = "H"  # HTP
+    E = "E"  # E-cigarette
 
 class RiskLevelEnum(str, enum.Enum):
-    L = "L"
-    M = "M"
-    H = "H"
+    L = "L"  # Low
+    M = "M"  # Medium
+    H = "H"  # High
 
 class ChangeTypeEnum(str, enum.Enum):
-    NONE = "none"
-    APPEND = "append"
-    NEW = "new"
-    REPEAL = "repeal"
+    NO = "NO" # None
+    A = "A"   # Append
+    NE = "NE" # New
+    R = "R"   # Repeal
+
+class TranslationStatusEnum(str, enum.Enum):
+    queued = "queued"
+    running = "running"
+    done = "done"
+    failed = "failed"

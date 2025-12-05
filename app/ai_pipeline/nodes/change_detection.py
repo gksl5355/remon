@@ -145,10 +145,10 @@ class ChangeDetectionNode:
         self.model_name = model_name
         self.confidence_scorer = ConfidenceScorer()
 
-    async def run(self, state: AppState) -> AppState:
+    async def run(self, state: AppState, db_session=None) -> AppState:
         """변경 감지 노드 실행 (Reference ID 기반)."""
         logger.info("=== Change Detection Node 시작 (Reference ID 기반) ===")
-
+        print("=== Change Detection Node 시작 (Reference ID 기반) ===")
         change_context = state.get("change_context", {})
         if not change_context:
             logger.info("change_context 없음, 변경 감지 스킵")
@@ -159,37 +159,68 @@ class ChangeDetectionNode:
             }
             return state
 
-        vision_results = state.get("vision_extraction_result", [])
-        if not vision_results:
-            logger.warning("vision_extraction_result 없음")
+        # DB 세션 확인
+        if not db_session:
+            logger.error("db_session 없음")
             state["change_detection_results"] = []
-            state["change_summary"] = {"status": "error", "reason": "no_vision_results"}
+            state["change_summary"] = {
+                "status": "error",
+                "reason": "no_db_session",
+            }
+            return state
+
+        # 신규 규제 ID
+        new_regulation_id = change_context.get("new_regulation_id")
+        print(f"new_regulation_id: {new_regulation_id}")
+        if not new_regulation_id:
+            logger.error("new_regulation_id 없음")
+            state["change_detection_results"] = []
+            state["change_summary"] = {
+                "status": "error",
+                "reason": "no_new_regulation_id",
+            }
+            return state
+
+        # 신규 규제 DB에서 조회
+        from app.core.repositories.regulation_repository import RegulationRepository
+        repo = RegulationRepository()
+        new_regul_data = await repo.get_regul_data(db_session, new_regulation_id)
+        
+        if not new_regul_data:
+            logger.warning(f"신규 regul_data 없음: regulation_id={new_regulation_id}")
+            state["change_detection_results"] = []
+            state["change_summary"] = {"status": "error", "reason": "no_new_regul_data"}
             return state
 
         # 신규 Reference Blocks 추출
-        new_ref_blocks = self._extract_reference_blocks(vision_results)
-        new_regulation_id = change_context.get("new_regulation_id", "NEW")
+        new_ref_blocks = self._extract_reference_blocks(new_regul_data)
+
 
         # Legacy 규제 식별
         legacy_regulation_id = change_context.get("legacy_regulation_id")
+        print(f"legacy_regulation_id: {legacy_regulation_id}")
 
-        # Legacy Reference Blocks 조회 (직접 제공 또는 Qdrant 검색)
-        legacy_vision_results = change_context.get("legacy_vision_results")
+        # Legacy Reference Blocks 조회 (직접 제공 또는 DB 검색)
+        legacy_regul_data = change_context.get("legacy_regul_data")
+        print(f"legacy_regul_data: {bool(legacy_regul_data)}")
 
-        if legacy_vision_results:
-            # JSON 직접 비교 모드: legacy_vision_results에서 추출
+        if legacy_regul_data:
+            # JSON 직접 비교 모드: legacy_regul_data에서 추출
             logger.info("Legacy 데이터 직접 사용 (JSON 비교 모드)")
-            legacy_ref_blocks = self._extract_reference_blocks(legacy_vision_results)
+            print("Legacy 데이터 직접 사용 (JSON 비교 모드)")
+            legacy_ref_blocks = self._extract_reference_blocks(legacy_regul_data)
             if not legacy_regulation_id:
                 legacy_regulation_id = "LEGACY"
         else:
-            # S3 검색 모드
+            # DB 검색 모드
             if not legacy_regulation_id:
-                legacy_regulation_id = await self._find_legacy_regulation_s3(
-                    vision_results
+                legacy_regulation_id = await self._find_legacy_regulation_db(
+                    new_regul_data, db_session, new_regulation_id
                 )
+                print(f"legacy_regulation_id: {legacy_regulation_id}")
                 if not legacy_regulation_id:
                     logger.info("완전히 새로운 규제로 처리")
+                    print("완전히 새로운 규제로 처리")
                     state["change_detection_results"] = []
                     state["change_summary"] = {
                         "status": "new_regulation",
@@ -197,8 +228,8 @@ class ChangeDetectionNode:
                     }
                     return state
 
-            legacy_ref_blocks = await self._get_legacy_reference_blocks_s3(
-                legacy_regulation_id
+            legacy_ref_blocks = await self._get_legacy_reference_blocks_db(
+                legacy_regulation_id, db_session
             )
             if not legacy_ref_blocks:
                 logger.warning(
@@ -258,255 +289,254 @@ class ChangeDetectionNode:
         logger.info(
             f"✅ 변경 감지 완료: {total_changes}개 변경 감지 (HIGH: {high_confidence})"
         )
+        print("node 끝")
 
         return state
 
     def _extract_reference_blocks(
-        self, vision_results: List[Dict[str, Any]]
+        self, regul_data: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
-        """Vision 결과에서 Reference Blocks 추출."""
+        """regul_data에서 reference_blocks 추출 (Vision Pipeline 구조 대응)."""
         ref_blocks = []
-        for page_result in vision_results:
-            structure = page_result.get("structure", {})
-            blocks = structure.get("reference_blocks", [])
-            for block in blocks:
-                ref_blocks.append(
-                    {
-                        "section_ref": block.get("section_ref"),
-                        "text": block.get("text"),
-                        "keywords": block.get("keywords", []),
-                        "page_num": page_result.get("page_num"),
-                    }
-                )
+        
+        # Vision Pipeline 출력 구조
+        vision_pages = regul_data.get("vision_extraction_result", [])
+        
+        for page in vision_pages:
+            structure = page.get("structure", {})
+            page_num = page.get("page_num", 0)
+            markdown_content = structure.get("markdown_content", "")
+            reference_blocks = structure.get("reference_blocks", [])
+            
+            # reference_blocks가 있으면 사용
+            if reference_blocks:
+                lines = markdown_content.splitlines()
+                total_lines = len(lines)
+                for ref in reference_blocks:
+                    start = max(ref.get("start_line", 0), 0)
+                    end = ref.get("end_line", total_lines) or total_lines
+                    end = min(end, total_lines)
+                    snippet = "\n".join(lines[start:end]) if lines else markdown_content
+                    
+                    ref_blocks.append({
+                        "section_ref": ref.get("section_ref", ""),
+                        "text": snippet,  # markdown_content에서 실제 텍스트 추출
+                        "keywords": ref.get("keywords", []),
+                        "page_num": page_num,
+                        "start_line": start,
+                        "end_line": end,
+                        "hierarchy": [],  # 계층 정보 (필요시 추가)
+                    })
+            else:
+                # reference_blocks가 없으면 페이지 전체를 하나의 블록으로
+                ref_blocks.append({
+                    "section_ref": f"Page {page_num}",
+                    "text": markdown_content[:500],  # 처음 500자
+                    "keywords": self._extract_keywords(markdown_content),
+                    "page_num": page_num,
+                    "start_line": 0,
+                    "end_line": len(markdown_content.splitlines()),
+                    "hierarchy": [],
+                })
+        
         return ref_blocks
+    
+    def _extract_keywords(self, text: str, max_keywords: int = 5) -> List[str]:
+        """텍스트에서 키워드 추출 (간단한 토큰 기반)."""
+        import re
+        
+        if not text:
+            return []
+        
+        # 숫자 포함 단어 우선 (예: 20mg, § 1141.1)
+        numeric_words = re.findall(r'\b\w*\d+\w*\b', text)
+        
+        # 대문자 시작 단어 (고유명사)
+        capitalized = re.findall(r'\b[A-Z][a-z]+\b', text)
+        
+        # 결합 및 중복 제거
+        keywords = list(dict.fromkeys(numeric_words[:3] + capitalized[:3]))
+        
+        return keywords[:max_keywords]
 
-    async def _find_legacy_regulation_s3(
-        self, vision_results: List[Dict[str, Any]]
-    ) -> Optional[str]:
-        """S3에서 Legacy 규제 JSON 검색."""
-        if not vision_results:
+    async def _find_legacy_regulation_db(
+        self, regul_data: Dict[str, Any], db_session, exclude_regulation_id: int = None
+    ) -> Optional[int]:
+        """DB에서 Legacy 규제 검색."""
+        if not regul_data:
             return None
 
-        first_page = vision_results[0]
-        metadata = first_page.get("structure", {}).get("metadata", {})
-
-        title = metadata.get("title", "")
-        country = metadata.get("country", "")
-        regulation_type = metadata.get("regulation_type", "")
-
+        title = regul_data.get("title", "")
+        country = regul_data.get("jurisdiction_code", "")
+        print(f"DB Legacy 검색: title={title}, country={country}")
         logger.info(
-            f"S3 Legacy 검색: title={title}, country={country}, type={regulation_type}"
+            f"DB Legacy 검색: title={title}, country={country}"
         )
 
         try:
-            from app.utils.s3_client import S3Client
+            from app.core.repositories.regulation_repository import RegulationRepository
 
-            s3_client = S3Client()
-            matched_files = s3_client.search_json_by_metadata(
-                title=title, country=country, regulation_type=regulation_type
+            repo = RegulationRepository()
+            print("_find_legacy_regulation_db 실행")
+            regulation = await repo.find_by_title_and_country(
+                db_session, title, country, exclude_regulation_id
             )
 
-            if matched_files:
-                s3_key = matched_files[0]["s3_key"]
-                logger.info(f"S3 Legacy 발견: {s3_key}")
-                return s3_key
+            if regulation:
+                logger.info(f"DB Legacy 발견: regulation_id={regulation.regulation_id}")
+                print(f"DB Legacy 발견: regulation_id={regulation.regulation_id}")
+                return regulation.regulation_id
 
-            logger.info("S3 Legacy 미발견")
+            logger.info("DB Legacy 미발견")
+            print("DB Legacy 미발견")
             return None
 
         except Exception as e:
-            logger.error(f"S3 Legacy 검색 실패: {e}")
+            logger.error(f"DB Legacy 검색 실패: {e}")
             return None
 
-        # Qdrant 검색 로직 (주석 처리)
-        # async def _find_legacy_regulation(self, vision_results: List[Dict[str, Any]]) -> Optional[str]:
-        """메타데이터 기반 Legacy 규제 검색 (다중 전략)."""
-        if not vision_results:
-            return None
-
-        first_page = vision_results[0]
-        structure = first_page.get("structure", {})
-        metadata = structure.get("metadata", {})
-
-        if not metadata:
-            return None
-
-        title = metadata.get("title", "")
-        country = metadata.get("country", "")
-        regulation_type = metadata.get("regulation_type", "")
-        keywords = metadata.get("keywords", [])
-
-        logger.info(
-            f"Legacy 검색: title={title}, country={country}, type={regulation_type}"
-        )
-
-        try:
-            from app.ai_pipeline.preprocess.embedding_pipeline import EmbeddingPipeline
-
-            embedding_pipeline = EmbeddingPipeline(use_sparse=False)
-
-            # 전략 1: Title + Keywords 임베딩 검색
-            query_parts = []
-            if title:
-                query_parts.append(title)
-            if keywords:
-                query_parts.extend(keywords[:5])
-
-            if not query_parts:
-                logger.warning("검색 쿼리 생성 실패: title과 keywords 모두 없음")
-                return None
-
-            query_text = " ".join(query_parts)
-            query_emb = embedding_pipeline.embed_single_text(query_text)
-
-            # 필터 구성 (있는 것만)
-            filters = {}
-            if country:
-                filters["country"] = country
-            if regulation_type:
-                filters["regulation_type"] = regulation_type
-
-            results = self.vector_client.search(
-                query_dense=query_emb["dense"],
-                top_k=5,
-                filters=filters if filters else None,
-            )
-
-            if results.get("metadatas"):
-                for idx, meta in enumerate(results["metadatas"]):
-                    legacy_id = meta.get("regulation_id")
-                    score = (
-                        results["scores"][idx] if idx < len(results["scores"]) else 0
-                    )
-
-                    if legacy_id and score > 0.7:  # 유사도 임계값
-                        logger.info(
-                            f"Legacy 규제 발견: {legacy_id} (score: {score:.2f})"
-                        )
-                        return legacy_id
-
-            # 전략 2: Keywords 기반 재검색 (임베딩 실패 시)
-            if keywords:
-                logger.info(f"Keywords 기반 재검색: {keywords[:3]}")
-                keyword_query = " ".join(keywords[:3])
-                keyword_emb = embedding_pipeline.embed_single_text(keyword_query)
-
-                results2 = self.vector_client.search(
-                    query_dense=keyword_emb["dense"],
-                    top_k=3,
-                    filters={"country": country} if country else None,
-                )
-
-                if results2.get("metadatas"):
-                    legacy_id = results2["metadatas"][0].get("regulation_id")
-                    score = results2["scores"][0] if results2["scores"] else 0
-                    logger.info(
-                        f"Keywords로 Legacy 발견: {legacy_id} (score: {score:.2f})"
-                    )
-                    return legacy_id
-
-            logger.info("Legacy 규제 미발견")
-            return None
-
-        except Exception as e:
-            logger.error(f"Legacy 규제 검색 실패: {e}", exc_info=True)
-            return None
-
-    async def _get_legacy_reference_blocks_s3(
-        self, s3_key: str
+        
+    async def _get_legacy_reference_blocks_db(
+        self, regulation_id: int, db_session
     ) -> List[Dict[str, Any]]:
-        """S3에서 Legacy JSON 다운로드 후 Reference Blocks 추출."""
+        """DB에서 Legacy regul_data 조회 후 Reference Blocks 추출."""
         try:
-            from app.utils.s3_client import S3Client
-            import json
+            from app.core.repositories.regulation_repository import RegulationRepository
 
-            s3_client = S3Client()
-            temp_path = f"/tmp/legacy_{Path(s3_key).name}"
+            repo = RegulationRepository()
+            regul_data = await repo.get_regul_data(db_session, regulation_id)
 
-            s3_client.download_json(s3_key, temp_path)
-
-            with open(temp_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-
-            legacy_vision_results = data.get("vision_extraction_result", [])
-
-            if not legacy_vision_results:
+            if not regul_data:
+                logger.warning(f"regul_data 없음: regulation_id={regulation_id}")
                 return []
 
-            ref_blocks = self._extract_reference_blocks(legacy_vision_results)
-            logger.info(f"S3 Legacy Reference Blocks: {len(ref_blocks)}개")
+            ref_blocks = self._extract_reference_blocks(regul_data)
+            logger.info(f"DB Legacy Reference Blocks: {len(ref_blocks)}개")
 
             return ref_blocks
 
         except Exception as e:
-            logger.error(f"S3 Legacy 다운로드 실패: {e}")
+            logger.error(f"DB Legacy 조회 실패: {e}")
             return []
 
-        # Qdrant 조회 로직 (주석 처리)
-        # async def _get_legacy_reference_blocks(self, regulation_id: str) -> List[Dict[str, Any]]:
-        """Qdrant에서 Legacy Reference Blocks 조회."""
-        try:
-            results = self.vector_client.client.scroll(
-                collection_name=self.vector_client.collection_name,
-                scroll_filter={
-                    "must": [
-                        {"key": "regulation_id", "match": {"value": regulation_id}}
-                    ]
-                },
-                limit=1000,
-                with_payload=True,
-                with_vectors=False,
-            )
-
-            if not results[0]:
-                return []
-
-            ref_blocks = []
-            for point in results[0]:
-                payload = point.payload
-                ref_blocks.append(
-                    {
-                        "ref_id": payload.get("ref_id"),
-                        "section_ref": payload.get("section_ref"),
-                        "text": payload.get("text"),
-                        "keywords": payload.get("keywords", []),
-                    }
-                )
-
-            return ref_blocks
-
-        except Exception as e:
-            logger.error(f"Legacy Reference Blocks 조회 실패: {e}")
-            return []
 
     async def _match_reference_blocks(
         self, new_blocks: List[Dict[str, Any]], legacy_blocks: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        """CoT Step 1: Section 번호 기반 정확 매칭 (밀림 현상 방지)."""
-        logger.info("Section 번호 기반 매칭 시작 (LLM 생략, 규칙 기반)")
+        """
+        CoT Step 1: 계층 구조 기반 정확 매칭 (밀림 현상 방지).
+        
+        전략:
+        1. 계층 구조 완전 일치 (hierarchy 배열 비교)
+        2. section_ref 일치 (fallback)
+        3. 키워드 유사도 (fuzzy matching)
+        """
+        logger.info("계층 구조 기반 매칭 시작 (규칙 기반)")
 
-        # Section 번호로 정확 매칭 (밀림 현상 방지)
         matched_pairs = []
+        matched_legacy_indices = set()
 
+        # 전략 1: 계층 구조 완전 일치
         for new_block in new_blocks:
+            new_hierarchy = new_block.get("hierarchy", [])
+            
+            if not new_hierarchy:
+                continue
+            
+            for idx, legacy_block in enumerate(legacy_blocks):
+                if idx in matched_legacy_indices:
+                    continue
+                
+                legacy_hierarchy = legacy_block.get("hierarchy", [])
+                
+                # 계층 구조 완전 일치
+                if new_hierarchy == legacy_hierarchy:
+                    matched_pairs.append(
+                        {
+                            "new_block": new_block,
+                            "legacy_block": legacy_block,
+                            "match_confidence": 1.0,
+                            "match_reason": f"Exact hierarchy match: {' > '.join(new_hierarchy)}",
+                        }
+                    )
+                    matched_legacy_indices.add(idx)
+                    break
+        
+        # 전략 2: section_ref 일치 (fallback)
+        for new_block in new_blocks:
+            # 이미 매칭된 경우 스킵
+            if any(p["new_block"] == new_block for p in matched_pairs):
+                continue
+            
             new_section = new_block["section_ref"]
-
-            # 동일 Section 번호 찾기
-            legacy_block = next(
-                (b for b in legacy_blocks if b["section_ref"] == new_section), None
-            )
-
-            if legacy_block:
+            
+            for idx, legacy_block in enumerate(legacy_blocks):
+                if idx in matched_legacy_indices:
+                    continue
+                
+                legacy_section = legacy_block["section_ref"]
+                
+                if new_section == legacy_section:
+                    matched_pairs.append(
+                        {
+                            "new_block": new_block,
+                            "legacy_block": legacy_block,
+                            "match_confidence": 0.9,
+                            "match_reason": f"Section ref match: {new_section}",
+                        }
+                    )
+                    matched_legacy_indices.add(idx)
+                    break
+        
+        # 전략 3: 키워드 유사도 (fuzzy matching)
+        for new_block in new_blocks:
+            if any(p["new_block"] == new_block for p in matched_pairs):
+                continue
+            
+            new_keywords = set(new_block.get("keywords", []))
+            
+            if not new_keywords:
+                continue
+            
+            best_match = None
+            best_score = 0.0
+            
+            for idx, legacy_block in enumerate(legacy_blocks):
+                if idx in matched_legacy_indices:
+                    continue
+                
+                legacy_keywords = set(legacy_block.get("keywords", []))
+                
+                if not legacy_keywords:
+                    continue
+                
+                # Jaccard 유사도
+                intersection = len(new_keywords & legacy_keywords)
+                union = len(new_keywords | legacy_keywords)
+                score = intersection / union if union > 0 else 0.0
+                
+                if score > best_score and score >= 0.5:  # 임계값
+                    best_score = score
+                    best_match = (idx, legacy_block)
+            
+            if best_match:
+                idx, legacy_block = best_match
                 matched_pairs.append(
                     {
                         "new_block": new_block,
                         "legacy_block": legacy_block,
-                        "match_confidence": 1.0,
-                        "match_reason": f"Exact section match: {new_section}",
+                        "match_confidence": best_score,
+                        "match_reason": f"Keyword similarity: {best_score:.2f}",
                     }
                 )
+                matched_legacy_indices.add(idx)
 
-        logger.info(f"Section 매칭 완료: {len(matched_pairs)}개 쌍 (정확 매칭)")
+        logger.info(
+            f"매칭 완료: {len(matched_pairs)}개 쌍 "
+            f"(정확: {sum(1 for p in matched_pairs if p['match_confidence'] == 1.0)}, "
+            f"section: {sum(1 for p in matched_pairs if p['match_confidence'] == 0.9)}, "
+            f"fuzzy: {sum(1 for p in matched_pairs if p['match_confidence'] < 0.9)})"
+        )
         return matched_pairs
 
     async def _detect_change_by_ref_id(
@@ -583,11 +613,11 @@ class ChangeDetectionNode:
 _default_node: Optional[ChangeDetectionNode] = None
 
 
-async def change_detection_node(state: AppState) -> AppState:
+async def change_detection_node(state: AppState, db_session=None) -> AppState:
     global _default_node
     if _default_node is None:
         _default_node = ChangeDetectionNode()
-    return await _default_node.run(state)
+    return await _default_node.run(state, db_session)
 
 
 __all__ = ["ChangeDetectionNode", "change_detection_node", "ConfidenceScorer"]

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>{{ title | default("SK 스타일 종합 보고서") }}</title>
+  <style>
+    :root {
+      --sk-color-main: #FF5C33;
+      --sk-color-sub: #E0E0E0;
+      --sk-color-text: #333333;
+      --sk-font-size-h1: 28px;
+      --sk-font-size-h2: 20px;
+      --sk-font-size-h3: 16px;
+    }
+    body {
+      font-family: 'Noto Sans KR', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+      line-height: 1.6;
+      color: var(--sk-color-text);
+      margin: 0 auto;
+      max-width: 900px;
+      padding: 40px 30px;
+    }
+    .report-title {
+      color: var(--sk-color-main);
+      font-size: var(--sk-font-size-h1);
+      border-bottom: 3px solid var(--sk-color-main);
+      padding-bottom: 15px;
+      margin-bottom: 30px;
+      font-weight: 700;
+    }
+    .section-header {
+      font-size: var(--sk-font-size-h2);
+      color: var(--sk-color-text);
+      border-left: 6px solid var(--sk-color-main);
+      padding: 5px 0 5px 15px;
+      margin-top: 35px;
+      margin-bottom: 20px;
+      background-color: #FAFAFA;
+      font-weight: 600;
+    }
+    .subsection-header {
+      font-size: var(--sk-font-size-h3);
+      color: #555;
+      border-bottom: 1px dashed var(--sk-color-sub);
+      padding-bottom: 8px;
+      margin-top: 25px;
+      margin-bottom: 15px;
+      font-weight: 500;
+    }
+    .meta-info p { margin: 5px 0; }
+    .content { margin-bottom: 12px; }
+    ul { padding-left: 20px; list-style-type: none; }
+    ul li:before {
+      content: '▪';
+      color: var(--sk-color-main);
+      font-weight: bold;
+      display: inline-block;
+      width: 1em;
+      margin-left: -1em;
+    }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 18px 0; }
+    th, td { border: 1px solid var(--sk-color-sub); padding: 8px 10px; text-align: left; font-size: 13px; }
+    th { background-color: #F0F0F0; color: var(--sk-color-text); font-weight: 600; }
+    a { color: #0b62d6; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .section { margin-bottom: 18px; }
+    .divider { margin-top: 50px; border: 0; border-top: 1px solid var(--sk-color-sub); }
+    .footer { text-align: center; font-size: 12px; color: #999; margin-top: 12px; }
+  </style>
+</head>
+<body lang="ko">
+  <h1 class="report-title">{{ title | default("SK 스타일 종합 보고서") }}</h1>
+  <div class="meta-info">
+    <p><strong>기간:</strong> {{ start_date }} ~ {{ end_date }}</p>
+  </div>
+
+  {% if summary %}
+    <div class="section">
+      <h2 class="section-header">요약</h2>
+      <p>{{ summary }}</p>
+    </div>
+  {% endif %}
+
+  {% for section in sections %}
+    <div class="section">
+      <h2 class="section-header">{{ loop.index }}. {{ section.title }}</h2>
+
+      {% if section.type == "paragraph" %}
+        <div class="content">
+          {% for line in section.content %}
+            <p>{{ line }}</p>
+          {% endfor %}
+        </div>
+      {% elif section.type == "list" %}
+        <ul>
+        {% for item in section.content %}
+          <li>{{ item }}</li>
+        {% endfor %}
+        </ul>
+      {% elif section.type == "table" %}
+        <table>
+          <thead>
+            <tr>{% for h in section.headers %}<th>{{ h }}</th>{% endfor %}</tr>
+          </thead>
+          <tbody>
+            {% for row in section.rows %}
+              <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% elif section.type == "links" %}
+        <ul>
+        {% for link in section.content %}
+          <li><a href="{{ link.url }}">{{ link.text }}</a></li>
+        {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+  {% endfor %}
+
+  <hr class="divider">
+  <p class="footer">
+    {% set current_year = (datetime.now().year) %}
+    Copyright © {{ current_year }} SK Group. All Rights Reserved.
+  </p>
+</body>
+</html>

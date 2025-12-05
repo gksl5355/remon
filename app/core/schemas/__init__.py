@@ -16,7 +16,7 @@ from .country_schema import (
 
 from .product_schema import (
     ProductCreate,
-    ProductUpdate,
+    # ProductUpdate,
     ProductResponse
 )
 
@@ -32,7 +32,7 @@ from .report_schema import (
     ReportCreate,
     ReportResponse,
     ReportItemCreate,
-    ReportWithItemsResponse
+    # ReportWithItemsResponse
 )
 
 from .impact_schema import (
