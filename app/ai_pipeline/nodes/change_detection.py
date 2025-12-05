@@ -183,9 +183,10 @@ class ChangeDetectionNode:
 
         # 신규 규제 DB에서 조회
         from app.core.repositories.regulation_repository import RegulationRepository
+
         repo = RegulationRepository()
         new_regul_data = await repo.get_regul_data(db_session, new_regulation_id)
-        
+
         if not new_regul_data:
             logger.warning(f"신규 regul_data 없음: regulation_id={new_regulation_id}")
             state["change_detection_results"] = []
@@ -194,7 +195,6 @@ class ChangeDetectionNode:
 
         # 신규 Reference Blocks 추출
         new_ref_blocks = self._extract_reference_blocks(new_regul_data)
-
 
         # Legacy 규제 식별
         legacy_regulation_id = change_context.get("legacy_regulation_id")
@@ -298,58 +298,62 @@ class ChangeDetectionNode:
     ) -> List[Dict[str, Any]]:
         """regul_data에서 reference_blocks 추출 (Vision Pipeline 구조 대응)."""
         ref_blocks = []
-        
+
         # Vision Pipeline 출력 구조
         vision_pages = regul_data.get("vision_extraction_result", [])
-        
+
         for page in vision_pages:
             structure = page.get("structure", {})
             page_num = page.get("page_num", 0)
             markdown_content = structure.get("markdown_content", "")
             reference_blocks = structure.get("reference_blocks", [])
-            
+
             # reference_blocks가 있으면 사용
             if reference_blocks:
                 for ref in reference_blocks:
-                    ref_blocks.append({
-                        "section_ref": ref.get("section_ref", ""),
-                        "text": "",  # 텍스트는 markdown_content에서 추출
-                        "keywords": ref.get("keywords", []),
-                        "page_num": page_num,
-                        "start_line": ref.get("start_line", 0),
-                        "end_line": ref.get("end_line", 0),
-                        "hierarchy": [],  # 계층 정보 (필요시 추가)
-                    })
+                    ref_blocks.append(
+                        {
+                            "section_ref": ref.get("section_ref", ""),
+                            "text": "",  # 텍스트는 markdown_content에서 추출
+                            "keywords": ref.get("keywords", []),
+                            "page_num": page_num,
+                            "start_line": ref.get("start_line", 0),
+                            "end_line": ref.get("end_line", 0),
+                            "hierarchy": [],  # 계층 정보 (필요시 추가)
+                        }
+                    )
             else:
                 # reference_blocks가 없으면 페이지 전체를 하나의 블록으로
-                ref_blocks.append({
-                    "section_ref": f"Page {page_num}",
-                    "text": markdown_content[:500],  # 처음 500자
-                    "keywords": self._extract_keywords(markdown_content),
-                    "page_num": page_num,
-                    "start_line": 0,
-                    "end_line": len(markdown_content.splitlines()),
-                    "hierarchy": [],
-                })
-        
+                ref_blocks.append(
+                    {
+                        "section_ref": f"Page {page_num}",
+                        "text": markdown_content[:500],  # 처음 500자
+                        "keywords": self._extract_keywords(markdown_content),
+                        "page_num": page_num,
+                        "start_line": 0,
+                        "end_line": len(markdown_content.splitlines()),
+                        "hierarchy": [],
+                    }
+                )
+
         return ref_blocks
-    
+
     def _extract_keywords(self, text: str, max_keywords: int = 5) -> List[str]:
         """텍스트에서 키워드 추출 (간단한 토큰 기반)."""
         import re
-        
+
         if not text:
             return []
-        
+
         # 숫자 포함 단어 우선 (예: 20mg, § 1141.1)
-        numeric_words = re.findall(r'\b\w*\d+\w*\b', text)
-        
+        numeric_words = re.findall(r"\b\w*\d+\w*\b", text)
+
         # 대문자 시작 단어 (고유명사)
-        capitalized = re.findall(r'\b[A-Z][a-z]+\b', text)
-        
+        capitalized = re.findall(r"\b[A-Z][a-z]+\b", text)
+
         # 결합 및 중복 제거
         keywords = list(dict.fromkeys(numeric_words[:3] + capitalized[:3]))
-        
+
         return keywords[:max_keywords]
 
     async def _find_legacy_regulation_db(
@@ -362,9 +366,7 @@ class ChangeDetectionNode:
         title = regul_data.get("title", "")
         country = regul_data.get("jurisdiction_code", "")
         print(f"DB Legacy 검색: title={title}, country={country}")
-        logger.info(
-            f"DB Legacy 검색: title={title}, country={country}"
-        )
+        logger.info(f"DB Legacy 검색: title={title}, country={country}")
 
         try:
             from app.core.repositories.regulation_repository import RegulationRepository
@@ -388,7 +390,6 @@ class ChangeDetectionNode:
             logger.error(f"DB Legacy 검색 실패: {e}")
             return None
 
-        
     async def _get_legacy_reference_blocks_db(
         self, regulation_id: int, db_session
     ) -> List[Dict[str, Any]]:
@@ -412,13 +413,12 @@ class ChangeDetectionNode:
             logger.error(f"DB Legacy 조회 실패: {e}")
             return []
 
-
     async def _match_reference_blocks(
         self, new_blocks: List[Dict[str, Any]], legacy_blocks: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         """
         CoT Step 1: 계층 구조 기반 정확 매칭 (밀림 현상 방지).
-        
+
         전략:
         1. 계층 구조 완전 일치 (hierarchy 배열 비교)
         2. section_ref 일치 (fallback)
@@ -432,16 +432,16 @@ class ChangeDetectionNode:
         # 전략 1: 계층 구조 완전 일치
         for new_block in new_blocks:
             new_hierarchy = new_block.get("hierarchy", [])
-            
+
             if not new_hierarchy:
                 continue
-            
+
             for idx, legacy_block in enumerate(legacy_blocks):
                 if idx in matched_legacy_indices:
                     continue
-                
+
                 legacy_hierarchy = legacy_block.get("hierarchy", [])
-                
+
                 # 계층 구조 완전 일치
                 if new_hierarchy == legacy_hierarchy:
                     matched_pairs.append(
@@ -454,21 +454,21 @@ class ChangeDetectionNode:
                     )
                     matched_legacy_indices.add(idx)
                     break
-        
+
         # 전략 2: section_ref 일치 (fallback)
         for new_block in new_blocks:
             # 이미 매칭된 경우 스킵
             if any(p["new_block"] == new_block for p in matched_pairs):
                 continue
-            
+
             new_section = new_block["section_ref"]
-            
+
             for idx, legacy_block in enumerate(legacy_blocks):
                 if idx in matched_legacy_indices:
                     continue
-                
+
                 legacy_section = legacy_block["section_ref"]
-                
+
                 if new_section == legacy_section:
                     matched_pairs.append(
                         {
@@ -480,38 +480,38 @@ class ChangeDetectionNode:
                     )
                     matched_legacy_indices.add(idx)
                     break
-        
+
         # 전략 3: 키워드 유사도 (fuzzy matching)
         for new_block in new_blocks:
             if any(p["new_block"] == new_block for p in matched_pairs):
                 continue
-            
+
             new_keywords = set(new_block.get("keywords", []))
-            
+
             if not new_keywords:
                 continue
-            
+
             best_match = None
             best_score = 0.0
-            
+
             for idx, legacy_block in enumerate(legacy_blocks):
                 if idx in matched_legacy_indices:
                     continue
-                
+
                 legacy_keywords = set(legacy_block.get("keywords", []))
-                
+
                 if not legacy_keywords:
                     continue
-                
+
                 # Jaccard 유사도
                 intersection = len(new_keywords & legacy_keywords)
                 union = len(new_keywords | legacy_keywords)
                 score = intersection / union if union > 0 else 0.0
-                
+
                 if score > best_score and score >= 0.5:  # 임계값
                     best_score = score
                     best_match = (idx, legacy_block)
-            
+
             if best_match:
                 idx, legacy_block = best_match
                 matched_pairs.append(

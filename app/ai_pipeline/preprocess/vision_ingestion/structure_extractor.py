@@ -845,7 +845,7 @@ Extract from entire document:
         content = [
             {
                 "type": "text",
-                "text": f"Document images ({len(page_infos)} pages, treat as ONE continuous document):"
+                "text": f"Document images ({len(page_infos)} pages, treat as ONE continuous document):",
             }
         ]
 
@@ -915,7 +915,9 @@ Extract from entire document:
                     }
                 )
 
-            logger.info(f"배치 파싱 완료: 통합 문서 ({len(page_infos)}페이지), {total_tokens}토큰")
+            logger.info(
+                f"배치 파싱 완료: 통합 문서 ({len(page_infos)}페이지), {total_tokens}토큰"
+            )
             return results
 
         except Exception as e:
