@@ -48,13 +48,10 @@ class ReportSummary(Base):
     __tablename__ = "report_summaries"
 
     summary_id = Column(Integer, primary_key=True, index=True)
-    
-    # [변경] report_id, impact_score_id 제거 및 JSONB 컬럼으로 변경
+
     summary_text = Column(JSONB)
     
     created_at = Column(DateTime, server_default=func.now())
-
-    # [변경] FK 제거로 인해 모든 Relationship 삭제됨
 
     # [신규] 수정 시간 (캐시 신선도 체크용)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)

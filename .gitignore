@@ -48,6 +48,7 @@ data/
 data/*
 app/data/
 .uv-cache/
+*.pdf
 
 google-chrome-stable_current_amd64.deb
 
@@ -58,4 +59,4 @@ test_insert.py
 Dockerfile*
 deploy/
 output/
-*.pdf
+regulation_file/

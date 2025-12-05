@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import regulation_api, report_api,  ai_api
+from app.api import regulation_api, report_api, ai_api, translation_api
 from app.api.admin import admin_regulation_api, admin_summary_api, admin_websearch_api
 
 app = FastAPI(
@@ -23,6 +23,7 @@ app.add_middleware(
 app.include_router(regulation_api.router, prefix="/api")
 app.include_router(report_api.router, prefix="/api")
 app.include_router(ai_api.router, prefix="/api")
+app.include_router(translation_api.router, prefix="/api")
 
 #관리자 페이지 엔드포인트
 app.include_router(admin_regulation_api.router, prefix="/api")

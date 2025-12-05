@@ -29,30 +29,59 @@ class RegulationRepository(BaseRepository[Regulation]):
     async def get_by_country(
         self, db: AsyncSession, country_code: str
     ) -> List[Regulation]:
-        """특정 국가의 모든 규제 조회"""
+        """특정 국가의 모든 규제 조회 (JSONB 쿼리)"""
+        from sqlalchemy import text
         result = await db.execute(
-            select(Regulation).where(Regulation.country_code == country_code)
+            text("""
+                SELECT regulation_id, regul_data, citation_code, created_at
+                FROM regulations 
+                WHERE regul_data->'vision_extraction_result'->0->'structure'->'metadata'->>'jurisdiction_code' = :country
+                ORDER BY created_at DESC
+            """),
+            {"country": country_code}
         )
-        return result.scalars().all()
+        regulations = []
+        for row in result.fetchall():
+            reg = Regulation()
+            reg.regulation_id = row[0]
+            reg.regul_data = row[1]
+            reg.citation_code = row[2]
+            reg.created_at = row[3]
+            regulations.append(reg)
+        return regulations
     
-    async def get_with_keynotes_and_impact(
+    async def get_with_versions_by_country(
         self, db: AsyncSession, country_code: str = None
     ) -> List[Regulation]:
-        """keynote와 impact_score를 포함한 규제 조회"""
-        from app.core.models.regulation_model import RegulationVersion, RegulationChangeKeynote
-        from app.core.models.impact_model import ImpactScore
-        
-        query = select(Regulation).options(
-            selectinload(Regulation.versions)
-            .selectinload(RegulationVersion.keynotes)
-            .selectinload(RegulationChangeKeynote.impact_score)
-        )
+        """버전 정보를 포함한 규제 조회 (JSONB 쿼리)"""
+        from sqlalchemy import text
         
         if country_code:
-            query = query.where(Regulation.country_code == country_code)
+            sql = """
+                SELECT regulation_id, regul_data, citation_code, created_at
+                FROM regulations 
+                WHERE regul_data->'vision_extraction_result'->0->'structure'->'metadata'->>'jurisdiction_code' = :country
+                ORDER BY created_at DESC
+            """
+            params = {"country": country_code}
+        else:
+            sql = """
+                SELECT regulation_id, regul_data, citation_code, created_at
+                FROM regulations 
+                ORDER BY created_at DESC
+            """
+            params = {}
         
-        result = await db.execute(query)
-        return result.scalars().all()
+        result = await db.execute(text(sql), params)
+        regulations = []
+        for row in result.fetchall():
+            reg = Regulation()
+            reg.regulation_id = row[0]
+            reg.regul_data = row[1]
+            reg.citation_code = row[2]
+            reg.created_at = row[3]
+            regulations.append(reg)
+        return regulations
     
     async def get_with_versions(
         self, db: AsyncSession, regulation_id: int
@@ -65,18 +94,140 @@ class RegulationRepository(BaseRepository[Regulation]):
         )
         return result.scalar_one_or_none()
     
-    async def get_active_regulations(
-        self, db: AsyncSession, country_code: str
+    async def get_by_country_and_date_range(
+        self, db: AsyncSession, country_code: str, start_date: str = None, end_date: str = None
     ) -> List[Regulation]:
-        """활성 상태의 규제만 조회"""
+        """국가 및 날짜 범위로 규제 조회 (JSONB 쿼리)"""
+        from sqlalchemy import text
+        
+        sql = """
+            SELECT regulation_id, regul_data, citation_code, created_at
+            FROM regulations 
+            WHERE regul_data->'vision_extraction_result'->0->'structure'->'metadata'->>'jurisdiction_code' = :country
+        """
+        params = {"country": country_code}
+        
+        if start_date:
+            sql += " AND regul_data->'vision_extraction_result'->0->'structure'->'metadata'->>'effective_date' >= :start_date"
+            params["start_date"] = start_date
+        
+        if end_date:
+            sql += " AND regul_data->'vision_extraction_result'->0->'structure'->'metadata'->>'effective_date' <= :end_date"
+            params["end_date"] = end_date
+        
+        sql += " ORDER BY created_at DESC"
+        
+        result = await db.execute(text(sql), params)
+        regulations = []
+        for row in result.fetchall():
+            reg = Regulation()
+            reg.regulation_id = row[0]
+            reg.regul_data = row[1]
+            reg.citation_code = row[2]
+            reg.created_at = row[3]
+            regulations.append(reg)
+        return regulations
+    
+    async def find_by_title_and_country(
+        self, 
+        db: AsyncSession, 
+        title: str, 
+        country_code: str,
+        exclude_regulation_id: int = None
+    ) -> Optional[Regulation]:
+        """제목과 국가로 Legacy 규제 검색 (JSONB)"""
+        from sqlalchemy import text
+        
+        if exclude_regulation_id:
+            sql = """
+                SELECT regulation_id, regul_data 
+                FROM regulations 
+                WHERE regul_data->>'title' ILIKE :title
+                AND regul_data->>'jurisdiction_code' = :country
+                AND regulation_id != :exclude_id
+                ORDER BY created_at DESC
+                LIMIT 1
+            """
+            params = {"title": f"%{title}%", "country": country_code, "exclude_id": exclude_regulation_id}
+        else:
+            sql = """
+                SELECT regulation_id, regul_data 
+                FROM regulations 
+                WHERE regul_data->>'title' ILIKE :title
+                AND regul_data->>'jurisdiction_code' = :country
+                ORDER BY created_at DESC
+                LIMIT 1
+            """
+            params = {"title": f"%{title}%", "country": country_code}
+        
+        result = await db.execute(text(sql), params)
+        row = result.fetchone()
+        if row:
+            reg = Regulation()
+            reg.regulation_id = row[0]
+            reg.regul_data = row[1]
+            return reg
+        return None
+    
+    async def get_regul_data(
+        self, 
+        db: AsyncSession, 
+        regulation_id: int
+    ) -> Optional[Dict]:
+        """regulation_id로 regul_data (vision 결과) 조회"""
+        from sqlalchemy import text
         result = await db.execute(
-            select(Regulation)
-            .where(
-                Regulation.country_code == country_code,
-                Regulation.status == "active"
-            )
+            text("SELECT regul_data FROM regulations WHERE regulation_id = :reg_id"),
+            {"reg_id": regulation_id}
         )
-        return result.scalars().all()
+        row = result.fetchone()
+        return row[0] if row else None
+    
+    async def create_from_vision_result(
+        self,
+        db: AsyncSession,
+        vision_result: Dict
+    ) -> Regulation:
+        """Vision Pipeline 결과를 DB에 저장"""
+        # 첫 페이지 메타데이터 추출
+        vision_pages = vision_result.get("vision_extraction_result", [])
+        if not vision_pages:
+            raise ValueError("vision_extraction_result가 비어있습니다")
+        
+        first_page = vision_pages[0]
+        metadata = first_page.get("structure", {}).get("metadata", {})
+        
+        # citation_code 추출 (변경 감지용)
+        citation_code = metadata.get("citation_code")
+        
+        # Regulation 생성
+        regulation = Regulation(
+            citation_code=citation_code,
+            regul_data=vision_result  # 전체 Vision 결과 저장
+        )
+        
+        db.add(regulation)
+        await db.flush()
+        await db.refresh(regulation)
+        
+        return regulation
+    
+    async def find_by_citation_code(
+        self,
+        db: AsyncSession,
+        citation_code: str,
+        exclude_regulation_id: Optional[int] = None
+    ) -> Optional[Regulation]:
+        """citation_code로 규제 검색 (변경 감지 대상 찾기)"""
+        query = select(Regulation).where(Regulation.citation_code == citation_code)
+        
+        if exclude_regulation_id:
+            query = query.where(Regulation.regulation_id != exclude_regulation_id)
+        
+        query = query.order_by(Regulation.created_at.desc()).limit(1)
+        
+        result = await db.execute(query)
+        return result.scalar_one_or_none()
     
     async def find_by_title_and_country(
         self, 
@@ -135,38 +286,31 @@ class RegulationRepository(BaseRepository[Regulation]):
     
 
     # 추가
-    async def check_all_products_processed(
+    async def get_regulations_count_by_country(
         self,
         db: AsyncSession
-    ) -> Dict[str, bool]:
+    ) -> Dict[str, int]:
         """
-        모든 제품에 대한 처리 상태 확인
-        (ValidationAgent용 - State 체크포인트)
+        국가별 규제 수 집계 (JSONB 쿼리)
         
         Returns:
-            {"all_processed": True/False, "pending_count": int}
+            {"US": 10, "KR": 5, ...}
         """
-        # 예: 모든 제품에 대해 최신 규제 번역이 있는지 확인
-        # 실제 로직은 비즈니스 요구사항에 따라 다름
+        from sqlalchemy import text
         
-        from sqlalchemy import func, select
-        from app.core.models.product_model import Product
-        from app.core.models.regulation_model import RegulationTranslation
+        result = await db.execute(
+            text("""
+                SELECT 
+                    regul_data->'vision_extraction_result'->0->'structure'->'metadata'->>'jurisdiction_code' as country,
+                    COUNT(*) as count
+                FROM regulations
+                WHERE regul_data->'vision_extraction_result'->0->'structure'->'metadata'->>'jurisdiction_code' IS NOT NULL
+                GROUP BY country
+                ORDER BY count DESC
+            """)
+        )
         
-        # 전체 제품 수
-        total_products = await db.execute(select(func.count(Product.product_id)))
-        total = total_products.scalar()
-        
-        # 처리된 제품 수 (예시 로직)
-        # 실제로는 더 복잡한 조건일 수 있음
-        processed = 0  # TODO: 실제 쿼리 구현
-        
-        return {
-            "all_processed": total == processed,
-            "total_count": total,
-            "processed_count": processed,
-            "pending_count": total - processed
-        }
+        return {row[0]: row[1] for row in result.fetchall()}
 # 여기까지
 
 
@@ -214,11 +358,7 @@ class RegulationTranslationRepository(BaseRepository[RegulationTranslation]):
         """
         result = await db.execute(
             select(Regulation)
-            .options(
-                selectinload(Regulation.versions),
-                joinedload(Regulation.country),
-                joinedload(Regulation.data_source)
-            )
+            .options(selectinload(Regulation.version))
             .order_by(Regulation.created_at.desc())
         )
         return list(result.unique().scalars().all())
@@ -227,24 +367,39 @@ class RegulationTranslationRepository(BaseRepository[RegulationTranslation]):
         self,
         db: AsyncSession,
         country_code: Optional[str] = None,
-        status: Optional[str] = None,
+        authority: Optional[str] = None,
         skip: int = 0,
         limit: int = 100
     ) -> List[Regulation]:
         """
-        필터링된 규제 목록 조회
+        필터링된 규제 목록 조회 (JSONB 쿼리)
         """
-        query = select(Regulation)
+        from sqlalchemy import text
+        
+        sql = "SELECT regulation_id, regul_data, citation_code, created_at FROM regulations WHERE 1=1"
+        params = {}
         
         if country_code:
-            query = query.where(Regulation.country_code == country_code)
-        if status:
-            query = query.where(Regulation.status == status)
+            sql += " AND regul_data->'vision_extraction_result'->0->'structure'->'metadata'->>'jurisdiction_code' = :country"
+            params["country"] = country_code
         
-        query = query.offset(skip).limit(limit)
+        if authority:
+            sql += " AND regul_data->'vision_extraction_result'->0->'structure'->'metadata'->>'authority' ILIKE :authority"
+            params["authority"] = f"%{authority}%"
         
-        result = await db.execute(query)
-        return list(result.scalars().all())
+        sql += " ORDER BY created_at DESC OFFSET :skip LIMIT :limit"
+        params.update({"skip": skip, "limit": limit})
+        
+        result = await db.execute(text(sql), params)
+        regulations = []
+        for row in result.fetchall():
+            reg = Regulation()
+            reg.regulation_id = row[0]
+            reg.regul_data = row[1]
+            reg.citation_code = row[2]
+            reg.created_at = row[3]
+            regulations.append(reg)
+        return regulations
 
 class RegulationVersionRepository(BaseRepository[RegulationVersion]):
     """규제 버전 Repository"""
