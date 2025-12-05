@@ -28,14 +28,14 @@ class DualIndexer:
         vision_results: List[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        청크를 Qdrant + Graph에 저장 (Reference ID 포함).
+        청크를 Qdrant + Graph에 저장 (마크다운 청킹 + 표 별도 처리).
         
         Args:
-            chunks: 컨텍스트 주입된 청크
+            chunks: 컨텍스트 주입된 청크 (사용 안 함, vision_results 우선)
             graph_data: 지식 그래프 데이터
             source_file: 원본 파일명
             regulation_id: 규제 ID (예: "FDA-2025-001")
-            vision_results: Vision 추출 결과 (reference_blocks 포함)
+            vision_results: Vision 추출 결과 (markdown_content + tables)
             
         Returns:
             Dict: 저장 결과 요약
@@ -43,18 +43,20 @@ class DualIndexer:
         from app.vectorstore.vector_client import VectorClient
         from app.ai_pipeline.preprocess.embedding_pipeline import EmbeddingPipeline
         
-        # Reference Blocks 추출 (Vision 결과에서)
-        ref_blocks = self._extract_reference_blocks(vision_results, regulation_id) if vision_results else []
+        # 마크다운 청킹 + 표 별도 처리
+        all_chunks = self._extract_chunks_from_vision(vision_results, regulation_id) if vision_results else []
         
-        # Reference Block이 있으면 우선 사용, 없으면 기존 chunks 사용
-        if ref_blocks:
-            logger.info(f"Reference Blocks 사용: {len(ref_blocks)}개")
-            texts = [rb["text"] for rb in ref_blocks]
-            metadatas_base = [rb["metadata"] for rb in ref_blocks]
-        else:
-            logger.info(f"기존 chunks 사용: {len(chunks)}개")
-            texts = [chunk["text"] for chunk in chunks]
-            metadatas_base = [chunk["metadata"] for chunk in chunks]
+        if not all_chunks:
+            logger.warning("청킹 결과 없음, 빈 결과 반환")
+            return {
+                "status": "error",
+                "error": "No chunks extracted",
+                "qdrant_chunks": 0
+            }
+        
+        logger.info(f"총 청크: {len(all_chunks)}개 (마크다운 청킹 + 표)")
+        texts = [chunk["text"] for chunk in all_chunks]
+        metadatas_base = [chunk["metadata"] for chunk in all_chunks]
         
         # 임베딩 생성
         embedding_pipeline = EmbeddingPipeline(use_sparse=True)
@@ -105,10 +107,17 @@ class DualIndexer:
         # Graph 저장 (추후 구현)
         graph_summary = self._store_graph(graph_data)
         
+        # reference_blocks 카운트 계산
+        ref_blocks_count = 0
+        if vision_results:
+            for page_result in vision_results:
+                ref_blocks = page_result.get("structure", {}).get("reference_blocks", [])
+                ref_blocks_count += len(ref_blocks)
+        
         result = {
             "status": "success",
             "qdrant_chunks": len(texts),
-            "reference_blocks_count": len(ref_blocks) if ref_blocks else 0,
+            "reference_blocks_count": ref_blocks_count,
             "graph_nodes": graph_summary["nodes"],
             "graph_edges": graph_summary["edges"],
             "collection_name": self.collection_name,
@@ -130,20 +139,26 @@ class DualIndexer:
         
         return {"nodes": len(nodes), "edges": len(edges)}
     
-    def _extract_reference_blocks(
+    def _extract_chunks_from_vision(
         self, 
         vision_results: List[Dict[str, Any]], 
         regulation_id: str
     ) -> List[Dict[str, Any]]:
         """
-        Vision 결과에서 Reference Blocks 추출 및 ref_id 생성.
+        Vision 결과에서 마크다운 청킹 + 표 별도 처리.
         
-        ref_id 형식: {regulation_id}-{section_ref}-P{page_num}
-        예시: "FDA-US-Required-Warnings-1114.5(a)(3)-P12"
+        전략:
+        1. markdown_content를 HierarchyChunker로 청킹 (헤더 기반)
+        2. tables 배열을 별도 청크로 추가
+        3. ref_id는 청크 인덱스 기반 (의미적 집합)
         """
-        ref_blocks = []
+        from app.ai_pipeline.preprocess.semantic_processing import HierarchyChunker
         
-        # 메타데이터 추출 (첫 페이지)
+        chunker = HierarchyChunker(max_tokens=1024)
+        all_chunks = []
+        chunk_counter = 0
+        
+        # 문서 메타데이터 추출 (첫 페이지)
         doc_metadata = {}
         if vision_results:
             first_page = vision_results[0]
@@ -152,33 +167,114 @@ class DualIndexer:
         for page_result in vision_results:
             page_num = page_result.get("page_num")
             structure = page_result.get("structure", {})
+            markdown_content = structure.get("markdown_content", "")
+            tables = structure.get("tables", [])
             
-            # Vision LLM이 추출한 reference_blocks
-            blocks = structure.get("reference_blocks", [])
+            # 1. 마크다운 헤더 기반 청킹
+            if markdown_content:
+                md_chunks = chunker.chunk_document(markdown_content, page_num)
+                
+                for md_chunk in md_chunks:
+                    chunk_counter += 1
+                    ref_id = f"{regulation_id}-Chunk{chunk_counter:04d}"
+                    
+                    # 계층 구조 추출
+                    hierarchy = md_chunk.get("hierarchy", [])
+                    section_label = " > ".join(hierarchy) if hierarchy else f"Page {page_num}"
+                    
+                    all_chunks.append({
+                        "text": md_chunk["text"],
+                        "metadata": {
+                            "ref_id": ref_id,
+                            "regulation_id": regulation_id,
+                            "content_type": "text",
+                            "page_num": page_num,
+                            "hierarchy": hierarchy,
+                            "token_count": md_chunk.get("token_count", 0),
+                            # 확장 메타데이터
+                            "document_id": doc_metadata.get("document_id"),
+                            "jurisdiction_code": doc_metadata.get("jurisdiction_code"),
+                            "authority": doc_metadata.get("authority"),
+                            "title": doc_metadata.get("title"),
+                            "citation_code": doc_metadata.get("citation_code"),
+                            "language": doc_metadata.get("language"),
+                            "publication_date": doc_metadata.get("publication_date"),
+                            "effective_date": doc_metadata.get("effective_date"),
+                            "source_url": doc_metadata.get("source_url"),
+                            "retrieval_datetime": doc_metadata.get("retrieval_datetime"),
+                            "original_format": doc_metadata.get("original_format"),
+                            "file_path": doc_metadata.get("file_path"),
+                            "raw_text_path": doc_metadata.get("raw_text_path"),
+                            "section_label": section_label,
+                            "page_range": doc_metadata.get("page_range"),
+                            "keywords": doc_metadata.get("keywords", []),
+                            # 하위 호환
+                            "country": doc_metadata.get("country") or doc_metadata.get("jurisdiction_code"),
+                            "regulation_type": doc_metadata.get("regulation_type") or doc_metadata.get("authority")
+                        }
+                    })
             
-            for block in blocks:
-                section_ref = block.get("section_ref", "UNKNOWN")
+            # 2. 표 별도 청킹
+            for table_idx, table in enumerate(tables):
+                chunk_counter += 1
+                ref_id = f"{regulation_id}-Table{chunk_counter:04d}"
                 
-                # ref_id 생성
-                ref_id = f"{regulation_id}-{section_ref}-P{page_num}"
+                # 표를 검색 가능한 텍스트로 변환
+                table_text = self._table_to_text(table)
                 
-                ref_blocks.append({
-                    "text": block.get("text", ""),
+                all_chunks.append({
+                    "text": table_text,
                     "metadata": {
                         "ref_id": ref_id,
                         "regulation_id": regulation_id,
-                        "section_ref": section_ref,
+                        "content_type": "table",
                         "page_num": page_num,
-                        "keywords": block.get("keywords", []),
-                        "start_line": block.get("start_line"),
-                        "end_line": block.get("end_line"),
-                        # 문서 메타데이터 (모든 블록에 포함)
+                        "table_caption": table.get("caption", f"Table {table_idx + 1}"),
+                        "table_headers": table.get("headers", []),
+                        "table_row_count": len(table.get("rows", [])),
+                        # 확장 메타데이터 (텍스트 청크와 동일하게)
+                        "document_id": doc_metadata.get("document_id"),
+                        "jurisdiction_code": doc_metadata.get("jurisdiction_code"),
+                        "authority": doc_metadata.get("authority"),
                         "title": doc_metadata.get("title"),
-                        "country": doc_metadata.get("country"),
-                        "regulation_type": doc_metadata.get("regulation_type"),
-                        "effective_date": doc_metadata.get("effective_date")
+                        "citation_code": doc_metadata.get("citation_code"),
+                        "language": doc_metadata.get("language"),
+                        "publication_date": doc_metadata.get("publication_date"),
+                        "effective_date": doc_metadata.get("effective_date"),
+                        "source_url": doc_metadata.get("source_url"),
+                        "retrieval_datetime": doc_metadata.get("retrieval_datetime"),
+                        "original_format": doc_metadata.get("original_format"),
+                        "file_path": doc_metadata.get("file_path"),
+                        "raw_text_path": doc_metadata.get("raw_text_path"),
+                        "section_label": table.get("caption", f"Table {table_idx + 1}"),
+                        "page_range": doc_metadata.get("page_range"),
+                        "keywords": doc_metadata.get("keywords", []),
+                        "country": doc_metadata.get("country") or doc_metadata.get("jurisdiction_code"),
+                        "regulation_type": doc_metadata.get("regulation_type") or doc_metadata.get("authority")
                     }
                 })
         
-        logger.info(f"Reference Blocks 추출 완료: {len(ref_blocks)}개")
-        return ref_blocks
+        logger.info(f"청킹 완료: {len(all_chunks)}개 (마크다운: {chunk_counter - len([c for c in all_chunks if c['metadata']['content_type'] == 'table'])}개, 표: {len([c for c in all_chunks if c['metadata']['content_type'] == 'table'])}개)")
+        return all_chunks
+    
+    def _table_to_text(self, table: Dict[str, Any]) -> str:
+        """표를 마크다운 형태로 변환 (LLM 입력 최적화)."""
+        lines = []
+        
+        # 캡션
+        if table.get("caption"):
+            lines.append(f"**{table['caption']}**")
+            lines.append("")
+        
+        # 헤더
+        headers = table.get("headers", [])
+        if headers:
+            lines.append("| " + " | ".join(headers) + " |")
+            lines.append("|" + "|".join(["---" for _ in headers]) + "|")
+        
+        # 행
+        for row in table.get("rows", []):
+            cells = [str(cell) if cell else "" for cell in row]
+            lines.append("| " + " | ".join(cells) + " |")
+        
+        return "\n".join(lines)

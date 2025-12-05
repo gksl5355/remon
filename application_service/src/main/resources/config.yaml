@@ -1,0 +1,49 @@
+# [Tavily API 설정]
+# API 키는 .env에서 로드됨
+
+targets:
+  # 1. 미국 FDA
+  - country: "USA FDA Official"
+    code: "US"  # [수정] US_FDA -> US (DB가 2글자만 받으므로 수정 필수)
+    enabled: true
+    category: "regulation"
+    keywords:
+      - "site:fda.gov/tobacco-products final rule filetype:pdf"
+      - "site:fda.gov guidance for industry tobacco pdf"
+
+  # 2. 미국 TTB (Title 27)
+  - country: "USA TTB/CFR Title 27"
+    code: "US"  # [수정] US_TTB -> US
+    enabled: true
+    category: "regulation"
+    keywords:
+      - "site:govinfo.gov CFR Title 27 tobacco products pdf"
+
+  # 3. 미국 연방 관보
+  - country: "USA Federal Register"
+    code: "US"  # [수정] US_FED_REG -> US
+    enabled: true
+    category: "news"
+    keywords:
+      - "site:federalregister.gov tobacco products final rule"
+
+  # 4. 러시아 EAEU
+  - country: "Russia EAEU"
+    code: "RU"  # [수정] RU_EAEU -> RU
+    enabled: true
+    category: "regulation"
+    keywords:
+      - "site:eec.eaeunion.org TR CU 035/2014 tobacco pdf"
+
+  # 5. 러시아 집행
+  - country: "Russia Enforcement"
+    code: "RU"  # [수정] RU_ENFORCE -> RU
+    enabled: true
+    category: "regulation"
+    keywords:
+      - "site:rospotrebnadzor.ru tobacco regulation control"
+
+
+
+    # ...
+    # code가 'US'로 들어오면 DB 체크 후 정상 처리됨

@@ -11,6 +11,8 @@ class ReportBase(BaseModel):
     change_id: Optional[int] = None
     created_reason: Optional[str] = None
     file_path: Optional[str] = None
+    s3_key: Optional[str] = None       # [신규]
+    pdf_updated_at: Optional[datetime] = None # [신규]
 
 class ReportCreate(ReportBase):
     pass
@@ -55,6 +57,7 @@ class ReportSummaryCreate(ReportSummaryBase):
 class ReportSummaryResponse(ReportSummaryBase):
     summary_id: int
     created_at: datetime
+    updated_at: datetime  # [신규]
 
     class Config:
         from_attributes = True
