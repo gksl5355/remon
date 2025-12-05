@@ -310,14 +310,21 @@ class ChangeDetectionNode:
             
             # reference_blocks가 있으면 사용
             if reference_blocks:
+                lines = markdown_content.splitlines()
+                total_lines = len(lines)
                 for ref in reference_blocks:
+                    start = max(ref.get("start_line", 0), 0)
+                    end = ref.get("end_line", total_lines) or total_lines
+                    end = min(end, total_lines)
+                    snippet = "\n".join(lines[start:end]) if lines else markdown_content
+                    
                     ref_blocks.append({
                         "section_ref": ref.get("section_ref", ""),
-                        "text": "",  # 텍스트는 markdown_content에서 추출
+                        "text": snippet,  # markdown_content에서 실제 텍스트 추출
                         "keywords": ref.get("keywords", []),
                         "page_num": page_num,
-                        "start_line": ref.get("start_line", 0),
-                        "end_line": ref.get("end_line", 0),
+                        "start_line": start,
+                        "end_line": end,
                         "hierarchy": [],  # 계층 정보 (필요시 추가)
                     })
             else:
