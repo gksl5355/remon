@@ -10,7 +10,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/api")
+@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 @RequiredArgsConstructor
 public class AuthController {
     
@@ -41,6 +42,22 @@ public class AuthController {
         ));
     }
     
+    @GetMapping("/check-auth")
+    public ResponseEntity<?> checkAuth(HttpSession session) {
+    Integer userId = (Integer) session.getAttribute("userId");
+    
+    if (userId == null) {
+        return ResponseEntity.status(401)
+                .body(Map.of("message", "로그인 필요"));
+    }
+    
+    // id가 1이면 관리자
+    return ResponseEntity.ok(Map.of(
+            "isAdmin", userId == 1,
+            "userId", userId
+    ));
+}
+
     @PostMapping("/logout")
     public ResponseEntity<?> logout(HttpSession session) {
         session.invalidate();
