@@ -24,6 +24,7 @@ FEATURE_UNIT_MAP: Dict[str, str] = {
     "certifying_agencies": "text", # New
     "revenue": "currency",       # New (Integer)
     "supply_partner": "text",    # New
+    "effective": "json"          # New (JSONB)
 }
 
 # Boolean 타입 컬럼 목록 업데이트

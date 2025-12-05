@@ -14,6 +14,8 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from app.core.models.enums import ProductCategoryEnum
+from sqlalchemy.dialects.postgresql import JSONB
+
 
 class Product(Base):
     __tablename__ = "products"
@@ -32,6 +34,7 @@ class Product(Base):
     package = Column(Text)
     certifying_agencies = Column(String(50))
     revenue = Column(Integer)
+    effective = Column(JSONB)
     
     # [변경] 1:N 관계 (제품 -> 국가)
     country_code = Column(String(2), ForeignKey("countries.country_code"))
