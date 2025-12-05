@@ -1,0 +1,94 @@
+package com.global17.auth_service.controller;
+
+import com.global17.auth_service.entity.CrawlTarget;
+import com.global17.auth_service.service.CrawlService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/crawl")
+@RequiredArgsConstructor
+// CORS 설정 (프론트엔드 연동 시 필요할 수 있음)
+@CrossOrigin(origins = "*") 
+public class CrawlController {
+
+    private final CrawlService crawlService;
+
+    // 1. 크롤링 실행 (비동기)
+    @PostMapping("/run-batch")
+    public String runBatch() {
+        new Thread(() -> crawlService.runBatchCrawling()).start();
+        return "🚀 크롤링 작업이 시작되었습니다.";
+    }
+
+    // 2. 타겟 목록 조회 (관리자 페이지용)
+    @GetMapping("/targets")
+    public List<CrawlTarget> getTargets() {
+        return crawlService.getAllTargets();
+    }
+
+    // 3. 타겟 추가 (관리자 페이지용)
+    @PostMapping("/targets")
+    public CrawlTarget addTarget(@RequestBody CrawlTarget target) {
+        return crawlService.addTarget(target);
+    }
+
+    // 4. 타겟 삭제 (관리자 페이지용)
+    @DeleteMapping("/targets/{id}")
+    public String deleteTarget(@PathVariable Long id) {
+        crawlService.deleteTarget(id);
+        return "✅ 삭제되었습니다.";
+    }
+
+    // 5. 타겟 수정 (전체 정보)
+    @PutMapping("/targets/{id}")
+    public CrawlTarget updateTarget(@PathVariable Long id, @RequestBody CrawlTarget target) {
+        System.out.println("🔄 타겟 수정 요청: ID=" + id);
+        return crawlService.updateTarget(id, target);
+    }
+
+    // 6. 상태 변경 (활성/비활성 토글)
+    @PatchMapping("/targets/{id}/status")
+    public String updateStatus(@PathVariable Long id, @RequestParam boolean enabled) {
+        crawlService.updateTargetStatus(id, enabled);
+        return "✅ 상태가 변경되었습니다.";
+    }
+}
+
+// package com.global17.auth_service.controller;
+
+// import com.global17.auth_service.service.CrawlService;
+// import lombok.RequiredArgsConstructor;
+// import org.springframework.web.bind.annotation.*;
+
+// @RestController
+// @RequestMapping("/api/crawl")
+// @RequiredArgsConstructor
+// public class CrawlController {
+
+//     private final CrawlService crawlService;
+
+//     // 1. [기존] 수동 실행 (테스트용)
+//     // POST /api/crawl/run?country=USA&code=US&keyword=tobacco
+//     @PostMapping("/run")
+//     public String startCrawling(
+//             @RequestParam String country,
+//             @RequestParam String code,
+//             @RequestParam String keyword) {
+        
+//         crawlService.runCrawling(country, code, keyword);
+//         return "✅ 단건 크롤링 작업이 완료되었습니다.";
+//     }
+
+//     // 2. [신규] 일괄 실행 (config.yaml 기반)
+//     // POST /api/crawl/run-batch
+//     @PostMapping("/run-batch")
+//     public String startBatchCrawling() {
+//         // 실제로는 비동기(@Async)로 돌리는 게 좋지만, 확인을 위해 동기로 실행
+//         crawlService.runBatchCrawling();
+//         return "🚀 config.yaml 기반 일괄 크롤링이 시작되었습니다. 로그를 확인하세요.";
+//     }
+// }
+
