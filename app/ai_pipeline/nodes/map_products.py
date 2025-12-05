@@ -8,12 +8,8 @@ import logging
 from decimal import Decimal
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Set, Tuple
 from collections import defaultdict
-# Protocol, TYPE_CHECKING 추가
-
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 try:  # pragma: no cover - import guard
     from openai import AsyncOpenAI
@@ -46,35 +42,250 @@ from app.core.repositories.product_repository import ProductRepository
 
 logger = logging.getLogger(__name__)
 
+HIGH_CONF_THRESHOLD = 0.7
+LOW_CONF_THRESHOLD = 0.5
+
+
 class MappingNode:
-    """
-    검색 + 매핑 통합 Node
-    - 검색은 외부 search_tool(TOOL CALL)로 처리
-    - search_tool 시그니처는 아직 미정이므로 wrapper 내부 TODO 처리
-    """
+    """검색 + 매핑 통합 Node."""
 
     def __init__(
         self,
         llm_client,
-        search_tool,  # 🔥 LangGraph TOOL 자체
+        search_tool,
         top_k: int = 5,
-        alpha: float = 0.7,  # 🔥 hybrid dense/sparse 비율
+        alpha: float = 0.7,
         product_repository: Optional[ProductRepository] = None,
         max_candidates_per_doc: int = 2,
     ):
         self.llm = llm_client
         self.search_tool = search_tool or get_retrieval_tool()
         self.top_k = top_k
-        self.alpha = alpha  # 🔥 dynamic hybrid weight
-
-        # 수정: Repository 생성 (클래스만 변경)
+        self.alpha = alpha
         self.product_repository = product_repository or ProductRepository()
         self.debug_enabled = settings.MAPPING_DEBUG_ENABLED
         self.max_candidates_per_doc = max_candidates_per_doc
 
     # ----------------------------------------------------------------------
-    # 1) 검색 TOOL 호출 wrapper (search_tool 인터페이스 확정되면 이 부분만 수정)
+    # change detection 연계 유틸
     # ----------------------------------------------------------------------
+    def _normalize_token(self, value: str) -> str:
+        return (
+            value.lower()
+            .replace(" ", "_")
+            .replace("-", "_")
+            .replace(".", "_")
+        )
+
+    def _extract_change_scope(
+        self,
+        change_results: List[Dict[str, Any]],
+        present_features: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        변경 감지 결과에서 검색/매핑에 쓸 힌트를 추출한다.
+        """
+        if not change_results:
+            return {
+                "actionable_results": [],
+                "pending_results": [],
+                "doc_filters": set(),
+                "chunk_filters": set(),
+                "feature_hints": set(),
+                "raw_results": [],
+            }
+
+        feature_key_map = {
+            self._normalize_token(name): name for name in present_features.keys()
+        }
+        feature_keys = set(feature_key_map.keys())
+        doc_filters: Set[str] = set()
+        chunk_filters: Set[str] = set()
+        feature_hints: Set[str] = set()
+        actionable: List[Dict[str, Any]] = []
+        pending: List[Dict[str, Any]] = []
+
+        for result in change_results:
+            status = result.get("status")
+            change_detected = result.get("change_detected")
+            positive_status = (status or "").lower() in (
+                "changed",
+                "updated",
+                "new",
+                "modified",
+                "added",
+            )
+            confidence = (
+                result.get("confidence_score")
+                or result.get("score")
+                or result.get("confidence")
+                or 0.0
+            )
+
+            # 신뢰도/상태에 따른 분류
+            is_inconclusive = (status or "").lower() == "inconclusive"
+            if change_detected or positive_status:
+                if confidence >= HIGH_CONF_THRESHOLD:
+                    actionable.append(result)
+                elif confidence >= LOW_CONF_THRESHOLD:
+                    pending.append(result)
+                else:
+                    continue
+            elif is_inconclusive:
+                pending.append(result)
+            else:
+                # 너무 낮은 신뢰도는 스킵
+                continue
+
+            # 문서/청크 식별자 수집 (검색 필터)
+            for key in (
+                "doc_id",
+                "regulation_id",
+                "new_regulation_id",
+                "legacy_regulation_id",
+                "meta_doc_id",
+            ):
+                val = result.get(key)
+                if val:
+                    doc_filters.add(str(val))
+
+            meta = result.get("metadata") or {}
+            for key in ("doc_id", "meta_doc_id"):
+                val = meta.get(key)
+                if val:
+                    doc_filters.add(str(val))
+
+            for key in (
+                "chunk_id",
+                "new_chunk_id",
+                "legacy_chunk_id",
+                "new_ref_id",
+                "legacy_ref_id",
+            ):
+                val = result.get(key)
+                if val:
+                    chunk_filters.add(str(val))
+
+            # feature 힌트: 명시적 feature 필드 또는 keywords와 이름 매칭
+            for key in ("feature", "feature_name", "feature_names"):
+                val = result.get(key)
+                if isinstance(val, str):
+                    normalized = self._normalize_token(val)
+                    if normalized in feature_keys:
+                        feature_hints.add(feature_key_map[normalized])
+                elif isinstance(val, list):
+                    for item in val:
+                        if not isinstance(item, str):
+                            continue
+                        normalized = self._normalize_token(item)
+                        if normalized in feature_keys:
+                            feature_hints.add(feature_key_map[normalized])
+
+            for kw in result.get("keywords", []) or []:
+                if not isinstance(kw, str):
+                    continue
+                normalized_kw = self._normalize_token(kw)
+                for norm_name, raw_name in feature_key_map.items():
+                    if normalized_kw in norm_name or norm_name in normalized_kw:
+                        feature_hints.add(raw_name)
+
+        return {
+            "actionable_results": actionable,
+            "pending_results": pending,
+            "doc_filters": doc_filters,
+            "chunk_filters": chunk_filters,
+            "feature_hints": feature_hints,
+            "raw_results": change_results,
+        }
+
+    def _build_change_filters(self, change_scope: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        filters: Dict[str, Any] = {}
+        doc_filters = change_scope.get("doc_filters") or set()
+        chunk_filters = change_scope.get("chunk_filters") or set()
+        if doc_filters:
+            filters["meta_doc_id"] = list(doc_filters)
+        if chunk_filters:
+            filters["chunk_id"] = list(chunk_filters)
+        return filters or None
+
+    def _select_features_for_mapping(
+        self,
+        present_features: Dict[str, Any],
+        change_scope: Dict[str, Any],
+    ) -> List[Tuple[str, Any]]:
+        if not present_features:
+            return []
+
+        feature_hints: Set[str] = change_scope.get("feature_hints") or set()
+        if feature_hints:
+            filtered = [
+                (name, value)
+                for name, value in present_features.items()
+                if name in feature_hints
+            ]
+            if filtered:
+                return filtered
+
+        return list(present_features.items())
+
+    def _candidate_matches_change(
+        self,
+        change_result: Dict[str, Any],
+        doc_id: Optional[str],
+        chunk_id: Optional[str],
+    ) -> bool:
+        doc_ids = {
+            str(v)
+            for v in (
+                change_result.get("doc_id"),
+                change_result.get("regulation_id"),
+                change_result.get("new_regulation_id"),
+                change_result.get("legacy_regulation_id"),
+                change_result.get("meta_doc_id"),
+            )
+            if v is not None
+        }
+        meta = change_result.get("metadata") or {}
+        for key in ("doc_id", "meta_doc_id"):
+            val = meta.get(key)
+            if val:
+                doc_ids.add(str(val))
+
+        chunk_ids = {
+            str(v)
+            for v in (
+                change_result.get("chunk_id"),
+                change_result.get("new_chunk_id"),
+                change_result.get("legacy_chunk_id"),
+                change_result.get("new_ref_id"),
+                change_result.get("legacy_ref_id"),
+            )
+            if v is not None
+        }
+
+        if chunk_id and chunk_id in chunk_ids:
+            return True
+        if doc_id and doc_id in doc_ids:
+            return True
+        return False
+
+    def _match_change_results_to_candidate(
+        self,
+        change_scope: Dict[str, Any],
+        candidate: RetrievedChunk,
+    ) -> List[Dict[str, Any]]:
+        """검색된 청크와 연관된 변경 감지 결과를 찾아 regulation_meta에 담는다."""
+        matches: List[Dict[str, Any]] = []
+        meta = candidate.get("metadata") or {}
+        doc_id = meta.get("meta_doc_id") or meta.get("doc_id")
+        chunk_id = candidate.get("chunk_id")
+        for result in (change_scope.get("actionable_results") or []) + (
+            change_scope.get("pending_results") or []
+        ):
+            if self._candidate_matches_change(result, doc_id, chunk_id):
+                matches.append(result)
+        return matches
+
     async def _run_search(
         self,
         product: ProductInfo,
@@ -83,11 +294,6 @@ class MappingNode:
         feature_unit: str | None,
         extra_filters: Optional[Dict[str, Any]] = None,
     ) -> RetrievalResult:
-        """
-        검색 TOOL을 호출하는 wrapper.
-        Hybrid 검색 Tool을 호출하고 state 스키마에 맞춰 변환한다.
-        """
-
         product_id = product["product_id"]
         query = self._build_search_query(feature_name, feature_value, feature_unit)
         filters = build_product_filters(product)
@@ -95,8 +301,6 @@ class MappingNode:
             filters.update(extra_filters)
 
         try:
-            # TODO(remon-tuning): once live RetrievalTool is connected, benchmark per-feature
-            # top_k/alpha/filter settings instead of relying on demo defaults.
             tool_result: RetrievalOutput = await self.search_tool.search(
                 query=query,
                 strategy="hybrid",
@@ -133,9 +337,6 @@ class MappingNode:
             candidates=candidates,
         )
 
-    # ----------------------------------------------------------------------
-    # 2) 매핑 프롬프트 생성 (local 처리)
-    # ----------------------------------------------------------------------
     def _build_prompt(
         self,
         feature_name,
@@ -156,9 +357,6 @@ class MappingNode:
         )
 
     def _build_search_query(self, feature_name, feature_value, feature_unit):
-        """
-        검색 Tool에 전달할 기본 쿼리 문자열 생성.
-        """
         parts: List[str] = [str(feature_name)]
         if feature_value is not None:
             parts.append(str(feature_value))
@@ -170,11 +368,6 @@ class MappingNode:
     def _prune_candidates(
         self, candidates: List[RetrievedChunk]
     ) -> List[RetrievedChunk]:
-        """
-        중복 chunk와 동일 문서 과잉 후보를 제거한다.
-        - 동일 chunk_id 중복 제거
-        - 같은 문서(meta_doc_id 기준)에서는 상위 N개까지만 유지
-        """
         seen_chunks = set()
         doc_counts = defaultdict(int)
         pruned: List[RetrievedChunk] = []
@@ -195,9 +388,6 @@ class MappingNode:
 
         return pruned
 
-    # ----------------------------------------------------------------------
-    # 3) LLM 매핑 호출
-    # ----------------------------------------------------------------------
     async def _call_llm(self, prompt: str) -> Dict:
         try:
             res = await self.llm.chat.completions.create(
@@ -219,21 +409,14 @@ class MappingNode:
                 },
             }
 
-    # ----------------------------------------------------------------------
-    # 4) LangGraph Node entrypoint
-    # ----------------------------------------------------------------------
     async def run(self, state: Dict) -> Dict:
         product: Optional[ProductInfo] = state.get("product_info")
         mapping_filters: Dict[str, Any] = state.get("mapping_filters") or {}
+        change_results: List[Dict[str, Any]] = (
+            state.get("change_detection_results") or []
+        )
         if not product:
             product_id = mapping_filters.get("product_id")
-
-            # 기존 호출 방식
-            # product = await self.product_repository.fetch_product(
-            #     int(product_id) if product_id is not None else None
-            # )
-            # state["product_info"] = product
-            # 수정: Repository 호출 방식 변경 (session 전달)
             async with AsyncSessionLocal() as session:
                 product = await self.product_repository.fetch_product_for_mapping(
                     session, int(product_id) if product_id is not None else None
@@ -245,11 +428,12 @@ class MappingNode:
         mapping_spec = product.get("mapping") or {}
         target_state = mapping_spec.get("target") or {}
         present_state = mapping_spec.get("present_state") or {}
-        # present_state가 비어있으면 target 혹은 구 버전 features를 활용해 최소한의 매핑을 진행한다.
         present_features = (
             present_state or target_state or product.get("features", {}) or {}
         )
         units = product.get("feature_units", {})
+
+        change_scope = self._extract_change_scope(change_results, present_features)
 
         mapping_results: List[MappingItem] = []
         mapping_targets: Dict[str, Dict[str, Any]] = {}
@@ -259,8 +443,13 @@ class MappingNode:
             for key, value in mapping_filters.items()
             if key not in {"product_id"}
         }
-        if not extra_search_filters:
-            extra_search_filters = None
+        change_search_filters = self._build_change_filters(change_scope)
+        merged_search_filters = {}
+        for src in (extra_search_filters, change_search_filters):
+            if src:
+                merged_search_filters.update(src)
+        if not merged_search_filters:
+            merged_search_filters = None
 
         if self.debug_enabled:
             logger.info(
@@ -276,8 +465,12 @@ class MappingNode:
                     "💤 매핑 대상 특성이 없습니다. mapping.present_state나 target을 확인하세요."
                 )
 
+        feature_iterable = self._select_features_for_mapping(
+            present_features, change_scope
+        )
+
         # 🔥 feature별로 검색 TOOL → 매핑
-        for feature_name, present_value in present_features.items():
+        for feature_name, present_value in feature_iterable:
             unit = units.get(feature_name)
             target_value = target_state.get(feature_name)
 
@@ -291,7 +484,7 @@ class MappingNode:
                     unit or "-",
                 )
             retrieval: RetrievalResult = await self._run_search(
-                product, feature_name, present_value, unit, extra_search_filters
+                product, feature_name, present_value, unit, merged_search_filters
             )
             original_count = len(retrieval["candidates"])
             retrieval["candidates"] = self._prune_candidates(retrieval["candidates"])
@@ -328,6 +521,13 @@ class MappingNode:
                 if current_value is None and present_value is not None:
                     current_value = present_value
 
+                regulation_meta = dict(cand.get("metadata") or {})
+                change_matches = self._match_change_results_to_candidate(
+                    change_scope, cand
+                )
+                if change_matches:
+                    regulation_meta["change_detection_matches"] = change_matches
+
                 item = MappingItem(
                     product_id=product_id,
                     product_name=product_name,
@@ -338,7 +538,7 @@ class MappingNode:
                     gap=llm_out["gap"],
                     regulation_chunk_id=cand["chunk_id"],
                     regulation_summary=cand["chunk_text"][:120],
-                    regulation_meta=cand["metadata"],
+                    regulation_meta=regulation_meta,
                     parsed=parsed,
                 )
                 mapping_results.append(item)
@@ -392,6 +592,8 @@ class MappingNode:
         state["mapping"] = mapping_payload
         state["mapping_results"] = mapping_payload
         state["mapping_targets"] = mapping_targets
+        state["mapping_actionable_changes"] = change_scope.get("actionable_results", [])
+        state["mapping_pending_changes"] = change_scope.get("pending_results", [])
         if self.debug_enabled:
             _log_mapping_preview(product_id, mapping_results)
             snapshot_path = _persist_mapping_snapshot(

@@ -258,22 +258,23 @@ class DualIndexer:
         return all_chunks
     
     def _table_to_text(self, table: Dict[str, Any]) -> str:
-        """표를 검색 가능한 텍스트로 변환."""
+        """표를 마크다운 형태로 변환 (LLM 입력 최적화)."""
         lines = []
         
         # 캡션
         if table.get("caption"):
-            lines.append(f"Table: {table['caption']}")
+            lines.append(f"**{table['caption']}**")
             lines.append("")
         
         # 헤더
         headers = table.get("headers", [])
         if headers:
-            lines.append(" | ".join(headers))
-            lines.append("-" * (len(" | ".join(headers))))
+            lines.append("| " + " | ".join(headers) + " |")
+            lines.append("|" + "|".join(["---" for _ in headers]) + "|")
         
         # 행
         for row in table.get("rows", []):
-            lines.append(" | ".join(str(cell) for cell in row))
+            cells = [str(cell) if cell else "" for cell in row]
+            lines.append("| " + " | ".join(cells) + " |")
         
         return "\n".join(lines)

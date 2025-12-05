@@ -296,26 +296,57 @@ class ChangeDetectionNode:
     def _extract_reference_blocks(
         self, regul_data: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
-        """regul_data에서 chunks 추출."""
+        """regul_data에서 reference_blocks 추출 (Vision Pipeline 구조 대응)."""
         ref_blocks = []
-        chunks = regul_data.get("chunks", [])
         
-        for chunk in chunks:
-            metadata = chunk.get("metadata", {})
-            ref_blocks.append(
-                {
-                    "section_ref": metadata.get("section_label", ""),
-                    "text": chunk.get("chunk_text", ""),
-                    "keywords": [],  # 필요시 추가
-                    "page_num": metadata.get("page_range", [0])[0] if metadata.get("page_range") else 0,
-                    "chunk_id": chunk.get("chunk_id", ""),
-                }
-            )
+        # Vision Pipeline 출력 구조
+        vision_pages = regul_data.get("vision_extraction_result", [])
+        
+        for page in vision_pages:
+            structure = page.get("structure", {})
+            page_num = page.get("page_num", 0)
+            markdown_content = structure.get("markdown_content", "")
+            reference_blocks = structure.get("reference_blocks", [])
+            
+            # reference_blocks가 있으면 사용
+            if reference_blocks:
+                lines = markdown_content.splitlines()
+                total_lines = len(lines)
+                for ref in reference_blocks:
+                    start = max(ref.get("start_line", 0), 0)
+                    end = ref.get("end_line", total_lines) or total_lines
+                    end = min(end, total_lines)
+                    snippet = "\n".join(lines[start:end]) if lines else markdown_content
+                    
+                    ref_blocks.append({
+                        "section_ref": ref.get("section_ref", ""),
+                        "text": snippet,  # markdown_content에서 실제 텍스트 추출
+                        "keywords": ref.get("keywords", []),
+                        "page_num": page_num,
+                        "start_line": start,
+                        "end_line": end,
+                        "hierarchy": [],  # 계층 정보 (필요시 추가)
+                    })
+            else:
+                # reference_blocks가 없으면 페이지 전체를 하나의 블록으로
+                ref_blocks.append({
+                    "section_ref": f"Page {page_num}",
+                    "text": markdown_content[:500],  # 처음 500자
+                    "keywords": self._extract_keywords(markdown_content),
+                    "page_num": page_num,
+                    "start_line": 0,
+                    "end_line": len(markdown_content.splitlines()),
+                    "hierarchy": [],
+                })
+        
         return ref_blocks
     
     def _extract_keywords(self, text: str, max_keywords: int = 5) -> List[str]:
         """텍스트에서 키워드 추출 (간단한 토큰 기반)."""
         import re
+        
+        if not text:
+            return []
         
         # 숫자 포함 단어 우선 (예: 20mg, § 1141.1)
         numeric_words = re.findall(r'\b\w*\d+\w*\b', text)
