@@ -41,6 +41,22 @@ public class AuthController {
         ));
     }
     
+    @GetMapping("/check-auth")
+    public ResponseEntity<?> checkAuth(HttpSession session) {
+    Integer userId = (Integer) session.getAttribute("userId");
+    
+    if (userId == null) {
+        return ResponseEntity.status(401)
+                .body(Map.of("message", "로그인 필요"));
+    }
+    
+    // id가 1이면 관리자
+    return ResponseEntity.ok(Map.of(
+            "isAdmin", userId == 1,
+            "userId", userId
+    ));
+}
+
     @PostMapping("/logout")
     public ResponseEntity<?> logout(HttpSession session) {
         session.invalidate();
