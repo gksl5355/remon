@@ -1,34 +1,37 @@
 <template>
-  <!-- 헤더 높이 약 100px 가정 -->
-  <div class="p-8 bg-[#0E0E0E] min-h-[calc(100vh-100px)]">
-    <div class="grid grid-cols-5 gap-6 h-[calc(100vh-100px-64px)]">
-      <!-- 좌측: 규제 목록 + 종합 리포트 -->
-      <div class="col-span-2 flex flex-col gap-6 h-full overflow-hidden">
-        <div class="flex-1 h-full overflow-hidden">
-          <RegulationTable @select-regulation="selectRegulation" />
-        </div>
-        <div class="h-[240px] overflow-hidden">
-          <CombinedReport />
-        </div>
+  <div class="w-full min-h-screen flex gap-6 p-6 bg-[#0F172A] text-gray-100">
+
+    <!-- 왼쪽 -->
+    <div class="flex flex-col flex-[3] gap-6 min-h-0">
+      
+      <!-- 글로벌 모니터링 -->
+      <div class="flex-[2] bg-slate-800/70 p-6 rounded-2xl shadow-md backdrop-blur flex flex-col">
+        <div class="text-lg font-semibold mb-3">글로벌 모니터링</div>
+        <WorldMap class="flex-1" />
       </div>
 
-      <!-- 우측: 선택된 규제의 요약 리포트 -->
-      <div class="col-span-3 h-full overflow-hidden">
-        <SummaryReport :selectedRegulation="selectedRegulation" />
+      <!-- 대시보드 -->
+      <div class="flex-[1] bg-slate-800/70 p-6 rounded-2xl shadow-md backdrop-blur">
+        <div class="text-lg font-semibold mb-3">AI 종합 대시보드</div>
       </div>
     </div>
+
+    <!-- 오른쪽 타임라인 -->
+    <div class="flex-[1] min-h-0">
+      <div class="h-full bg-slate-800/70 p-6 rounded-2xl shadow-md backdrop-blur flex flex-col">
+        <div class="text-xl font-bold mb-4">규제 타임라인</div>
+
+        <!-- 타임라인 영역 확보 -->
+        <div class="flex-1 min-h-[350px] overflow-y-auto pr-2">
+          <Timeline />
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script setup>
-import CombinedReport from "@/components/CombinedReport.vue";
-import RegulationTable from "@/components/RegulationTable.vue";
-import SummaryReport from "@/components/SummaryReport.vue";
-import { ref } from "vue";
-
-const selectedRegulation = ref(null);
-
-const selectRegulation = (r) => {
-  selectedRegulation.value = r;
-};
+import Timeline from "@/components/main/Timeline.vue";
+import WorldMap from "@/components/main/WorldMap.vue";
 </script>

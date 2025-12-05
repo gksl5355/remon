@@ -1,46 +1,31 @@
 <template>
-  <div class="min-h-screen bg-[#0d0d0d] text-gray-200">
-    <!-- 헤더 -->
-    <HeaderBar
-      :is-logged-in="isLoggedIn"
-      @open-login="showLogin = true"
-      @logout="handleLogout"
-    />
+  <div class="h-screen flex flex-col">
 
-    <!-- 로그인 모달 -->
-    <LoginModal
-      v-if="showLogin"
-      @close="showLogin = false"
-      @success="handleLoginSuccess"
-    />
+    <!-- Header -->
+    <div ref="headerRef" class="flex-shrink-0">
+      <HeaderBar />
+    </div>
 
-    <!-- 페이지 라우팅 -->
-    <router-view />
+    <!-- Main Layout -->
+    <div
+      class="flex-1 min-h-0"
+      :style="headerHeight > 0 ? `height: calc(100vh - ${headerHeight}px)` : ''"
+    >
+      <router-view :header-height="headerHeight" />
+    </div>
+
   </div>
 </template>
 
 <script setup>
 import HeaderBar from "@/components/HeaderBar.vue";
-import LoginModal from "@/components/LoginModal.vue";
-import { ref } from "vue";
-import { useRouter } from "vue-router";
+import { nextTick, onMounted, ref } from "vue";
 
-const router = useRouter();
-const showLogin = ref(false);
-const isLoggedIn = ref(false);
+const headerRef = ref(null);
+const headerHeight = ref(0);
 
-// ✅ 로그인 성공 시 → 상태 true + 관리자 페이지로 이동
-const handleLoginSuccess = () => {
-  isLoggedIn.value = true;
-  showLogin.value = false;
-  router.push("/admin");
-};
-
-// ✅ 로그아웃 시 → 상태 false + 메인페이지로 이동
-const handleLogout = () => {
-  localStorage.removeItem("access_token");
-  console.log('로그아웃 성공')
-  isLoggedIn.value = false;
-  router.push("/");
-};
+onMounted(async () => {
+  await nextTick();
+  headerHeight.value = headerRef.value?.offsetHeight || 0;
+});
 </script>
