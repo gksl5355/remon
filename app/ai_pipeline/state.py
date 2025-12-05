@@ -156,6 +156,7 @@ class AppState(TypedDict, total=False):
     retrieval: RetrievalResult
     mapping: MappingResults
     mapping_debug: MappingDebugInfo
+    mapping_filters: Dict[str, Any]  # 매핑 필터 (국가, 규제 ID 등)
     strategies: List[str]
     validation_strategy: bool
     mapping_context: MappingContext
@@ -174,6 +175,11 @@ class AppState(TypedDict, total=False):
     change_detection_results: List[Dict[str, Any]]  # 변경 감지 상세 결과
     change_summary: Dict[str, Any]  # 변경 감지 요약
     change_detection: Dict[str, Any]
+    
+    # regulation info (매핑 노드 입력용)
+    regulation: Dict[str, Any]  # 규제 정보 (매핑 노드가 사용)
+    regulation_id: Optional[int]  # DB에 저장된 regulation_id
+    
     #validation
     validation_result: Optional[Dict[str, Any]]
     validation_retry_count: int = 0
