@@ -12,6 +12,7 @@ from functools import partial
 from typing import Any, Dict, List, Optional, TypedDict
 from urllib.parse import urlparse
 
+import os
 from app.ai_pipeline.tools.hybrid_retriever import HybridRetriever
 from app.config.settings import settings
 
@@ -47,15 +48,32 @@ class RegulationRetrievalTool:
         host: Optional[str] = None,
         port: Optional[int] = None,
         retriever: Optional[HybridRetriever] = None,
+        url: Optional[str] = None,
+        api_key: Optional[str] = None,
+        prefer_grpc: Optional[bool] = None,
+        timeout: Optional[float] = None,
     ):
+        self.offline = os.getenv("QDRANT_OFFLINE", "false").lower() == "true"
         parsed = urlparse(settings.QDRANT_URL)
         resolved_host = host or parsed.hostname or "localhost"
         resolved_port = port or parsed.port or 6333
+        resolved_url = url or settings.QDRANT_URL
+        resolved_api_key = api_key or settings.QDRANT_API_KEY
+        resolved_prefer_grpc = (
+            settings.QDRANT_PREFER_GRPC if prefer_grpc is None else prefer_grpc
+        )
+        resolved_timeout = timeout or settings.QDRANT_TIMEOUT
+        resolved_vector_name = settings.QDRANT_VECTOR_NAME
         self.collection = collection or settings.QDRANT_COLLECTION
         self._retriever = retriever or HybridRetriever(
             default_collection=self.collection,
             host=resolved_host,
             port=resolved_port,
+            url=resolved_url,
+            api_key=resolved_api_key,
+            prefer_grpc=resolved_prefer_grpc,
+            timeout=resolved_timeout,
+            vector_name=resolved_vector_name,
         )
 
     async def search(
@@ -83,6 +101,8 @@ class RegulationRetrievalTool:
         filters : Optional[Dict[str, Any]]
             Qdrant 메타데이터 필터
         """
+        if self.offline:
+            return RetrievalOutput(results=[], metadata={"query": query, "top_k": top_k, "filters": filters or {}})
         if strategy != "hybrid":
             raise ValueError("현재는 hybrid 전략만 지원합니다.")
 

@@ -53,7 +53,7 @@ class MappingNode:
         self,
         llm_client,
         search_tool,
-        top_k: int = 5,
+        top_k: int = 10,
         alpha: float = 0.7,
         product_repository: Optional[ProductRepository] = None,
         max_candidates_per_doc: int = 2,
@@ -286,6 +286,214 @@ class MappingNode:
                 matches.append(result)
         return matches
 
+    def _build_regulation_filters(self, regulation: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """state.regulation 메타데이터 기반 검색 필터."""
+        if not regulation:
+            return {}
+        filters: Dict[str, Any] = {}
+        for key in ("country", "citation_code", "effective_date", "title", "regulation_id"):
+            val = regulation.get(key)
+            if val:
+                filters[key] = val
+        return filters
+
+    def _merge_filters(self, *filters: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        merged: Dict[str, Any] = {}
+        for src in filters:
+            if src:
+                merged.update(src)
+        return merged or None
+
+    def _build_change_query(self, change_hint: Optional[Dict[str, Any]]) -> Optional[str]:
+        if not change_hint:
+            return None
+        parts: List[str] = []
+        for key in ("new_snippet", "legacy_snippet", "new_text", "legacy_text"):
+            val = change_hint.get(key)
+            if isinstance(val, str) and val.strip():
+                parts.append(val.strip())
+        for kw in change_hint.get("keywords", []) or []:
+            if isinstance(kw, str):
+                parts.append(kw)
+        return " ".join(parts) if parts else None
+
+    def _merge_candidate_lists(
+        self,
+        base: List[RetrievedChunk],
+        extra: List[RetrievedChunk],
+    ) -> List[RetrievedChunk]:
+        """
+        chunk_id 기준으로 병합하며 더 높은 semantic_score를 유지한다.
+        """
+        merged: Dict[str, RetrievedChunk] = {}
+        for cand in base + extra:
+            cid = cand.get("chunk_id")
+            if cid in merged:
+                if (cand.get("semantic_score") or 0) > (
+                    merged[cid].get("semantic_score") or 0
+                ):
+                    merged[cid] = cand
+            else:
+                merged[cid] = cand
+        return list(merged.values())
+
+    def _choose_change_hint(self, change_scope: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        actionable = change_scope.get("actionable_results") or []
+        pending = change_scope.get("pending_results") or []
+        if actionable:
+            return actionable[0]
+        if pending:
+            return pending[0]
+        return None
+
+    def _build_trace_entries(
+        self,
+        mapping_results: List[MappingItem],
+        regulation_meta: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        now_ts = datetime.utcnow().isoformat() + "Z"
+        entries: List[Dict[str, Any]] = []
+        for item in mapping_results:
+            if not item.get("applies"):
+                continue
+            rerank_meta = item.get("regulation_meta", {}).get("rerank", {}) or {}
+            change_status = (
+                "pending" if rerank_meta.get("pending") else "applied"
+            )
+            entries.append(
+                {
+                    "feature": item.get("feature_name"),
+                    "applied_value": item.get("required_value"),
+                    "regulation_record_id": item.get("regulation_chunk_id"),
+                    "mapping_score": rerank_meta.get("final_confidence")
+                    or item.get("regulation_meta", {}).get("semantic_score"),
+                    "change_status": change_status,
+                    "evidence": {
+                        "legacy_snippet": None,
+                        "new_snippet": item.get("regulation_summary"),
+                    },
+                    "regulation_info": {
+                        "country": regulation_meta.get("country"),
+                        "citation_code": regulation_meta.get("citation_code"),
+                        "title": regulation_meta.get("title"),
+                        "effective_date": regulation_meta.get("effective_date"),
+                        "regulation_id": regulation_meta.get("regulation_id"),
+                    },
+                    "updated_at": now_ts,
+                }
+            )
+        return entries
+
+    def _rule_rank_candidates(
+        self,
+        candidates: List[RetrievedChunk],
+        change_hint: Optional[Dict[str, Any]],
+        top_n: int = 3,
+    ) -> List[RetrievedChunk]:
+        """
+        규칙 기반 스코어로 상위 후보 추림.
+        - semantic_score 우선
+        - change keywords, numerical_change 텍스트 매칭에 가점
+        """
+        if not candidates:
+            return []
+
+        keywords = set()
+        numbers = set()
+        if change_hint:
+            for kw in change_hint.get("keywords", []) or []:
+                if isinstance(kw, str):
+                    keywords.add(self._normalize_token(kw))
+            for num_entry in change_hint.get("numerical_changes", []) or []:
+                for key in ("legacy_value", "new_value"):
+                    val = num_entry.get(key)
+                    if isinstance(val, str):
+                        numbers.add(val.lower())
+
+        def score(cand: RetrievedChunk) -> float:
+            base = cand.get("semantic_score") or 0.0
+            text = (cand.get("chunk_text") or "").lower()
+            bonus = 0.0
+            for kw in keywords:
+                if kw in text:
+                    bonus += 0.05
+            for num in numbers:
+                if num and num in text:
+                    bonus += 0.05
+            return base + bonus
+
+        ranked = sorted(candidates, key=score, reverse=True)
+        return ranked[:top_n]
+
+    def _build_rerank_prompt(
+        self,
+        change_hint: Dict[str, Any],
+        candidates: List[RetrievedChunk],
+    ) -> str:
+        """
+        rerank + 변경 요약 + 요구사항 추출을 한 번에 수행하도록 LLM 프롬프트 구성.
+        """
+        evidence = {
+            "change_type": change_hint.get("change_type"),
+            "confidence_score": change_hint.get("confidence_score"),
+            "new_snippet": change_hint.get("new_snippet")
+            or change_hint.get("new_text")
+            or change_hint.get("new_ref_text"),
+            "legacy_snippet": change_hint.get("legacy_snippet")
+            or change_hint.get("legacy_text")
+            or change_hint.get("legacy_ref_text"),
+            "keywords": change_hint.get("keywords", []),
+            "numerical_changes": change_hint.get("numerical_changes", []),
+        }
+        cand_payload = []
+        for idx, cand in enumerate(candidates):
+            cand_payload.append(
+                {
+                    "id": cand.get("chunk_id"),
+                    "text": cand.get("chunk_text"),
+                    "metadata": cand.get("metadata", {}),
+                    "semantic_score": cand.get("semantic_score"),
+                }
+            )
+
+        prompt = {
+            "task": "select_best_point_and_summarize_change",
+            "change_evidence": evidence,
+            "candidates": cand_payload,
+            "instructions": (
+                "1) 후보 중 변화와 가장 잘 맞는 point_id를 1개 선택.\n"
+                "2) 무엇이 어떻게 바뀌었는지 한 줄로 요약.\n"
+                "3) 조항 내 요구사항을 bullet로 나열.\n"
+                "4) 최종 신뢰도 0~1 산출. 0.7 미만이면 pending=true."
+            ),
+            "output_schema": {
+                "selected_point_id": "string",
+                "reason": "string",
+                "change_summary": "string",
+                "requirements": ["string"],
+                "final_confidence": "float",
+                "pending": "boolean",
+            },
+        }
+        return json.dumps(prompt, ensure_ascii=False)
+
+    async def _rerank_candidates(
+        self,
+        change_hint: Dict[str, Any],
+        candidates: List[RetrievedChunk],
+    ) -> Optional[Dict[str, Any]]:
+        if not candidates:
+            return None
+        prompt = self._build_rerank_prompt(change_hint, candidates)
+        try:
+            res = await self.llm.chat.completions.create(
+                model="gpt-5-nano",
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return json.loads(res.choices[0].message.content)
+        except Exception:
+            return None
+
     async def _run_search(
         self,
         product: ProductInfo,
@@ -293,6 +501,7 @@ class MappingNode:
         feature_value: Any,
         feature_unit: str | None,
         extra_filters: Optional[Dict[str, Any]] = None,
+        change_query: Optional[str] = None,
     ) -> RetrievalResult:
         product_id = product["product_id"]
         query = self._build_search_query(feature_name, feature_value, feature_unit)
@@ -308,6 +517,15 @@ class MappingNode:
                 alpha=self.alpha,
                 filters=filters or None,
             )
+            change_tool_result: Optional[RetrievalOutput] = None
+            if change_query:
+                change_tool_result = await self.search_tool.search(
+                    query=change_query,
+                    strategy="hybrid",
+                    top_k=self.top_k,
+                    alpha=self.alpha,
+                    filters=filters or None,
+                )
         except Exception as exc:
             logger.warning("retrieval tool 호출 실패: %s", exc)
             return RetrievalResult(
@@ -318,15 +536,23 @@ class MappingNode:
                 candidates=[],
             )
 
-        candidates: List[RetrievedChunk] = []
-        for item in tool_result["results"]:
-            candidates.append(
-                RetrievedChunk(
-                    chunk_id=item.get("id", ""),
-                    chunk_text=item.get("text", ""),
-                    semantic_score=item.get("scores", {}).get("final_score", 0.0),
-                    metadata=item.get("metadata", {}),
+        def _convert(out: RetrievalOutput) -> List[RetrievedChunk]:
+            converted: List[RetrievedChunk] = []
+            for item in out["results"]:
+                converted.append(
+                    RetrievedChunk(
+                        chunk_id=item.get("id", ""),
+                        chunk_text=item.get("text", ""),
+                        semantic_score=item.get("scores", {}).get("final_score", 0.0),
+                        metadata=item.get("metadata", {}),
+                    )
                 )
+            return converted
+
+        candidates = _convert(tool_result)
+        if change_query and change_tool_result:
+            candidates = self._merge_candidate_lists(
+                candidates, _convert(change_tool_result)
             )
 
         return RetrievalResult(
@@ -412,6 +638,7 @@ class MappingNode:
     async def run(self, state: Dict) -> Dict:
         product: Optional[ProductInfo] = state.get("product_info")
         mapping_filters: Dict[str, Any] = state.get("mapping_filters") or {}
+        regulation_meta: Dict[str, Any] = state.get("regulation") or {}
         change_results: List[Dict[str, Any]] = (
             state.get("change_detection_results") or []
         )
@@ -434,6 +661,8 @@ class MappingNode:
         units = product.get("feature_units", {})
 
         change_scope = self._extract_change_scope(change_results, present_features)
+        change_hint = self._choose_change_hint(change_scope)
+        change_query = self._build_change_query(change_hint)
 
         mapping_results: List[MappingItem] = []
         mapping_targets: Dict[str, Dict[str, Any]] = {}
@@ -444,12 +673,10 @@ class MappingNode:
             if key not in {"product_id"}
         }
         change_search_filters = self._build_change_filters(change_scope)
-        merged_search_filters = {}
-        for src in (extra_search_filters, change_search_filters):
-            if src:
-                merged_search_filters.update(src)
-        if not merged_search_filters:
-            merged_search_filters = None
+        regulation_filters = self._build_regulation_filters(regulation_meta)
+        merged_search_filters = self._merge_filters(
+            extra_search_filters, change_search_filters, regulation_filters
+        )
 
         if self.debug_enabled:
             logger.info(
@@ -484,7 +711,12 @@ class MappingNode:
                     unit or "-",
                 )
             retrieval: RetrievalResult = await self._run_search(
-                product, feature_name, present_value, unit, merged_search_filters
+                product,
+                feature_name,
+                present_value,
+                unit,
+                merged_search_filters,
+                change_query=change_query,
             )
             original_count = len(retrieval["candidates"])
             retrieval["candidates"] = self._prune_candidates(retrieval["candidates"])
@@ -496,10 +728,29 @@ class MappingNode:
                     pruned_count,
                 )
 
+            ranked_candidates = retrieval["candidates"]
+            rerank_result: Optional[Dict[str, Any]] = None
+            if change_hint and ranked_candidates:
+                ranked_candidates = self._rule_rank_candidates(
+                    ranked_candidates, change_hint, top_n=3
+                )
+                rerank_result = await self._rerank_candidates(
+                    change_hint, ranked_candidates
+                )
+                if rerank_result and rerank_result.get("selected_point_id"):
+                    # rerank 결과의 point_id와 일치하는 후보를 우선 유지
+                    selected_id = rerank_result["selected_point_id"]
+                    ranked_candidates = [
+                        cand
+                        for cand in ranked_candidates
+                        if cand.get("chunk_id") == selected_id
+                    ] or ranked_candidates
+            # fallback: 기존 순서 유지
+
             # -----------------------------------------
             # b) LLM 매핑 수행
             # -----------------------------------------
-            for cand in retrieval["candidates"]:
+            for cand in ranked_candidates:
                 prompt = self._build_prompt(
                     feature_name,
                     present_value,
@@ -522,11 +773,14 @@ class MappingNode:
                     current_value = present_value
 
                 regulation_meta = dict(cand.get("metadata") or {})
+                regulation_meta["semantic_score"] = cand.get("semantic_score")
                 change_matches = self._match_change_results_to_candidate(
                     change_scope, cand
                 )
                 if change_matches:
                     regulation_meta["change_detection_matches"] = change_matches
+                if rerank_result:
+                    regulation_meta["rerank"] = rerank_result
 
                 item = MappingItem(
                     product_id=product_id,
@@ -594,6 +848,17 @@ class MappingNode:
         state["mapping_targets"] = mapping_targets
         state["mapping_actionable_changes"] = change_scope.get("actionable_results", [])
         state["mapping_pending_changes"] = change_scope.get("pending_results", [])
+        # regulation_trace 업데이트 (in-memory)
+        trace_entries = self._build_trace_entries(mapping_results, regulation_meta)
+        if trace_entries:
+            existing_trace = product.get("regulation_trace") or {}
+            existing_list = existing_trace.get("trace") or []
+            last_updated = trace_entries[0]["updated_at"]
+            product["regulation_trace"] = {
+                "trace": existing_list + trace_entries,
+                "last_updated": last_updated,
+            }
+            state["product_info"] = product
         if self.debug_enabled:
             _log_mapping_preview(product_id, mapping_results)
             snapshot_path = _persist_mapping_snapshot(
