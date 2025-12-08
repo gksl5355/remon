@@ -49,8 +49,6 @@ def _route_validation(state: AppState) -> str:
 
     return "ok"
 
-
-
 # --------------------------------------------------------------
 # Build Graph
 # --------------------------------------------------------------
@@ -65,10 +63,13 @@ def build_graph():
     graph.add_node("validator",         validator_node)    # node name OK
     graph.add_node("report_node",       report_node)       # node_name만 변경
 
-    graph.set_entry_point("preprocess")
+    graph.set_entry_point("preprocess")   
 
-    # preprocess → detect_changes
+    # main flow
     graph.add_edge("preprocess", "detect_changes")
+    graph.add_edge("map_products",      "generate_strategy")
+    graph.add_edge("generate_strategy", "score_impact")
+    graph.add_edge("score_impact",      "validator")
 
     # detect_changes → map_products | terminate
     graph.add_conditional_edges(
@@ -81,11 +82,6 @@ def build_graph():
             "proceed": "map_products",
         }
     )
-
-    # main flow
-    graph.add_edge("map_products",      "generate_strategy")
-    graph.add_edge("generate_strategy", "score_impact")
-    graph.add_edge("score_impact",      "validator")
 
     # validator → validation only for 3 nodes
     graph.add_conditional_edges(

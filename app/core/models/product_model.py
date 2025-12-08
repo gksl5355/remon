@@ -1,4 +1,16 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Enum, Numeric, func
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Text,
+    Enum,
+    Numeric,
+    func,
+)
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from app.core.models.enums import ProductCategoryEnum
@@ -24,10 +36,10 @@ class Product(Base):
     # [변경] 1:N 관계 (제품 -> 국가)
     country_code = Column(String(2), ForeignKey("countries.country_code"))
     supply_partner = Column(String(50))
+    regulation_trace = Column(JSONB)  # 규제 매핑/추적용 JSON
 
     # Relationships
     country = relationship("Country", back_populates="products")
     impact_scores = relationship("ImpactScore", back_populates="products")
     # reports = relationship("Report", back_populates="products")
-
 

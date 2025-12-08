@@ -19,6 +19,7 @@ from app.ai_pipeline.state import AppState
 
 # DB 연동
 from app.core.database import AsyncSessionLocal
+from sqlalchemy import text
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -168,6 +169,7 @@ async def report_node(state: AppState) -> Dict[str, Any]:
     mapping_items = state.get("mapping", {}).get("items", [])
     strategies = state.get("strategies", [])
     impact_score = (state.get("impact_scores") or [{}])[0]
+    regulation_trace = meta.get("regulation_trace")
 
     context_parts = [
         f"국가: {meta.get('country','')}, 지역: {meta.get('region','')}",
@@ -211,8 +213,21 @@ async def report_node(state: AppState) -> Dict[str, Any]:
             logger.info(f"Keynote 저장 완료: {keynote.keynote_id}")
 
             summary = await summary_repo.create_report_summary(db_session, sections)
+            # 규제 trace 저장
+            if regulation_trace:
+                pid = meta.get("product_id")
+                try:
+                    pid_int = int(pid)
+                except (TypeError, ValueError):
+                    logger.error("Invalid product_id for trace update: %s", pid)
+                else:
+                    await db_session.execute(
+                        text(
+                            "UPDATE products SET regulation_trace = :trace WHERE product_id = :pid"
+                        ),
+                        {"trace": json.dumps(regulation_trace), "pid": pid_int},
+                    )
             await db_session.commit()
-
             report_json["report_id"] = summary.summary_id
             logger.info(f"ReportSummary 저장 완료: {summary.summary_id}")
 

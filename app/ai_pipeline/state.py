@@ -24,6 +24,7 @@ class ProductInfo(TypedDict):
     feature_units: Dict[str, str]
     country: Optional[str]
     category: Optional[str]
+    regulation_trace: Optional[Dict[str, Any]]
 
 
 # ---------------------------------------------------------------------------
@@ -49,7 +50,7 @@ class RetrievalResult(TypedDict):
 # ---------------------------------------------------------------------------
 class MappingParsed(TypedDict):
     category: Optional[str]
-    requirement_type: Optional[str]  # "max" | "min" | "range" | "boolean" | "other"
+    requirement_type: Optional[str]  # "max" | "min" | "range" | "boolean" | "other" 
     condition: Optional[str]
 
 
