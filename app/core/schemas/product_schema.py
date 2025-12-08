@@ -20,6 +20,7 @@ class ProductBase(BaseModel):
     revenue: Optional[int] = None
     country_code: Optional[str] = None
     supply_partner: Optional[str] = None
+    effective: Optional[dict] = None
 
 class ProductCreate(ProductBase):
     product_name: str # 필수
