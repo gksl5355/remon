@@ -37,9 +37,9 @@ class HierarchyChunker:
         
         # 1차: Markdown 헤더 기반 분할
         headers_to_split_on = [
-            ("#", "Part"),
-            ("##", "Section"),
-            ("###", "Subsection"),
+            ("#", "H1"),      # Title/Part/Department
+            ("##", "H2"),     # Subpart/Preamble Captions (AGENCY, SUMMARY, etc.)
+            ("###", "H3"),    # Section/Sub-sections
         ]
         
         md_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on)
@@ -95,9 +95,9 @@ class HierarchyChunker:
         return final_chunks
     
     def _extract_hierarchy(self, metadata: Dict[str, Any]) -> List[str]:
-        """메타데이터에서 계층 구조 추출."""
+        """메타데이터에서 계층 구조 추출 (범용)."""
         hierarchy = []
-        for key in ["Part", "Section", "Subsection"]:
+        for key in ["H1", "H2", "H3"]:
             if key in metadata:
                 hierarchy.append(metadata[key])
         return hierarchy

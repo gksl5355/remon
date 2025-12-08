@@ -36,7 +36,8 @@ logger = logging.getLogger(__name__)
 
 def parse_args():
     parser = argparse.ArgumentParser(description="규제 전처리 및 DB 저장")
-    parser.add_argument("--pdf", type=str, required=True, help="PDF 파일 경로")
+    parser.add_argument("--pdf", type=str, help="S3 키 (regulation/US/file.pdf)")
+    parser.add_argument("--date", type=str, help="처리할 날짜 (YYYYMMDD, 기본값: 오늘)")
     parser.add_argument("--save-to-db", action="store_true", help="DB에 저장")
     parser.add_argument("--enable-change-detection", action="store_true", help="변경 감지 활성화")
     parser.add_argument("--max-concurrency", type=int, default=30, help="최대 동시 실행 수")
@@ -46,25 +47,57 @@ def parse_args():
 async def main():
     args = parse_args()
     
-    pdf_path = Path(args.pdf)
-    if not pdf_path.is_absolute():
-        pdf_path = project_root / pdf_path
+    from app.utils.s3_client import S3Client
+    s3_client = S3Client()
     
-    if not pdf_path.exists():
-        logger.error(f"❌ PDF 파일 없음: {pdf_path}")
-        return
+    # S3에서 처리할 파일 목록 가져오기
+    if args.pdf:
+        # 특정 파일 지정
+        s3_keys = [args.pdf]
+    else:
+        # 날짜 기반 자동 탐색
+        s3_keys = s3_client.get_today_regulation_files(args.date)
+        if not s3_keys:
+            logger.error(f"❌ {args.date or 'today'} 규제 파일 없음")
+            return
     
     logger.info("=" * 60)
-    logger.info(f"🚀 규제 처리 시작: {pdf_path.name}")
+    logger.info(f"🚀 규제 처리 시작: {len(s3_keys)}개 파일")
     logger.info("=" * 60)
     
+    for s3_key in s3_keys:
+        await process_single_regulation(s3_client, s3_key, args)
+
+
+async def process_single_regulation(s3_client, s3_key: str, args):
+    """S3 규제 파일 1개 처리"""
+    logger.info(f"\n📄 처리 중: {s3_key}")
+    
+    # S3 → /tmp 다운로드
+    temp_path = s3_client.download_to_temp(s3_key)
+    
+    try:
+        await _process_pdf(temp_path, s3_key, args)
+    finally:
+        # 임시 파일 삭제
+        import os
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+            logger.debug(f"🗑️ 임시 파일 삭제: {temp_path}")
+
+
+async def _process_pdf(pdf_path: str, s3_key: str, args):
+    """PDF 전처리 로직 (기존 코드)"""
+    logger.info("=" * 60)
+    logger.info(f"🚀 규제 처리 시작: {Path(pdf_path).name}")
+    logger.info("=" * 60)
     # Phase 1: Vision Pipeline 실행
     logger.info("📄 Vision Pipeline 실행 중...")
     orchestrator = VisionOrchestrator(max_concurrency=args.max_concurrency)
     
     result = await asyncio.to_thread(
         orchestrator.process_pdf,
-        str(pdf_path),
+        pdf_path,
         use_parallel=True
     )
     
