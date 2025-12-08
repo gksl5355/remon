@@ -63,7 +63,9 @@ class RegulationTranslation(Base):
     regulation_version_id = Column(Integer, ForeignKey("regulation_versions.regulation_version_id"), nullable=False)
     language_code = Column(String(10))
     translated_text = Column(Text)
-    glossary_term_id = Column(Integer, ForeignKey("glossary_terms.glossary_term_id")) # UUID 타입이면 DB에 맞게 조정
+   
+    glossary_term_id = Column(Integer, ForeignKey("glossary_terms.glossary_term_id"))
+
     translation_status = Column(String(20))
     created_at = Column(DateTime, server_default=func.now())
 
