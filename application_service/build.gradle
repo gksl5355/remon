@@ -1,6 +1,7 @@
+
+
 plugins {
     id 'java'
-    // [요청 반영] 팀원 요구사항에 맞춰 3.5.8 버전 지정
     id 'org.springframework.boot' version '3.5.8'
     id 'io.spring.dependency-management' version '1.1.7'
 }
@@ -23,14 +24,12 @@ configurations {
 
 repositories {
     mavenCentral()
-    // 혹시 3.5.8이 사내 저장소나 Snapshot 저장소에 있다면 아래 저장소 추가가 필요할 수 있습니다.
-    // maven { url 'https://repo.spring.io/milestone' }
-    // maven { url 'https://repo.spring.io/snapshot' }
 }
 
 dependencies {
-    // 1. Web & JPA
-    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    // 1. Web Starter
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa' 
+    
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     
@@ -39,6 +38,7 @@ dependencies {
     
     // 3. Utils (Lombok)
     compileOnly 'org.projectlombok:lombok'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
     annotationProcessor 'org.projectlombok:lombok'
     
     // 4. AWS S3 SDK (버전 관리 BOM 사용)
@@ -47,13 +47,15 @@ dependencies {
 
     // 5. HTTP Client (Tavily 요청용)
     implementation 'org.apache.httpcomponents.client5:httpclient5'
+    // HTML 파싱 및 텍스트 추출용 (Java의 BeautifulSoup)
+    implementation 'org.jsoup:jsoup:1.17.2'
 
     // 6. Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
-	// [추가] HTML 파싱 및 텍스트 추출용 (Java의 BeautifulSoup)
-    implementation 'org.jsoup:jsoup:1.17.2'
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.2.0'
+
 }
 
 tasks.named('test') {

@@ -73,20 +73,20 @@ class DualIndexer:
             })
             metadatas.append(metadata)
         
-        # Qdrant 저장 (로컬 + 원격)
+        # Qdrant 저장 (원격만 사용)
         storage_locations = []
         
-        # 로컬 저장
-        logger.info(f"Qdrant 로컬 저장 중: {self.collection_name}")
-        local_client = VectorClient(collection_name=self.collection_name, use_local=True)
-        local_client.insert(
-            texts=texts,
-            dense_embeddings=embeddings_result["dense"],
-            metadatas=metadatas,
-            sparse_embeddings=embeddings_result.get("sparse")
-        )
-        logger.info("✅ 로컬 Qdrant 저장 완료")
-        storage_locations.append("local")
+        # # 로컬 저장 (비활성화 - 서버 전용 모드)
+        # logger.info(f"Qdrant 로컬 저장 중: {self.collection_name}")
+        # local_client = VectorClient(collection_name=self.collection_name, use_local=True)
+        # local_client.insert(
+        #     texts=texts,
+        #     dense_embeddings=embeddings_result["dense"],
+        #     metadatas=metadatas,
+        #     sparse_embeddings=embeddings_result.get("sparse")
+        # )
+        # logger.info("✅ 로컬 Qdrant 저장 완료")
+        # storage_locations.append("local")
         
         # 원격 저장 (작은 배치 크기로 타임아웃 방지)
         try:
@@ -102,7 +102,8 @@ class DualIndexer:
             logger.info("✅ 원격 Qdrant 저장 완료")
             storage_locations.append("remote")
         except Exception as e:
-            logger.warning(f"⚠️ 원격 Qdrant 저장 실패 (로컬만 저장됨): {e}")
+            logger.error(f"❌ 원격 Qdrant 저장 실패: {e}")
+            raise
         
         # Graph 저장 (추후 구현)
         graph_summary = self._store_graph(graph_data)

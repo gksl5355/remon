@@ -3,13 +3,7 @@
 from typing import Any, Dict, List, Optional
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import (
-    SparseVector,
-    Filter,
-    FieldCondition,
-    MatchValue,
-    Range,
-)
+from qdrant_client.models import Filter, FieldCondition, MatchValue, Range
 
 from .hybrid_embedder import HybridEmbedder
 
@@ -27,11 +21,22 @@ class HybridRetriever:
         default_collection: str,
         host: str = "localhost",
         port: int = 6333,
+        url: str | None = None,
+        api_key: str | None = None,
+        prefer_grpc: bool = False,
+        timeout: float = 10.0,
+        vector_name: str = "strategy-dense-vector",
     ):
-        # HTTP REST Client 사용 (search 지원)
-        self.client = QdrantClient(url=f"http://{host}:{port}")
+        resolved_url = url or f"http://{host}:{port}"
+        self.client = QdrantClient(
+            url=resolved_url,
+            api_key=api_key,
+            prefer_grpc=False,  # hybrid(gRPC) 비활성
+            timeout=timeout,
+        )
 
         self.default_collection = default_collection
+        self.vector_name = vector_name
         self.embedder = HybridEmbedder()
 
     # ----------------------------------------------------
@@ -47,19 +52,15 @@ class HybridRetriever:
         filters: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """
-        Hybrid 검색
-        - dense, sparse 임베딩 생성
-        - 각각 Qdrant에서 검색
-        - score fusion 후 상위 limit 반환
+        Dense-only 검색. 메타데이터 필터 적용.
         """
         collection_name = collection or self.default_collection
         if not collection_name:
             raise ValueError("Collection name must be provided.")
 
-        # 1) 임베딩 생성
+        # 1) 임베딩 생성 (dense만 사용)
         emb = self.embedder.embed(query)
         dense_vec = emb["dense"]
-        sparse_vec: SparseVector = emb["sparse"]
 
         # 2) Dense 검색
         qdrant_filter = self._build_query_filter(filters)
@@ -67,62 +68,29 @@ class HybridRetriever:
         dense_response = self.client.query_points(
             collection_name=collection_name,
             query=dense_vec,
-            using="dense",
+            using=self.vector_name,
             limit=limit * 3,
             query_filter=qdrant_filter,
             with_payload=True,
         )
         dense_results = dense_response.points or []
-
-        # 3) Sparse 검색
-        sparse_response = self.client.query_points(
-            collection_name=collection_name,
-            query=sparse_vec,
-            using="sparse",
-            limit=limit * 3,
-            query_filter=qdrant_filter,
-            with_payload=True,
-        )
-        sparse_results = sparse_response.points or []
-
-        # 4) 점수 결합(fusion)
-        score_map: Dict[str, Dict[str, Any]] = {}
-        for r in dense_results:
-            score_map.setdefault(
-                r.id, {"payload": r.payload, "dense": 0.0, "sparse": 0.0}
-            )
-            score_map[r.id]["dense"] = r.score
-
-        for r in sparse_results:
-            score_map.setdefault(
-                r.id, {"payload": r.payload, "dense": 0.0, "sparse": 0.0}
-            )
-            score_map[r.id]["sparse"] = r.score
-
-        # Fusion
         fused: List[Dict[str, Any]] = []
-        for pid, entry in score_map.items():
-            fused_score = (
-                entry["dense"] * dense_weight
-                + entry["sparse"] * sparse_weight
+        for r in dense_results:
+            fused.append(
+                {
+                    "id": r.id,
+                    "score": r.score,
+                    "payload": r.payload,
+                    "text": r.payload.get("text", ""),
+                    "scores": {
+                        "dense_score": r.score,
+                        "sparse_score": 0.0,
+                        "final_score": r.score,
+                    },
+                }
             )
-            fused.append({
-                "id": pid,
-                "score": fused_score,
-                "payload": entry["payload"],
-                "text": entry["payload"].get("text", ""),
-                "scores": {
-                    "dense_score": entry["dense"],
-                    "sparse_score": entry["sparse"],
-                    "final_score": fused_score,
-                },
-            })
 
-        # 상위 limit 반환
-        fused.sort(
-            key=lambda x: x["scores"].get("final_score", 0.0),
-            reverse=True,
-        )
+        fused.sort(key=lambda x: x["scores"].get("final_score", 0.0), reverse=True)
         return fused[:limit]
     
     def _build_query_filter(

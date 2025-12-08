@@ -122,8 +122,8 @@ class PreprocessConfig:
     VISION_MAX_TOKENS: int = int(os.getenv("VISION_MAX_TOKENS", "16384"))
     """Vision LLM 최대 출력 토큰. 기본값: 16384 (Prompt Caching 효율화)"""
     
-    VISION_TEMPERATURE: float = float(os.getenv("VISION_TEMPERATURE", "0.1"))
-    """Vision LLM 온도 (구조 추출용 낮게). 기본값: 0.1"""
+    VISION_TEMPERATURE: float = float(os.getenv("VISION_TEMPERATURE", "0.2"))
+    """Vision LLM 온도 (구조 추출용). 기본값: 0.2"""
     
     ENABLE_GRAPH_EXTRACTION: bool = os.getenv("ENABLE_GRAPH_EXTRACTION", "true").lower() == "true"
     """지식 그래프 추출 활성화. 기본값: True"""
