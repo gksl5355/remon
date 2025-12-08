@@ -58,7 +58,10 @@ class EmbeddingPipeline:
         if not texts:
             raise ValueError("텍스트 리스트 비어있음")
 
+        logger.debug(f"임베딩 시작: {len(texts)}개 텍스트")
+        
         if HAS_FLAG_EMBEDDING and self.use_sparse:
+            logger.debug("FlagEmbedding 인코딩 시작...")
             embeddings_dict = self.model.encode(
                 texts,
                 batch_size=self.batch_size,
@@ -67,6 +70,7 @@ class EmbeddingPipeline:
                 return_sparse=True,
                 return_colbert_vecs=False,
             )
+            logger.debug("FlagEmbedding 인코딩 완료")
 
             result = {
                 "dense": [

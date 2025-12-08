@@ -1,5 +1,6 @@
 #======================================================================
 # app/ai_pipeline/tools/strategy_history.py
+# updated: 2025-01-19 - QdrantClient 제거, REST API 전용
 # 규제-제품-전략 히스토리 저장용 Qdrant Tool
 #
 # 저장 스키마(예상 payload):
@@ -28,15 +29,10 @@ from typing import List, Dict, Any
 import os
 import uuid
 
-from qdrant_client import QdrantClient
-from qdrant_client.models import (
-    PointStruct,
-    Distance,
-    VectorParams,
-    SparseVectorParams,
-)
-
+import logging
 from .hybrid_embedder import HybridEmbedder
+
+logger = logging.getLogger(__name__)
 
 
 class StrategyHistoryTool:
@@ -58,20 +54,19 @@ class StrategyHistoryTool:
         collection : str
             Qdrant collection name (전략 히스토리용 컬렉션)
         host : str, optional
-            Qdrant 호스트 (기본값: QDRANT_HOST env 또는 'localhost')
+            사용 안함 (호환성 유지)
         port : int, optional
-            Qdrant 포트 (기본값: QDRANT_PORT env 또는 6333)
+            사용 안함 (호환성 유지)
         """
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        
         self.collection = collection
-
-        host = host or os.getenv("QDRANT_HOST", "localhost")
-        port = port or int(os.getenv("QDRANT_PORT", "6333"))
-
-        # HTTP 클라이언트 사용
-        self.client = QdrantClient(url=f"http://{host}:{port}")
-
-        # 규제+제품 텍스트 → dense/sparse 임베딩용
+        self._base_url = os.getenv("QDRANT_URL", "https://qdrant.skala25a.project.skala-ai.com")
+        self._api_key = os.getenv("QDRANT_API_KEY")
+        self._timeout = 60
         self.embedder = HybridEmbedder()
+        logger.info(f"✅ StrategyHistoryTool REST API 모드: {self._base_url}")
 
     # ------------------------------------------------------------------
     # 컬렉션 존재 보장
@@ -81,30 +76,32 @@ class StrategyHistoryTool:
         전략 히스토리 컬렉션이 없을 경우 생성한다.
         - named vectors: dense (cosine), sparse
         """
+        import requests
+        
+        # REST API로 컬렉션 확인
+        url = f"{self._base_url}/collections/{self.collection}"
+        headers = {"api-key": self._api_key, "Content-Type": "application/json"}
+        
         try:
-            self.client.get_collection(self.collection)
-            return
-        except Exception as exc:
-            msg = str(exc).lower()
-            if "not found" not in msg and "doesn't exist" not in msg:
-                raise
-
-        # 컬렉션 생성: dense 차원은 임베딩 결과 길이로 결정
+            response = requests.get(url, headers=headers, verify=False, timeout=self._timeout)
+            if response.status_code == 200:
+                return
+        except Exception:
+            pass
+        
         probe = self.embedder.embed("init strategy history")
         dense_dim = len(probe["dense"])
-
-        self.client.create_collection(
-            collection_name=self.collection,
-            vectors_config={
-                "dense": VectorParams(
-                    size=dense_dim,
-                    distance=Distance.COSINE,
-                )
-            },
-            sparse_vectors_config={
-                "sparse": SparseVectorParams(),
-            },
+        
+        create_payload = {
+            "vectors": {"dense": {"size": dense_dim, "distance": "Cosine"}},
+            "sparse_vectors": {"sparse": {}}
+        }
+        
+        response = requests.put(
+            url, json=create_payload, headers=headers, 
+            verify=False, timeout=self._timeout
         )
+        response.raise_for_status()
 
     # ------------------------------------------------------------------
     # 임베딩용 텍스트 빌드
@@ -183,20 +180,34 @@ class StrategyHistoryTool:
             "meta_embedding_model": "bge-m3",
         }
 
-        # 4) Qdrant PointStruct 생성
-        point = PointStruct(
-            id=str(uuid.uuid4()),
-            payload=payload,
-            vector={
-                "dense": dense_vec,
-                "sparse": sparse_vec,
+        # 4) REST API로 upsert (vector_client.py 방식)
+        import requests
+        import random
+        
+        point_id = random.randint(1, 2**63 - 1)
+        
+        # NumPy float32 → Python float 변환
+        point = {
+            "id": point_id,
+            "vector": {
+                "dense": [float(x) for x in dense_vec],
+                "sparse": {
+                    "indices": [int(k) for k in sparse_vec.indices],
+                    "values": [float(v) for v in sparse_vec.values]
+                }
             },
+            "payload": payload
+        }
+        
+        # 5) REST API로 upsert 수행
+        url = f"{self._base_url}/collections/{self.collection}/points?wait=true"
+        headers = {"api-key": self._api_key, "Content-Type": "application/json"}
+        
+        response = requests.put(
+            url,
+            json={"points": [point]},
+            headers=headers,
+            verify=False,
+            timeout=self._timeout
         )
-
-        # 5) upsert 수행
-        #    - 컬렉션 스키마(이름이 "dense", "sparse" 인 named vector)는
-        #      미리 생성되어 있다고 가정한다.
-        self.client.upsert(
-            collection_name=self.collection,
-            points=[point],
-        )
+        response.raise_for_status()

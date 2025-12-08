@@ -189,6 +189,9 @@ class RegulationRepository(BaseRepository[Regulation]):
         vision_result: Dict
     ) -> Regulation:
         """Vision Pipeline 결과를 DB에 저장"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
         # 첫 페이지 메타데이터 추출
         vision_pages = vision_result.get("vision_extraction_result", [])
         if not vision_pages:
@@ -200,6 +203,10 @@ class RegulationRepository(BaseRepository[Regulation]):
         # citation_code 추출 (변경 감지용)
         citation_code = metadata.get("citation_code")
         
+        logger.info(f"   추출된 citation_code: {citation_code}")
+        logger.info(f"   vision_result 크기: {len(str(vision_result))} bytes")
+        logger.info(f"   페이지 수: {len(vision_pages)}")
+        
         # Regulation 생성
         regulation = Regulation(
             citation_code=citation_code,
@@ -209,6 +216,8 @@ class RegulationRepository(BaseRepository[Regulation]):
         db.add(regulation)
         await db.flush()
         await db.refresh(regulation)
+        
+        logger.info(f"   생성된 regulation_id: {regulation.regulation_id}")
         
         return regulation
     
