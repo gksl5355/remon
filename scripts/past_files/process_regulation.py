@@ -110,6 +110,7 @@ async def _process_pdf(pdf_path: str, s3_key: str, args):
     
     # Phase 2: DB 저장
     regulation_id = None
+    citation_code = None
     if args.save_to_db:
         logger.info("\n💾 PostgreSQL DB 저장 중...")
         
@@ -127,10 +128,13 @@ async def _process_pdf(pdf_path: str, s3_key: str, args):
                 logger.info(f"✅ DB 저장 완료")
                 logger.info(f"   regulation_id: {regulation_id}")
                 logger.info(f"   citation_code: {citation_code}")
+                logger.info(f"   regul_data 크기: {len(str(regulation.regul_data))} bytes")
                 
             except Exception as e:
                 await session.rollback()
                 logger.error(f"❌ DB 저장 실패: {e}")
+                import traceback
+                traceback.print_exc()
                 return
     
     # Phase 3: 변경 감지 (선택적)
@@ -145,6 +149,12 @@ async def _process_pdf(pdf_path: str, s3_key: str, args):
             repo = RegulationRepository()
             new_regul_data = await repo.get_regul_data(session, regulation_id)
             
+            if not new_regul_data:
+                logger.error(f"❌ regulation_id={regulation_id}의 regul_data 조회 실패")
+                return
+            
+            logger.info(f"   신규 규제 데이터 조회 완료: {len(str(new_regul_data))} bytes")
+            
             # AppState 구성
             state: AppState = {
                 "vision_extraction_result": vision_results,
@@ -154,9 +164,10 @@ async def _process_pdf(pdf_path: str, s3_key: str, args):
                 }
             }
             
-            # 변경 감지 실행
+            # 변경 감지 실행 (config에 db_session 전달)
             try:
-                state = await change_detection_node(state, db_session=session)
+                config = {"configurable": {"db_session": session}}
+                state = await change_detection_node(state, config)
                 
                 change_summary = state.get("change_summary", {})
                 change_results = state.get("change_detection_results", [])
@@ -165,6 +176,11 @@ async def _process_pdf(pdf_path: str, s3_key: str, args):
                 logger.info(f"   상태: {change_summary.get('status')}")
                 logger.info(f"   총 변경: {change_summary.get('total_changes', 0)}개")
                 logger.info(f"   HIGH 신뢰도: {change_summary.get('high_confidence_changes', 0)}개")
+                
+                # Legacy regulation_id 출력
+                legacy_id = change_summary.get('legacy_regulation_id')
+                if legacy_id:
+                    logger.info(f"   Legacy regulation_id: {legacy_id}")
                 
                 # 변경 사항 출력
                 if change_results:
@@ -177,6 +193,8 @@ async def _process_pdf(pdf_path: str, s3_key: str, args):
                 
             except Exception as e:
                 logger.error(f"❌ 변경 감지 실패: {e}")
+                import traceback
+                traceback.print_exc()
     
     # Phase 4: 임베딩 (변경 감지 후 자동 실행됨)
     if args.enable_change_detection:

@@ -92,6 +92,8 @@ class PreprocessRequest(TypedDict, total=False):
     pdf_paths: List[str]
     skip_vectorstore: bool
     product_info: ProductInfo
+    load_from_s3: bool  # True이면 S3에서 오늘 날짜 파일 자동 로드
+    s3_date: Optional[str]  # YYYYMMDD 형식 (None이면 오늘)
 
 
 class PreprocessSummary(TypedDict, total=False):

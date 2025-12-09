@@ -62,7 +62,7 @@ class RegulationRetrievalTool:
         resolved_prefer_grpc = (
             settings.QDRANT_PREFER_GRPC if prefer_grpc is None else prefer_grpc
         )
-        resolved_timeout = timeout or settings.QDRANT_TIMEOUT
+        resolved_timeout = timeout if timeout is not None else 60  # 60초 타임아웃
         resolved_vector_name = settings.QDRANT_VECTOR_NAME
         self.collection = collection or settings.QDRANT_COLLECTION
         self._retriever = retriever or HybridRetriever(

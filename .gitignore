@@ -60,3 +60,4 @@ Dockerfile*
 deploy/
 output/
 regulation_file/
+notebooks/
