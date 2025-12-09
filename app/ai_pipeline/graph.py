@@ -23,6 +23,49 @@ from app.ai_pipeline.nodes.validator import validator_node
 from app.ai_pipeline.nodes.score_impact import score_impact_node
 from app.ai_pipeline.nodes.report import report_node
 
+# 임베딩 노드 추가
+async def embedding_node(state: AppState) -> AppState:
+    """임베딩 노드: 변경 감지 결과에 따라 임베딩 수행."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info("📦 Embedding Node 시작")
+    
+    preprocess_results = state.get("preprocess_results", [])
+    if not preprocess_results:
+        logger.warning("⚠️ preprocess_results 없음 - 임베딩 스킵")
+        return state
+    
+    result = preprocess_results[0]
+    chunks = result.get("chunks", [])
+    graph_data = result.get("graph_data", {"nodes": [], "edges": []})
+    vision_results = result.get("vision_extraction_result", [])
+    
+    if not chunks:
+        logger.warning("⚠️ chunks 없음 - 임베딩 스킵")
+        return state
+    
+    # Dual Indexing 실행
+    from app.ai_pipeline.preprocess.semantic_processing import DualIndexer
+    from pathlib import Path
+    
+    indexer = DualIndexer()
+    regulation_id = result.get("regulation_id")
+    pdf_path = result.get("pdf_path", "unknown.pdf")
+    
+    index_summary = indexer.index(
+        chunks=chunks,
+        graph_data=graph_data,
+        source_file=Path(pdf_path).name,
+        regulation_id=regulation_id,
+        vision_results=vision_results
+    )
+    
+    state["dual_index_summary"] = index_summary
+    logger.info(f"✅ 임베딩 완료: {index_summary.get('qdrant_chunks', 0)}개 청크")
+    
+    return state
+
 # --------------------------------------------------------------
 # Validator → 다음 노드 결정
 # --------------------------------------------------------------
@@ -49,43 +92,53 @@ def _route_validation(state: AppState) -> str:
 
     return "ok"
 
-
-
 # --------------------------------------------------------------
 # Build Graph
 # --------------------------------------------------------------
-def build_graph():
+def build_graph(start_node: str = "preprocess"):
     graph = StateGraph(AppState)
 
     graph.add_node("preprocess",        preprocess_node)
     graph.add_node("detect_changes",    change_detection_node)
+    graph.add_node("embedding",         embedding_node)  # 임베딩 노드 추가
     graph.add_node("map_products",      map_products_node)
     graph.add_node("generate_strategy", generate_strategy_node)
     graph.add_node("score_impact",      score_impact_node)
-    graph.add_node("validator",         validator_node)    # node name OK
-    graph.add_node("report_node",       report_node)       # node_name만 변경
+    graph.add_node("validator",         validator_node)
+    graph.add_node("report_node",       report_node)
 
-    graph.set_entry_point("preprocess")
-
-    # preprocess → detect_changes
-    graph.add_edge("preprocess", "detect_changes")
-
-    # detect_changes → map_products | terminate
-    graph.add_conditional_edges(
+    # entry point can be overridden for reuse (e.g., start at map_products when
+    # preprocess/change_detection 결과를 재사용)
+    if start_node not in {
+        "preprocess",
         "detect_changes",
-        lambda state: "terminate"
-        if state.get("change_detection", {}).get("terminated")
-        else "proceed",
-        {
-            "terminate": END,
-            "proceed": "map_products",
-        }
-    )
+        "map_products",
+        "generate_strategy",
+        "score_impact",
+        "validator",
+        "report_node",
+    }:
+        raise ValueError(f"Invalid start_node: {start_node}")
+    graph.set_entry_point(start_node)
 
     # main flow
+    graph.add_edge("preprocess", "detect_changes")
     graph.add_edge("map_products",      "generate_strategy")
     graph.add_edge("generate_strategy", "score_impact")
     graph.add_edge("score_impact",      "validator")
+
+    # detect_changes → embedding (변경 감지 또는 신규) | map_products (변경 없음)
+    graph.add_conditional_edges(
+        "detect_changes",
+        lambda state: "embedding" if state.get("needs_embedding", False) else "skip_embedding",
+        {
+            "embedding": "embedding",
+            "skip_embedding": "map_products",
+        }
+    )
+    
+    # embedding → map_products
+    graph.add_edge("embedding", "map_products")
 
     # validator → validation only for 3 nodes
     graph.add_conditional_edges(
@@ -103,6 +156,4 @@ def build_graph():
     graph.add_edge("report_node", END)
 
     return graph.compile()
-
-
 

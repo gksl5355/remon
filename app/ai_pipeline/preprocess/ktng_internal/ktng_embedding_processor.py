@@ -11,6 +11,7 @@ dependencies:
 
 from typing import List, Dict, Any
 import logging
+import os
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -41,10 +42,10 @@ class KTNGEmbeddingProcessor:
         self.embedding_pipeline = EmbeddingPipeline(use_sparse=True)
         self.vector_client = VectorClient(collection_name=collection_name)
 
-        # 이중 저장을 위한 로컬 클라이언트 추가
-        self.local_client = VectorClient(
-            collection_name=collection_name, use_local=True
-        )
+        # # 로컬 클라이언트 (비활성화 - 서버 전용 모드)
+        # self.local_client = VectorClient(
+        #     collection_name=collection_name, use_local=True
+        # )
 
         # 처리된 파일 추적 (중복 방지)
         self.processed_files = set()
@@ -53,18 +54,18 @@ class KTNGEmbeddingProcessor:
         if reset_collection:
             try:
                 self.vector_client.delete_collection()
-                self.local_client.delete_collection()
+                # self.local_client.delete_collection()  # 비활성화
                 logger.info(f"✅ 기존 컬렉션 삭제: {collection_name}")
 
                 # 새 컬렉션 생성
                 self.vector_client._ensure_collection()
-                self.local_client._ensure_collection()
+                # self.local_client._ensure_collection()  # 비활성화
                 logger.info(f"✅ 새 컬렉션 생성: {collection_name}")
             except Exception as e:
                 logger.warning(f"⚠️ 컬렉션 초기화 실패: {e}")
 
         logger.info(
-            f"✅ KTNG 임베딩 프로세서 초기화: collection={collection_name} (이중 저장 모드, reset={reset_collection})"
+            f"✅ KTNG 임베딩 프로세서 초기화: collection={collection_name} (원격 전용 모드, reset={reset_collection})"
         )
 
     async def process_and_store(
@@ -142,7 +143,7 @@ class KTNGEmbeddingProcessor:
                     sparse_emb = metadata.pop("sparse_embedding", None)
                     sparse_for_insert.append(sparse_emb)
 
-            # Docker VectorDB에 저장
+            # 원격 VectorDB에 저장 (서버 전용 모드)
             self.vector_client.insert(
                 texts=texts,
                 dense_embeddings=dense_embeddings,
@@ -150,22 +151,21 @@ class KTNGEmbeddingProcessor:
                 sparse_embeddings=sparse_for_insert,
             )
 
-            # 로컬 VectorDB에도 저장 (이중 저장)
-            logger.info(f"  로컬 VectorDB 저장 중: {self.collection_name}")
-            self.local_client.insert(
-                texts=texts,
-                dense_embeddings=dense_embeddings,
-                metadatas=metadatas,
-                sparse_embeddings=sparse_for_insert,
-            )
+            # # 로컬 VectorDB 저장 (비활성화 - 서버 전용 모드)
+            # logger.info(f"  로컬 VectorDB 저장 중: {self.collection_name}")
+            # self.local_client.insert(
+            #     texts=texts,
+            #     dense_embeddings=dense_embeddings,
+            #     metadatas=metadatas,
+            #     sparse_embeddings=sparse_for_insert,
+            # )
 
             # 5. 결과 반환
             result = {
                 "status": "success",
                 "collection_name": self.collection_name,
-                "storage_mode": "dual (Docker + Local)",
-                "docker_path": "http://localhost:6333",
-                "local_path": "/home/minje/remon/data/qdrant",
+                "storage_mode": "remote",
+                "remote_url": os.getenv("QDRANT_URL", "https://localhost:6333"),
                 "processed_chunks": len(combined_chunks),
                 "embedding_dimension": (
                     len(dense_embeddings[0]) if dense_embeddings else 0
@@ -194,7 +194,7 @@ class KTNGEmbeddingProcessor:
             }
 
             logger.info(
-                f"✅ KTNG 임베딩 처리 완료: {len(combined_chunks)}개 청크 이중 저장 (Docker + 로컬)"
+                f"✅ KTNG 임베딩 처리 완료: {len(combined_chunks)}개 청크 원격 저장"
             )
 
             # 처리 완료된 파일 기록

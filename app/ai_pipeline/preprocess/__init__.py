@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Dict, List, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from app.ai_pipeline.state import AppState, PreprocessRequest, PreprocessSummary
 
@@ -70,6 +70,36 @@ async def _run_vision_orchestrator(
     return await asyncio.to_thread(orchestrator.process_pdf, pdf_path)
 
 
+def _resolve_pdf_paths(state: AppState) -> List[str]:
+    """
+    PDF 경로 결정 우선순위:
+    1. state["preprocess_request"]["pdf_paths"] (직접 지정)
+    2. state["preprocess_request"]["load_from_s3"] = True (S3 자동 로드)
+    3. 빈 리스트 (스킵)
+    """
+    request: PreprocessRequest | None = state.get("preprocess_request")
+    
+    if not request:
+        return []
+    
+    # 1. 직접 지정된 경로
+    pdf_paths = request.get("pdf_paths", [])
+    if pdf_paths:
+        return pdf_paths
+    
+    # 2. S3 자동 로드
+    if request.get("load_from_s3"):
+        from app.ai_pipeline.preprocess.s3_loader import load_today_regulations
+        
+        target_date = request.get("s3_date")  # YYYYMMDD or None
+        logger.info("📥 S3에서 오늘 날짜 규제 파일 자동 로드")
+        
+        s3_paths = load_today_regulations(target_date)
+        return s3_paths
+    
+    return []
+
+
 async def preprocess_node(state: AppState) -> AppState:
     """
     LangGraph preprocess node.
@@ -97,21 +127,10 @@ async def preprocess_node(state: AppState) -> AppState:
         state["dual_index_summary"]  # Vision Pipeline 사용 시
     """
 
-    request: PreprocessRequest | None = state.get("preprocess_request")
-
-    if not request:
-        logger.info("preprocess_node skipped – preprocess_request 없음")
-        summary: PreprocessSummary = {
-            "status": "skipped",
-            "processed_count": 0,
-            "succeeded": 0,
-            "failed": 0,
-            "reason": "preprocess_request missing",
-        }
-        state["preprocess_summary"] = summary
-        return state
-
-    pdf_paths: List[str] = request.get("pdf_paths", [])
+    # PDF 경로 결정 (직접 지정 또는 S3 자동 로드)
+    pdf_paths: List[str] = _resolve_pdf_paths(state)
+    
+    request: PreprocessRequest | None = state.get("preprocess_request") or {}
     if not pdf_paths:
         logger.info("preprocess_node skipped – pdf_paths 비어있음")
         summary = {
@@ -151,6 +170,23 @@ async def preprocess_node(state: AppState) -> AppState:
                 result = await _run_orchestrator(pdf_path)
             
             result.setdefault("pdf_path", pdf_path)
+            
+            # 🔥 DB에 저장하고 regulation_id 추가
+            if result.get("status") == "success" and use_vision:
+                from app.core.repositories.regulation_repository import RegulationRepository
+                from app.core.database import AsyncSessionLocal
+                
+                async with AsyncSessionLocal() as session:
+                    repo = RegulationRepository()
+                    try:
+                        regulation = await repo.create_from_vision_result(session, result)
+                        await session.commit()
+                        result["regulation_id"] = regulation.regulation_id
+                        logger.info(f"✅ DB 저장 완료: regulation_id={regulation.regulation_id}")
+                    except Exception as e:
+                        await session.rollback()
+                        logger.error(f"❌ DB 저장 실패: {e}")
+            
             processed_results.append(result)
             
             if result.get("status") == "success":
@@ -230,6 +266,8 @@ async def preprocess_node(state: AppState) -> AppState:
         if state.get("change_context"):
             logger.info("변경 감지 노드 실행")
             state = await change_detection_node(state)
+            # 그래프 단계에서 중복 실행되지 않도록 표시
+            state["change_detection_ran_inline"] = True
         else:
             logger.info("change_context 없음, 변경 감지 스킵")
 

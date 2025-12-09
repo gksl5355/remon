@@ -1,6 +1,11 @@
 """
-state.py
-LangGraph 전역 State 스키마 정의 – Production Minimal Version
+module: state.py
+description: LangGraph 전역 State 스키마 정의 – Production Minimal Version
+author: AI Agent
+created: 2025-01-18
+updated: 2025-12-09
+dependencies:
+    - typing
 """
 
 from typing import Any, Dict, List, Optional, TypedDict, Literal
@@ -17,6 +22,14 @@ class ProductMapping(TypedDict, total=False):
     present_state: Dict[str, Any]
 
 
+class MappingTarget(TypedDict, total=False):
+    """매핑 결과로 산출된 타깃 값 + 근거 위치."""
+
+    required_value: Any
+    chunk_id: Optional[str]
+    doc_id: Optional[str]
+
+
 class ProductInfo(TypedDict):
     product_id: str
     product_name: str
@@ -24,6 +37,7 @@ class ProductInfo(TypedDict):
     feature_units: Dict[str, str]
     country: Optional[str]
     category: Optional[str]
+    regulation_trace: Optional["RegulationTrace"]
 
 
 # ---------------------------------------------------------------------------
@@ -49,7 +63,7 @@ class RetrievalResult(TypedDict):
 # ---------------------------------------------------------------------------
 class MappingParsed(TypedDict):
     category: Optional[str]
-    requirement_type: Optional[str]  # "max" | "min" | "range" | "boolean" | "other"
+    requirement_type: Optional[str]  # "max" | "min" | "range" | "boolean" | "other" 
     condition: Optional[str]
 
 
@@ -72,7 +86,12 @@ class MappingItem(TypedDict):
 class MappingResults(TypedDict):
     product_id: str
     items: List[MappingItem]
-    targets: Dict[str, Dict[str, Any]]
+    targets: Dict[str, MappingTarget]
+    actionable_changes: List[Dict[str, Any]]
+    pending_changes: List[Dict[str, Any]]
+    unknown_requirements: List[Dict[str, Any]]
+    # change detection에 힌트가 없을 때, LLM 분류로 얻은 feature 재매핑 요청
+    recovered_feature_hints: List[str]
 
 
 class MappingDebugInfo(TypedDict, total=False):
@@ -80,6 +99,24 @@ class MappingDebugInfo(TypedDict, total=False):
 
     snapshot_path: str
     total_items: int
+
+
+class RegulationTraceEntry(TypedDict, total=False):
+    """map_products에서 regulation_trace로 축적하는 단일 레코드."""
+
+    feature: str
+    applied_value: Any
+    regulation_record_id: str  # chunk_id
+    mapping_score: Any
+    change_status: str  # "pending" | "applied"
+    evidence: Dict[str, Any]
+    regulation_info: Dict[str, Any]
+    updated_at: str
+
+
+class RegulationTrace(TypedDict, total=False):
+    trace: List[RegulationTraceEntry]
+    last_updated: str
 
 
 # ---------------------------------------------------------------------------
@@ -91,6 +128,8 @@ class PreprocessRequest(TypedDict, total=False):
     pdf_paths: List[str]
     skip_vectorstore: bool
     product_info: ProductInfo
+    load_from_s3: bool  # True이면 S3에서 오늘 날짜 파일 자동 로드
+    s3_date: Optional[str]  # YYYYMMDD 형식 (None이면 오늘)
 
 
 class PreprocessSummary(TypedDict, total=False):
@@ -175,6 +214,7 @@ class AppState(TypedDict, total=False):
     change_detection_results: List[Dict[str, Any]]  # 변경 감지 상세 결과
     change_summary: Dict[str, Any]  # 변경 감지 요약
     change_detection: Dict[str, Any]
+    regulation_analysis_hints: Dict[str, Any]  # 변경감지 노드가 매핑 노드에 전달하는 힌트
     
     # regulation info (매핑 노드 입력용)
     regulation: Dict[str, Any]  # 규제 정보 (매핑 노드가 사용)

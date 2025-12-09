@@ -11,7 +11,7 @@ import json
 import re
 import os
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from dotenv import load_dotenv
 
 from openai import OpenAI
@@ -19,6 +19,7 @@ from app.ai_pipeline.state import AppState
 
 # DB 연동
 from app.core.database import AsyncSessionLocal
+from sqlalchemy import text
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -93,14 +94,21 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
         "(빈값 대응) 전략 수립 데이터 부족"
     ]
 
-    product_rows = [
-        [
-            item.get("feature_name", ""),
-            item.get("product_name", ""),
-            f"현재: {item.get('current_value', '-')}, 필요: {item.get('required_value','-')}"
-        ]
-        for item in mapping_items
-    ]
+    # 중복 feature-row를 최소화하기 위해 (feature, product) 기준으로 dedupe
+    seen_rows = set()
+    product_rows = []
+    for item in mapping_items:
+        key = (item.get("feature_name", ""), item.get("product_name", ""))
+        if key in seen_rows:
+            continue
+        seen_rows.add(key)
+        product_rows.append(
+            [
+                item.get("feature_name", ""),
+                item.get("product_name", ""),
+                f"현재: {item.get('current_value', '-')}, 필요: {item.get('required_value','-')}",
+            ]
+        )
 
     references = []
     for item in mapping_items:
@@ -161,6 +169,45 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
 
 
 # -----------------------------
+# 알림 메시지/슬랙 전송 헬퍼
+# -----------------------------
+def build_report_notification(mapping: Dict[str, Any], product_name: str = "") -> str:
+    """변경 건수와 보고서 생성 완료 메시지를 단순 문자열로 생성."""
+    actionable = len(mapping.get("actionable_changes", []) or [])
+    pending = len(mapping.get("pending_changes", []) or [])
+    unknown = len(mapping.get("unknown_requirements", []) or [])
+    total = actionable + pending
+    prod = product_name or mapping.get("items", [{}])[0].get("product_name", "") or "unknown"
+    return (
+        f"[Report] product={prod} changes={total} (actionable={actionable}, pending={pending}, "
+        f"unknown={unknown} report generated.| global 17팀 대장 고서아")
+
+
+def send_slack_notification(message: str, webhook_url: Optional[str] = None) -> bool:
+    """
+    간단한 Slack Webhook 전송 헬퍼.
+    테스트 시 SLACK_WEBHOOK_URL 환경변수나 인자를 지정해야 하며,
+    실패해도 예외를 던지지 않고 False 반환.
+    """
+    import os
+    import requests
+
+    url = webhook_url or os.getenv("SLACK_WEBHOOK_URL")
+    if not url:
+        logger.warning("SLACK_WEBHOOK_URL 미설정 - 슬랙 전송 스킵")
+        return False
+    try:
+        resp = requests.post(url, json={"text": message}, timeout=5)
+        if resp.status_code >= 300:
+            logger.warning("Slack 전송 실패: status=%s body=%s", resp.status_code, resp.text)
+            return False
+        return True
+    except Exception as exc:
+        logger.warning("Slack 전송 예외: %s", exc)
+        return False
+
+
+# -----------------------------
 # 메인 Report Node
 # -----------------------------
 async def report_node(state: AppState) -> Dict[str, Any]:
@@ -168,6 +215,7 @@ async def report_node(state: AppState) -> Dict[str, Any]:
     mapping_items = state.get("mapping", {}).get("items", [])
     strategies = state.get("strategies", [])
     impact_score = (state.get("impact_scores") or [{}])[0]
+    regulation_trace = meta.get("regulation_trace")
 
     context_parts = [
         f"국가: {meta.get('country','')}, 지역: {meta.get('region','')}",
@@ -211,8 +259,21 @@ async def report_node(state: AppState) -> Dict[str, Any]:
             logger.info(f"Keynote 저장 완료: {keynote.keynote_id}")
 
             summary = await summary_repo.create_report_summary(db_session, sections)
+            # 규제 trace 저장
+            if regulation_trace:
+                pid = meta.get("product_id")
+                try:
+                    pid_int = int(pid)
+                except (TypeError, ValueError):
+                    logger.error("Invalid product_id for trace update: %s", pid)
+                else:
+                    await db_session.execute(
+                        text(
+                            "UPDATE products SET regulation_trace = :trace WHERE product_id = :pid"
+                        ),
+                        {"trace": json.dumps(regulation_trace), "pid": pid_int},
+                    )
             await db_session.commit()
-
             report_json["report_id"] = summary.summary_id
             logger.info(f"ReportSummary 저장 완료: {summary.summary_id}")
 

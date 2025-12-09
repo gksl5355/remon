@@ -24,6 +24,7 @@ FEATURE_UNIT_MAP: Dict[str, str] = {
     "certifying_agencies": "text", # New
     "revenue": "currency",       # New (Integer)
     "supply_partner": "text",    # New
+    "effective": "json"          # New (JSONB)
 }
 
 # Boolean 타입 컬럼 목록 업데이트
@@ -47,7 +48,8 @@ SELECT
     p.certifying_agencies,
     p.revenue,
     p.supply_partner,
-    p.country_code
+    p.country_code,
+    p.regulation_trace
 FROM products p
 """
 
@@ -147,6 +149,14 @@ class ProductRepository(BaseRepository[Product]):
         # 3. State.ProductInfo 형식 반환
         # export_country 컬럼이 사라지고 country_code가 직접 존재함
         country_code = row.get("country_code")
+        raw_trace = row.get("regulation_trace")
+        regulation_trace = (
+            raw_trace if isinstance(raw_trace, dict) else {}
+        )
+        if "trace" not in regulation_trace:
+            regulation_trace["trace"] = []
+        if "last_updated" not in regulation_trace:
+            regulation_trace["last_updated"] = None
         
         return {
             "product_id": str(row["product_id"]),
@@ -158,5 +168,5 @@ class ProductRepository(BaseRepository[Product]):
                 "present_state": features,
             },
             "feature_units": feature_units,
+            "regulation_trace": regulation_trace,
         }
-

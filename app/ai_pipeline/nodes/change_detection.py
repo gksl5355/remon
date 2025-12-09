@@ -12,7 +12,7 @@ dependencies:
 
 import json
 import logging
-from typing import Dict, Any, List, Optional, Literal
+from typing import Dict, Any, List, Optional, Literal, Set
 from openai import AsyncOpenAI
 
 from app.ai_pipeline.state import AppState
@@ -90,6 +90,38 @@ Return JSON array of matches:
 }
 """
 
+NEW_REGULATION_ANALYSIS_PROMPT = """You are a regulatory compliance expert analyzing a NEW regulation.
+
+**TASK:**
+Extract key requirements and identify affected product areas for compliance mapping.
+
+**INSTRUCTIONS:**
+1. Summarize the regulation's main purpose (1-2 sentences)
+2. Extract ALL key requirements:
+   - Numerical limits (e.g., "nicotine ≤ 20mg/ml")
+   - Mandatory features (e.g., "child-resistant packaging")
+   - Prohibited substances
+   - Labeling requirements
+   - Testing/certification requirements
+3. Identify affected product areas using normalized names:
+   - Use snake_case (e.g., "nicotine_content", "package_volume")
+   - Be specific (e.g., "warning_label_size" not just "labeling")
+
+**OUTPUT FORMAT (JSON):**
+{
+  "regulation_summary": "Brief 1-2 sentence summary",
+  "key_requirements": [
+    {
+      "requirement": "Descriptive name",
+      "value": "Specific value or limit",
+      "unit": "Unit if applicable (or null)",
+      "context": "When/where this applies"
+    }
+  ],
+  "affected_areas": ["snake_case_area_1", "snake_case_area_2"]
+}
+"""
+
 
 # ==================== Confidence Scorer ====================
 class ConfidenceScorer:
@@ -146,135 +178,156 @@ class ChangeDetectionNode:
         self.confidence_scorer = ConfidenceScorer()
 
     async def run(self, state: AppState, db_session=None) -> AppState:
-        """변경 감지 노드 실행 (Reference ID 기반)."""
+        """변경 감지 노드 실행 (짧은 DB 세션 사용)."""
         logger.info("=== Change Detection Node 시작 (Reference ID 기반) ===")
-        print("=== Change Detection Node 시작 (Reference ID 기반) ===")
         change_context = state.get("change_context", {})
         if not change_context:
             logger.info("change_context 없음, 변경 감지 스킵")
             state["change_detection_results"] = []
-            state["change_summary"] = {
-                "status": "skipped",
-                "reason": "no_change_context",
-            }
+            state["change_summary"] = {"status": "skipped", "reason": "no_change_context"}
             return state
 
-        # DB 세션 확인
-        if not db_session:
-            logger.error("db_session 없음")
-            state["change_detection_results"] = []
-            state["change_summary"] = {
-                "status": "error",
-                "reason": "no_db_session",
-            }
-            return state
-
-        # 신규 규제 ID
         new_regulation_id = change_context.get("new_regulation_id")
-        print(f"new_regulation_id: {new_regulation_id}")
-        if not new_regulation_id:
-            logger.error("new_regulation_id 없음")
-            state["change_detection_results"] = []
-            state["change_summary"] = {
-                "status": "error",
-                "reason": "no_new_regulation_id",
-            }
-            return state
 
-        # 신규 규제 DB에서 조회
-        from app.core.repositories.regulation_repository import RegulationRepository
-        repo = RegulationRepository()
-        new_regul_data = await repo.get_regul_data(db_session, new_regulation_id)
-        
+        # 우선순위: 1) change_context.new_regul_data 2) preprocess_results[0] 3) DB
+        new_regul_data = change_context.get("new_regul_data")
         if not new_regul_data:
-            logger.warning(f"신규 regul_data 없음: regulation_id={new_regulation_id}")
-            state["change_detection_results"] = []
-            state["change_summary"] = {"status": "error", "reason": "no_new_regul_data"}
-            return state
+            pre_results = state.get("preprocess_results") or []
+            if pre_results:
+                new_regul_data = pre_results[0]
+                if not new_regulation_id:
+                    new_regulation_id = (
+                        new_regul_data.get("regulation_id")
+                        or new_regul_data.get("regulation", {}).get("regulation_id")
+                        or "INLINE_NEW"
+                    )
 
-        # 신규 Reference Blocks 추출
-        new_ref_blocks = self._extract_reference_blocks(new_regul_data)
-
-
-        # Legacy 규제 식별
         legacy_regulation_id = change_context.get("legacy_regulation_id")
-        print(f"legacy_regulation_id: {legacy_regulation_id}")
-
-        # Legacy Reference Blocks 조회 (직접 제공 또는 DB 검색)
         legacy_regul_data = change_context.get("legacy_regul_data")
-        print(f"legacy_regul_data: {bool(legacy_regul_data)}")
 
-        if legacy_regul_data:
-            # JSON 직접 비교 모드: legacy_regul_data에서 추출
-            logger.info("Legacy 데이터 직접 사용 (JSON 비교 모드)")
-            print("Legacy 데이터 직접 사용 (JSON 비교 모드)")
-            legacy_ref_blocks = self._extract_reference_blocks(legacy_regul_data)
-            if not legacy_regulation_id:
-                legacy_regulation_id = "LEGACY"
-        else:
-            # DB 검색 모드
-            if not legacy_regulation_id:
-                legacy_regulation_id = await self._find_legacy_regulation_db(
-                    new_regul_data, db_session, new_regulation_id
-                )
-                print(f"legacy_regulation_id: {legacy_regulation_id}")
-                if not legacy_regulation_id:
-                    logger.info("완전히 새로운 규제로 처리")
-                    print("완전히 새로운 규제로 처리")
-                    state["change_detection_results"] = []
-                    state["change_summary"] = {
-                        "status": "new_regulation",
-                        "total_changes": 0,
-                    }
-                    return state
+        # DB가 필요한 경우에만 세션을 연다
+        if not new_regul_data or (not legacy_regul_data and legacy_regulation_id):
+            from app.core.repositories.regulation_repository import RegulationRepository
+            from app.core.database import AsyncSessionLocal
 
-            legacy_ref_blocks = await self._get_legacy_reference_blocks_db(
-                legacy_regulation_id, db_session
+            repo = RegulationRepository()
+            async with AsyncSessionLocal() as session:
+                if not new_regul_data:
+                    if not new_regulation_id:
+                        logger.error("new_regulation_id 없음")
+                        state["change_detection_results"] = []
+                        state["change_summary"] = {"status": "error", "reason": "no_new_regulation_id"}
+                        return state
+
+                    new_regul_data = await repo.get_regul_data(session, new_regulation_id)
+                    if not new_regul_data:
+                        logger.warning(f"신규 regul_data 없음: regulation_id={new_regulation_id}")
+                        state["change_detection_results"] = []
+                        state["change_summary"] = {"status": "error", "reason": "no_new_regul_data"}
+                        return state
+
+                if not legacy_regul_data:
+                    if not legacy_regulation_id:
+                        legacy_regulation_id = await self._find_legacy_regulation_db(
+                            new_regul_data, session, new_regulation_id
+                        )
+                        if not legacy_regulation_id:
+                            logger.info("완전히 새로운 규제로 처리")
+                            state["change_detection_results"] = []
+                            state["change_summary"] = {"status": "new_regulation", "total_changes": 0}
+                            return state
+
+                    legacy_regul_data = await repo.get_regul_data(session, legacy_regulation_id)
+                    if not legacy_regul_data:
+                        logger.warning(f"Legacy regul_data 없음: regulation_id={legacy_regulation_id}")
+                        state["change_detection_results"] = []
+                        state["change_summary"] = {"status": "error", "reason": "legacy_not_found"}
+                        return state
+                # end session block
+
+        # legacy_regulation_id 없지만 legacy_regul_data 주입된 경우 기본값 세팅
+        if legacy_regul_data and not legacy_regulation_id:
+            legacy_regulation_id = (
+                legacy_regul_data.get("regulation_id")
+                or legacy_regul_data.get("regulation", {}).get("regulation_id")
+                or "LEGACY"
             )
-            if not legacy_ref_blocks:
-                logger.warning(
-                    f"Legacy Reference Blocks 조회 실패: {legacy_regulation_id}"
-                )
-                state["change_detection_results"] = []
-                state["change_summary"] = {
-                    "status": "error",
-                    "reason": "legacy_not_found",
-                }
-                return state
+        # new_regulation_id 없을 때도 기본값 세팅
+        if not new_regulation_id:
+            new_regulation_id = (
+                new_regul_data.get("regulation_id")
+                or new_regul_data.get("regulation", {}).get("regulation_id")
+                or "INLINE_NEW"
+            )
 
-        logger.info(
-            f"Reference Blocks: 신규 {len(new_ref_blocks)}개, Legacy {len(legacy_ref_blocks)}개"
-        )
+        # ========== Reference Blocks 추출 (세션 불필요) ==========
+        new_ref_blocks = self._extract_reference_blocks(new_regul_data)
+        legacy_ref_blocks = self._extract_reference_blocks(legacy_regul_data)
+        
+        logger.info(f"Reference Blocks: 신규 {len(new_ref_blocks)}개, Legacy {len(legacy_ref_blocks)}개")
 
-        # CoT Step 1: Section 매칭 (LLM 1회 호출)
-        matched_pairs = await self._match_reference_blocks(
-            new_ref_blocks, legacy_ref_blocks
-        )
+        # ========== Section 매칭 (세션 불필요) ==========
+        matched_pairs = await self._match_reference_blocks(new_ref_blocks, legacy_ref_blocks)
         logger.info(f"Section 매칭 완료: {len(matched_pairs)}개 쌍")
 
-        # CoT Step 2-4: 변경 감지 (매칭된 쌍마다 LLM 호출)
+        # ========== LLM 변경 감지 (병렬 처리, 10개 단위) ==========
+        import asyncio
+        
+        semaphore = asyncio.Semaphore(10)  # LangSmith 부하 방지
+        
+        async def detect_single_pair(pair):
+            async with semaphore:
+                return await self._detect_change_by_ref_id(pair, new_regulation_id, legacy_regulation_id)
+        
+        logger.info(f"🔄 변경 감지 병렬 처리: {len(matched_pairs)}개 섹션 (10개 동시 제한)")
+        
+        detection_results_raw = await asyncio.gather(
+            *[detect_single_pair(pair) for pair in matched_pairs],
+            return_exceptions=True
+        )
+        
         detection_results = []
-        for pair in matched_pairs:
-            result = await self._detect_change_by_ref_id(
-                pair, new_regulation_id, legacy_regulation_id
-            )
+        for result in detection_results_raw:
+            if isinstance(result, Exception):
+                logger.error(f"❌ 변경 감지 실패: {result}")
+                continue
             if result:
                 detection_results.append(result)
 
         # 신뢰도 조정
         for result in detection_results:
-            result["confidence_score"] = self.confidence_scorer.adjust_confidence(
-                result
-            )
-            result["confidence_level"] = self.confidence_scorer.get_confidence_level(
-                result["confidence_score"]
-            )
+            result["confidence_score"] = self.confidence_scorer.adjust_confidence(result)
+            result["confidence_level"] = self.confidence_scorer.get_confidence_level(result["confidence_score"])
 
-        # 요약 생성
         total_changes = sum(1 for r in detection_results if r.get("change_detected"))
-        high_confidence = sum(
-            1 for r in detection_results if r.get("confidence_level") == "HIGH"
-        )
+        high_confidence = sum(1 for r in detection_results if r.get("confidence_level") == "HIGH")
+
+        # 상세 로그 출력
+        logger.info("\n" + "=" * 80)
+        logger.info("📋 변경 감지 상세 결과")
+        logger.info("=" * 80)
+        for idx, result in enumerate(detection_results, 1):
+            section = result.get("section_ref", "Unknown")
+            detected = result.get("change_detected", False)
+            confidence = result.get("confidence_level", "UNKNOWN")
+            change_type = result.get("change_type", "N/A")
+            
+            logger.info(f"\n[{idx}] Section: {section}")
+            logger.info(f"  변경 감지: {detected}")
+            logger.info(f"  신뢰도: {confidence} ({result.get('confidence_score', 0):.2f})")
+            logger.info(f"  변경 유형: {change_type}")
+            
+            if detected:
+                logger.info(f"  Legacy: {result.get('legacy_snippet', '')[:100]}...")
+                logger.info(f"  New: {result.get('new_snippet', '')[:100]}...")
+                
+                numerical = result.get("numerical_changes", [])
+                if numerical:
+                    logger.info(f"  수치 변경: {len(numerical)}개")
+                    for num_change in numerical[:3]:
+                        logger.info(f"    - {num_change.get('field')}: {num_change.get('legacy_value')} → {num_change.get('new_value')}")
+        
+        logger.info("\n" + "=" * 80)
 
         state["change_detection_results"] = detection_results
         state["change_summary"] = {
@@ -286,11 +339,13 @@ class ChangeDetectionNode:
             "new_regulation_id": new_regulation_id,
         }
 
-        logger.info(
-            f"✅ 변경 감지 완료: {total_changes}개 변경 감지 (HIGH: {high_confidence})"
-        )
-        print("node 끝")
-
+        logger.info(f"✅ 변경 감지 완료: {total_changes}개 변경 감지 (HIGH: {high_confidence})")
+        
+        # ========== 임베딩 필요 여부 플래그 ==========
+        needs_embedding = total_changes > 0
+        state["needs_embedding"] = needs_embedding
+        logger.info(f"📦 임베딩 필요: {needs_embedding}")
+        
         return state
 
     def _extract_reference_blocks(
@@ -298,126 +353,134 @@ class ChangeDetectionNode:
     ) -> List[Dict[str, Any]]:
         """regul_data에서 reference_blocks 추출 (Vision Pipeline 구조 대응)."""
         ref_blocks = []
-        
         # Vision Pipeline 출력 구조
         vision_pages = regul_data.get("vision_extraction_result", [])
-        
+
+        doc_id = (
+            regul_data.get("regulation_id")
+            or regul_data.get("regulation", {}).get("regulation_id")
+        )
+
         for page in vision_pages:
             structure = page.get("structure", {})
             page_num = page.get("page_num", 0)
             markdown_content = structure.get("markdown_content", "")
             reference_blocks = structure.get("reference_blocks", [])
-            
+
             # reference_blocks가 있으면 사용
             if reference_blocks:
                 lines = markdown_content.splitlines()
-                total_lines = len(lines)
                 for ref in reference_blocks:
-                    start = max(ref.get("start_line", 0), 0)
-                    end = ref.get("end_line", total_lines) or total_lines
-                    end = min(end, total_lines)
+                    start = max(0, ref.get("start_line", 0))
+                    end = ref.get("end_line", len(lines))
+                    if end <= start:
+                        end = min(len(lines), start + 20)
                     snippet = "\n".join(lines[start:end]) if lines else markdown_content
-                    
-                    ref_blocks.append({
-                        "section_ref": ref.get("section_ref", ""),
-                        "text": snippet,  # markdown_content에서 실제 텍스트 추출
-                        "keywords": ref.get("keywords", []),
-                        "page_num": page_num,
-                        "start_line": start,
-                        "end_line": end,
-                        "hierarchy": [],  # 계층 정보 (필요시 추가)
-                    })
+
+                    kw = ref.get("keywords") or self._extract_keywords(snippet)
+
+                    ref_blocks.append(
+                        {
+                            "section_ref": ref.get("section_ref", ""),
+                            "text": snippet,
+                            "keywords": kw,
+                            "page_num": page_num,
+                            "start_line": ref.get("start_line", 0),
+                            "end_line": ref.get("end_line", 0),
+                            "hierarchy": [],  # 계층 정보 (필요시 추가)
+                            "doc_id": doc_id,
+                            "meta_doc_id": doc_id,
+                        }
+                    )
             else:
                 # reference_blocks가 없으면 페이지 전체를 하나의 블록으로
-                ref_blocks.append({
-                    "section_ref": f"Page {page_num}",
-                    "text": markdown_content[:500],  # 처음 500자
-                    "keywords": self._extract_keywords(markdown_content),
-                    "page_num": page_num,
-                    "start_line": 0,
-                    "end_line": len(markdown_content.splitlines()),
-                    "hierarchy": [],
-                })
-        
+                ref_blocks.append(
+                    {
+                        "section_ref": f"Page {page_num}",
+                        "text": markdown_content[:500],  # 처음 500자
+                        "keywords": self._extract_keywords(markdown_content),
+                        "page_num": page_num,
+                        "start_line": 0,
+                        "end_line": len(markdown_content.splitlines()),
+                        "hierarchy": [],
+                        "doc_id": doc_id,
+                        "meta_doc_id": doc_id,
+                    }
+                )
+
         return ref_blocks
-    
+
     def _extract_keywords(self, text: str, max_keywords: int = 5) -> List[str]:
         """텍스트에서 키워드 추출 (간단한 토큰 기반)."""
         import re
-        
+
         if not text:
             return []
-        
+
         # 숫자 포함 단어 우선 (예: 20mg, § 1141.1)
-        numeric_words = re.findall(r'\b\w*\d+\w*\b', text)
-        
+        numeric_words = re.findall(r"\b\w*\d+\w*\b", text)
+
         # 대문자 시작 단어 (고유명사)
-        capitalized = re.findall(r'\b[A-Z][a-z]+\b', text)
-        
+        capitalized = re.findall(r"\b[A-Z][a-z]+\b", text)
+
         # 결합 및 중복 제거
         keywords = list(dict.fromkeys(numeric_words[:3] + capitalized[:3]))
-        
+
         return keywords[:max_keywords]
 
     async def _find_legacy_regulation_db(
         self, regul_data: Dict[str, Any], db_session, exclude_regulation_id: int = None
     ) -> Optional[int]:
-        """DB에서 Legacy 규제 검색."""
+        """DB에서 Legacy 규제 검색 (강화된 검색 로직 + Citation Code 정규화)."""
         if not regul_data:
+            logger.warning("regul_data가 None입니다")
             return None
 
-        title = regul_data.get("title", "")
-        country = regul_data.get("jurisdiction_code", "")
-        print(f"DB Legacy 검색: title={title}, country={country}")
-        logger.info(
-            f"DB Legacy 검색: title={title}, country={country}"
-        )
+        # vision_extraction_result에서 메타데이터 추출
+        vision_pages = regul_data.get("vision_extraction_result", [])
+        if not vision_pages:
+            logger.warning("vision_extraction_result가 비어있습니다")
+            return None
+        
+        first_page = vision_pages[0]
+        metadata = first_page.get("structure", {}).get("metadata", {})
+        
+        title = metadata.get("title", "")
+        country = metadata.get("jurisdiction_code", "")
+        citation_code = metadata.get("citation_code", "")
+        version = metadata.get("version", "")
+        effective_date = metadata.get("effective_date", "")
+        
+        # Citation Code 정규화 (하이픈 제거, 대문자 변환)
+        def normalize_citation(code: str) -> str:
+            if not code:
+                return ""
+            return code.upper().replace("-", "").replace(" ", "")
+        
+        normalized_citation = normalize_citation(citation_code)
+        
+        logger.info(f"DB Legacy 검색: title={title}, country={country}")
+        # noisy print 제거, logger로만 기록
 
         try:
             from app.core.repositories.regulation_repository import RegulationRepository
 
             repo = RegulationRepository()
-            print("_find_legacy_regulation_db 실행")
             regulation = await repo.find_by_title_and_country(
                 db_session, title, country, exclude_regulation_id
             )
 
             if regulation:
                 logger.info(f"DB Legacy 발견: regulation_id={regulation.regulation_id}")
-                print(f"DB Legacy 발견: regulation_id={regulation.regulation_id}")
                 return regulation.regulation_id
 
             logger.info("DB Legacy 미발견")
-            print("DB Legacy 미발견")
             return None
 
         except Exception as e:
             logger.error(f"DB Legacy 검색 실패: {e}")
             return None
 
-        
-    async def _get_legacy_reference_blocks_db(
-        self, regulation_id: int, db_session
-    ) -> List[Dict[str, Any]]:
-        """DB에서 Legacy regul_data 조회 후 Reference Blocks 추출."""
-        try:
-            from app.core.repositories.regulation_repository import RegulationRepository
-
-            repo = RegulationRepository()
-            regul_data = await repo.get_regul_data(db_session, regulation_id)
-
-            if not regul_data:
-                logger.warning(f"regul_data 없음: regulation_id={regulation_id}")
-                return []
-
-            ref_blocks = self._extract_reference_blocks(regul_data)
-            logger.info(f"DB Legacy Reference Blocks: {len(ref_blocks)}개")
-
-            return ref_blocks
-
-        except Exception as e:
-            logger.error(f"DB Legacy 조회 실패: {e}")
-            return []
 
 
     async def _match_reference_blocks(
@@ -425,7 +488,7 @@ class ChangeDetectionNode:
     ) -> List[Dict[str, Any]]:
         """
         CoT Step 1: 계층 구조 기반 정확 매칭 (밀림 현상 방지).
-        
+
         전략:
         1. 계층 구조 완전 일치 (hierarchy 배열 비교)
         2. section_ref 일치 (fallback)
@@ -439,16 +502,16 @@ class ChangeDetectionNode:
         # 전략 1: 계층 구조 완전 일치
         for new_block in new_blocks:
             new_hierarchy = new_block.get("hierarchy", [])
-            
+
             if not new_hierarchy:
                 continue
-            
+
             for idx, legacy_block in enumerate(legacy_blocks):
                 if idx in matched_legacy_indices:
                     continue
-                
+
                 legacy_hierarchy = legacy_block.get("hierarchy", [])
-                
+
                 # 계층 구조 완전 일치
                 if new_hierarchy == legacy_hierarchy:
                     matched_pairs.append(
@@ -461,21 +524,21 @@ class ChangeDetectionNode:
                     )
                     matched_legacy_indices.add(idx)
                     break
-        
+
         # 전략 2: section_ref 일치 (fallback)
         for new_block in new_blocks:
             # 이미 매칭된 경우 스킵
             if any(p["new_block"] == new_block for p in matched_pairs):
                 continue
-            
+
             new_section = new_block["section_ref"]
-            
+
             for idx, legacy_block in enumerate(legacy_blocks):
                 if idx in matched_legacy_indices:
                     continue
-                
+
                 legacy_section = legacy_block["section_ref"]
-                
+
                 if new_section == legacy_section:
                     matched_pairs.append(
                         {
@@ -487,38 +550,38 @@ class ChangeDetectionNode:
                     )
                     matched_legacy_indices.add(idx)
                     break
-        
+
         # 전략 3: 키워드 유사도 (fuzzy matching)
         for new_block in new_blocks:
             if any(p["new_block"] == new_block for p in matched_pairs):
                 continue
-            
+
             new_keywords = set(new_block.get("keywords", []))
-            
+
             if not new_keywords:
                 continue
-            
+
             best_match = None
             best_score = 0.0
-            
+
             for idx, legacy_block in enumerate(legacy_blocks):
                 if idx in matched_legacy_indices:
                     continue
-                
+
                 legacy_keywords = set(legacy_block.get("keywords", []))
-                
+
                 if not legacy_keywords:
                     continue
-                
+
                 # Jaccard 유사도
                 intersection = len(new_keywords & legacy_keywords)
                 union = len(new_keywords | legacy_keywords)
                 score = intersection / union if union > 0 else 0.0
-                
+
                 if score > best_score and score >= 0.5:  # 임계값
                     best_score = score
                     best_match = (idx, legacy_block)
-            
+
             if best_match:
                 idx, legacy_block = best_match
                 matched_pairs.append(
@@ -549,6 +612,8 @@ class ChangeDetectionNode:
         section_ref = new_block["section_ref"]
         new_text = new_block["text"]
         legacy_text = legacy_block["text"]
+        new_doc_id = new_block.get("doc_id")
+        legacy_doc_id = legacy_block.get("doc_id")
 
         # Reference ID 생성
         new_ref_id = (
@@ -594,6 +659,21 @@ class ChangeDetectionNode:
             result["section_ref"] = section_ref
             result["new_ref_id"] = new_ref_id
             result["legacy_ref_id"] = legacy_ref_id
+            result["doc_id"] = new_doc_id
+            result["meta_doc_id"] = new_doc_id
+            result.setdefault("new_snippet", new_text[:1000])
+            result.setdefault("legacy_snippet", legacy_text[:1000])
+
+            # 키워드/필드 보강 (검색/매핑 힌트용)
+            kw: Set[str] = set(result.get("keywords") or [])
+            kw |= set(self._extract_keywords(new_text, max_keywords=5))
+            kw |= set(self._extract_keywords(legacy_text, max_keywords=5))
+            for num_change in result.get("numerical_changes", []) or []:
+                field = num_change.get("field")
+                if field:
+                    kw.add(str(field))
+            if kw:
+                result["keywords"] = list(kw)
 
             return result
 
@@ -608,16 +688,64 @@ class ChangeDetectionNode:
                 "error": str(e),
             }
 
+    async def _analyze_new_regulation(
+        self, regul_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """신규 규제 분석 (Legacy 없을 때 LLM으로 핵심 요구사항 추출)."""
+        vision_pages = regul_data.get("vision_extraction_result", [])
+        if not vision_pages:
+            return {"regulation_summary": "", "key_requirements": [], "affected_areas": []}
+        
+        # 전체 텍스트 추출 (최대 5000자)
+        full_text = ""
+        for page in vision_pages[:10]:  # 최대 10페이지
+            markdown = page.get("structure", {}).get("markdown_content", "")
+            full_text += markdown + "\n\n"
+        
+        full_text = full_text[:5000]
+        
+        user_prompt = f"""**Regulation Text:**
+{full_text}
+"""
+        
+        try:
+            response = await self.llm.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "system", "content": NEW_REGULATION_ANALYSIS_PROMPT},
+                    {"role": "user", "content": user_prompt},
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.1,
+            )
+            
+            result = json.loads(response.choices[0].message.content)
+            return result
+        
+        except Exception as e:
+            logger.error(f"신규 규제 분석 실패: {e}")
+            return {"regulation_summary": "", "key_requirements": [], "affected_areas": []}
+
 
 # ==================== 노드 함수 ====================
 _default_node: Optional[ChangeDetectionNode] = None
 
 
-async def change_detection_node(state: AppState, db_session=None) -> AppState:
+async def change_detection_node(state: AppState, config: Dict[str, Any] = None) -> AppState:
+    """LangGraph 노드 엔트리포인트 (내부에서 짧은 세션 생성)."""
     global _default_node
     if _default_node is None:
         _default_node = ChangeDetectionNode()
-    return await _default_node.run(state, db_session)
+
+    # 중복 실행 방지: 이미 결과가 있고 강제 재실행이 아닌 경우 skip
+    if (
+        (state.get("change_detection_ran_inline") or state.get("change_detection_results"))
+        and not state.get("force_rerun_change_detection")
+    ):
+        logger.info("change_detection 이미 실행됨. 재실행 건너뜀.")
+        return state
+    
+    return await _default_node.run(state, db_session=None)
 
 
 __all__ = ["ChangeDetectionNode", "change_detection_node", "ConfidenceScorer"]

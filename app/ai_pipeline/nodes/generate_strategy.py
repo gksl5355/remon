@@ -45,29 +45,23 @@ from app.ai_pipeline.prompts.strategy_prompt import STRATEGY_PROMPT
 
 STRATEGY_HISTORY_COLLECTION = os.getenv(
     "QDRANT_STRATEGY_COLLECTION",
-    "remon_strategy_history",
+    "skala-2.4.17-strategy",
 )
-QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
-QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
 
 # history 검색 시 가져올 최대 개수
 HISTORY_TOP_K = 5
 
 
 #----------------------------------------------------------------------
-# 도구 인스턴스 (모듈 로드 시 1회 생성)
+# 도구 인스턴스 (모듈 로드 시 1회 생성) - 원격 서버 사용
 #----------------------------------------------------------------------
 
 retriever = HybridRetriever(
     default_collection=STRATEGY_HISTORY_COLLECTION,
-    host=QDRANT_HOST,
-    port=QDRANT_PORT,
 )
 
 history_tool = StrategyHistoryTool(
     collection=STRATEGY_HISTORY_COLLECTION,
-    host=QDRANT_HOST,
-    port=QDRANT_PORT,
 )
 
 
