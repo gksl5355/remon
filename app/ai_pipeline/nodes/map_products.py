@@ -746,12 +746,7 @@ class MappingNode:
                     filtered = [
                         cand for cand in ranked_candidates
                         if cand.get("chunk_id") == selected_id
-                    ]
-                    # 개선: Rerank 실패 시 전체가 아닌 최상위 1개만 사용
-                    ranked_candidates = filtered if filtered else ranked_candidates[:1]
-                else:
-                    # Rerank 자체가 실패한 경우도 최상위 1개만
-                    ranked_candidates = ranked_candidates[:1]
+                    ] or ranked_candidates
 
             # b) LLM 매핑 수행 (후보별 병렬)
             async def process_candidate(cand: RetrievedChunk):
@@ -830,6 +825,7 @@ class MappingNode:
                 return item
             
             # 후보별 병렬 처리
+            import asyncio
             candidate_results = await asyncio.gather(
                 *[process_candidate(cand) for cand in ranked_candidates],
                 return_exceptions=True
@@ -837,6 +833,7 @@ class MappingNode:
             return [r for r in candidate_results if not isinstance(r, Exception)]
         
         # feature별 병렬 처리
+        import asyncio
         feature_results = await asyncio.gather(
             *[process_feature(fname, fval) for fname, fval in feature_iterable],
             return_exceptions=True
