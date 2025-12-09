@@ -1,6 +1,11 @@
 """
-state.py
-LangGraph 전역 State 스키마 정의 – Production Minimal Version
+module: state.py
+description: LangGraph 전역 State 스키마 정의 – Production Minimal Version
+author: AI Agent
+created: 2025-01-18
+updated: 2025-12-09
+dependencies:
+    - typing
 """
 
 from typing import Any, Dict, List, Optional, TypedDict, Literal
@@ -209,6 +214,7 @@ class AppState(TypedDict, total=False):
     change_detection_results: List[Dict[str, Any]]  # 변경 감지 상세 결과
     change_summary: Dict[str, Any]  # 변경 감지 요약
     change_detection: Dict[str, Any]
+    regulation_analysis_hints: Dict[str, Any]  # 변경감지 노드가 매핑 노드에 전달하는 힌트
     
     # regulation info (매핑 노드 입력용)
     regulation: Dict[str, Any]  # 규제 정보 (매핑 노드가 사용)

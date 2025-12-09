@@ -1,6 +1,13 @@
 """
-map_products.py
-검색 TOOL + LLM 매핑 Node
+module: map_products.py
+description: 검색 TOOL + LLM 매핑 Node
+author: AI Agent
+created: 2025-01-18
+updated: 2025-12-09
+dependencies:
+    - openai
+    - app.ai_pipeline.tools.retrieval_tool
+    - app.core.repositories.product_repository
 """
 
 import asyncio
@@ -221,8 +228,7 @@ class MappingNode:
     ) -> Tuple[List[Tuple[str, Any]], List[str]]:
         """
         변경 힌트/복구 힌트가 있으면 해당 feature만 선택.
-        힌트가 있는데 매칭되는 feature가 없으면 unknown candidate로 기록.
-        힌트가 없으면 전수 검색을 피한다.
+        힌트가 없으면 전체 feature 매핑 (Legacy 있지만 변경 없는 경우 대응).
         """
         unknown: List[str] = []
         if not present_features:
@@ -233,16 +239,24 @@ class MappingNode:
             hints |= recovered_hints
 
         if hints:
+            # 힌트가 있으면 해당 feature만 선택
             filtered = [
                 (name, value)
                 for name, value in present_features.items()
                 if name in hints
             ]
             unknown = [hint for hint in hints if hint not in present_features]
+            logger.info(f"🎯 힌트 기반 매핑: {len(filtered)}개 feature 선택")
             return filtered, unknown
 
-        # 힌트가 없을 때는 전수 검색을 피하고, 추후 unknown 요구사항 알림용으로 빈 반환
-        return [], unknown
+        # 힌트가 없으면 전체 feature 매핑 (Legacy 있지만 변경 없는 경우)
+        all_features = [
+            (name, value)
+            for name, value in present_features.items()
+            if name != "feature_units"  # feature_units는 제외
+        ]
+        logger.info(f"🔍 전체 feature 매핑: {len(all_features)}개 feature")
+        return all_features, unknown
 
     async def _classify_change_requirement(
         self,
@@ -618,6 +632,7 @@ class MappingNode:
                     else:
                         logger.warning("retrieval tool 최종 실패 query=%s err=%s", q, exc)
                         return None
+            return None
 
         # run the combined query (base + change hint) once; retry on transient failures
         tool_result = await _search_with_retry(combined_query)
@@ -771,6 +786,11 @@ class MappingNode:
             extra_search_filters, change_search_filters, regulation_filters
         )
 
+        # ------------------------------------------------------
+        # change_detection 노드에서 받은 힌트 활용 (신규 규제 분석 결과)
+        # ------------------------------------------------------
+        regulation_hints = state.get("regulation_analysis_hints") or {}
+
         if self.debug_enabled:
             logger.info(
                 "🧭 Mapping start: product=%s name=%s features=%d top_k=%d alpha=%.2f",
@@ -780,36 +800,26 @@ class MappingNode:
                 self.top_k,
                 self.alpha,
             )
+            logger.info(f"📊 change_results: {len(change_results)}개")
+            logger.info(f"📊 change_scope: actionable={len(change_scope.get('actionable_results', []))}, pending={len(change_scope.get('pending_results', []))}, feature_hints={len(change_scope.get('feature_hints', set()))}")
+            logger.info(f"📊 regulation_hints: {bool(regulation_hints)}")
             if not present_features:
                 logger.info(
                     "💤 매핑 대상 특성이 없습니다. mapping.present_state나 target을 확인하세요."
                 )
-
-        # ------------------------------------------------------
-        # change 힌트가 비었거나 매칭 실패한 경우 LLM으로 feature 매칭 시도
-        # ------------------------------------------------------
-        sem = self._llm_semaphore or __import__("asyncio").Semaphore(8)
-        if not change_scope.get("feature_hints"):
-            for ch in (change_scope.get("actionable_results") or []) + (
-                change_scope.get("pending_results") or []
-            ):
-                classification = await self._classify_change_requirement(
-                    ch, present_features, sem
-                )
-                status = classification.get("match_status")
-                if status == "existing_feature" and classification.get("matched_feature"):
-                    recovered_hints.add(classification["matched_feature"])
-                else:
-                    unknown_requirements.append(
-                        {
-                            "reason": status or "ambiguous",
-                            "hint": classification.get("suggested_hint")
-                            or classification.get("matched_feature"),
-                            "section_ref": ch.get("section_ref"),
-                            "new_snippet": ch.get("new_snippet") or ch.get("new_text"),
-                            "legacy_snippet": ch.get("legacy_snippet") or ch.get("legacy_text"),
-                        }
-                    )
+        if regulation_hints and not change_scope.get("feature_hints"):
+            # 신규 규제 분석 결과에서 affected_areas를 feature_hints로 변환
+            affected_areas = regulation_hints.get("affected_areas", [])
+            for area in affected_areas:
+                normalized = self._normalize_token(area)
+                for norm_name, raw_name in {
+                    self._normalize_token(name): name for name in present_features.keys()
+                }.items():
+                    if normalized == norm_name or normalized in norm_name:
+                        recovered_hints.add(raw_name)
+            
+            if self.debug_enabled:
+                logger.info(f"🆕 신규 규제 힌트 활용: {len(recovered_hints)}개 feature 복구")
 
         feature_iterable, unknown_hints = self._select_features_for_mapping(
             present_features, change_scope, recovered_hints
