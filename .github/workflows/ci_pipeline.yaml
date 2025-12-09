@@ -1,0 +1,81 @@
+name: REMON CI Pipeline
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  ci-basic:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ------------------------------------------------------------
+      # 1. Repository Checkout
+      # ------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ------------------------------------------------------------
+      # 2. Versioning (자동 버전 증가)
+      #    - 이제 CI 실행 번호로 자동 버전 생성
+      #    - 실제 Docker build에서 사용 예정
+      # ------------------------------------------------------------
+      - name: Set VERSION
+        run: echo "VERSION=build-${{ github.run_number }}" >> $GITHUB_ENV
+
+      # ------------------------------------------------------------
+      # 3. Python 테스트 (아직 test 미완성 → 전체 주석 처리)
+      #    - 테스트 작성되면 아래 블록 주석 해제 가능
+      # ------------------------------------------------------------
+      # - name: Setup Python
+      #   uses: actions/setup-python@v4
+      #   with:
+      #     python-version: "3.11"
+      #
+      # - name: Install dependencies
+      #   run: |
+      #     if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      #
+      # - name: Run tests
+      #   run: |
+      #     if [ -d tests ]; then pytest -q; else echo "No tests found."; fi
+
+      # ------------------------------------------------------------
+      # 4. Docker Build & Push (추후 활성화 예정)
+      # ------------------------------------------------------------
+      # - name: Docker Login (Harbor)
+      #   uses: docker/login-action@v3
+      #   with:
+      #     registry: ${{ secrets.HARBOR_REGISTRY }}
+      #     username: ${{ secrets.HARBOR_ID }}
+      #     password: ${{ secrets.HARBOR_PW }}
+      #
+      # - name: Docker Build & Push
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: .
+      #     push: true
+      #     tags: |
+      #       ${{ secrets.HARBOR_REGISTRY }}/remon-api:${{ env.VERSION }}
+      #       ${{ secrets.HARBOR_REGISTRY }}/remon-api:latest
+
+      # ------------------------------------------------------------
+      # 5. Kubernetes Deploy (나중에 추가)
+      # ------------------------------------------------------------
+      # - name: Setup kubectl
+      #   uses: azure/setup-kubectl@v4
+      #
+      # - name: Deploy to Kubernetes
+      #   run: |
+      #     echo "TODO: 자동 배포 스크립트 예정"
+      #     # kubectl apply -f k8s/deployment.yaml
+
+      # ------------------------------------------------------------
+      # NOTE:
+      # 지금은 버전 생성 + Workflow 기본 골격만 구성됨.
+      # 추후:
+      #  - 테스트 코드 완성되면 테스트 블록 주석 해제
+      #  - Docker build/push 활성화
+      #  - k8s 자동 배포 활성화
+      # ------------------------------------------------------------
