@@ -1,0 +1,20 @@
+name: Test Action
+
+on:
+  push:
+    branches:
+      - rag_th
+  pull_request:
+    branches:
+      - rag_th
+
+jobs:
+  test-job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Print message
+        run: echo "GitHub Actions from rag_th!"
+
