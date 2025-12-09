@@ -339,7 +339,6 @@ class ChangeDetectionNode:
     ) -> List[Dict[str, Any]]:
         """regul_data에서 reference_blocks 추출 (Vision Pipeline 구조 대응)."""
         ref_blocks = []
-
         # Vision Pipeline 출력 구조
         vision_pages = regul_data.get("vision_extraction_result", [])
 

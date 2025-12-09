@@ -44,6 +44,71 @@ class ReportService:
             self.s3_client = None
 
     
+    async def get_all_summaries(self, db: AsyncSession) -> dict:
+        """
+        모든 리포트 요약 목록을 조회한다.
+        
+        Returns:
+            dict: {summary_id: {title, last_updated, sections}}
+        """
+        logger.info("Fetching all summaries")
+        
+        summaries = await self.repo.get_all(db)
+        result = {}
+        
+        for summary in summaries:
+            result[summary.summary_id] = {
+                "title": summary.summary_text[0].get("title", "제목 없음") if summary.summary_text else "제목 없음",
+                "last_updated": summary.created_at.strftime("%Y-%m-%d") if summary.created_at else "",
+                "sections": summary.summary_text
+            }
+        
+        return result
+    
+    
+    async def update_report(self, db: AsyncSession, summary_id: int, sections: list) -> dict | None:
+        """
+        리포트 요약의 sections를 업데이트한다.
+        
+        Returns:
+            dict | None: {title, last_updated, sections}
+        """
+        logger.info(f"Updating summary: summary_id={summary_id}")
+        
+        summary = await self.repo.get_by_summary_id(db, summary_id)
+        
+        if not summary:
+            return None
+        
+        await self.repo.update(db, summary_id, summary_text=sections)
+        await db.commit()
+        
+        from datetime import date
+        return {
+            "title": sections[0].get("title", "제목 없음") if sections else "제목 없음",
+            "last_updated": str(date.today()),
+            "sections": sections
+        }
+    
+    async def delete_report(self, db: AsyncSession, summary_id: int) -> bool:
+        """
+        리포트 요약을 삭제한다.
+        
+        Returns:
+            bool: 삭제 성공 여부
+        """
+        logger.info(f"Deleting summary: summary_id={summary_id}")
+        
+        summary = await self.repo.get_by_summary_id(db, summary_id)
+        
+        if not summary:
+            return False
+        
+        await self.repo.delete(db, summary_id)
+        await db.commit()
+        
+        return True
+    
     async def get_report_detail(self, db: AsyncSession, summary_id: int) -> dict | None:
         """
         리포트 상세 정보를 조회한다 (프론트 형식).
@@ -106,58 +171,6 @@ class ReportService:
         
         return {"report_id": None, "status": "pending"}
 
-    async def update_report(
-        self,
-        db: AsyncSession,
-        report_id: int,
-        update_data: dict
-    ) -> dict | None:
-        """
-        리포트 내용을 수정한다.
-
-        Args:
-            db (AsyncSession): 데이터베이스 세션.
-            report_id (int): 리포트 ID.
-            update_data (dict): 수정할 데이터.
-
-        Returns:
-            dict | None: 수정된 리포트 정보 또는 None.
-        """
-        logger.info(f"Updating report: report_id={report_id}")
-        
-        try:
-            async with db.begin():
-                updated = await self.repo.update(db, report_id, update_data)
-                if updated:
-                    await self.report_repo.invalidate_pdf_cache(db, report_id)
-                    logger.info(f"Report updated: report_id={report_id}")
-                    return {"report_id": updated.report_id, "status": "updated"}
-                return None
-        except Exception as e:
-            logger.error(f"Error updating report: {e}", exc_info=True)
-            return None
-
-    async def delete_report(self, db: AsyncSession, report_id: int) -> bool:
-        """
-        리포트를 삭제한다.
-
-        Args:
-            db (AsyncSession): 데이터베이스 세션.
-            report_id (int): 리포트 ID.
-
-        Returns:
-            bool: 삭제 성공 여부.
-        """
-        logger.info(f"Deleting report: report_id={report_id}")
-        
-        try:
-            async with db.begin():
-                success = await self.repo.delete(db, report_id)
-                logger.info(f"Report deleted: report_id={report_id}, success={success}")
-                return success
-        except Exception as e:
-            logger.error(f"Error deleting report: {e}", exc_info=True)
-            return False
 
     async def download_report(self, db: AsyncSession, report_id: int) -> Optional[bytes]:
         """
