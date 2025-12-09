@@ -220,8 +220,6 @@ async def run_full_pipeline():
     # 테스트용 하드코딩 설정
     new_s3_key = "skala2/skala-2.4.17/regulation/US/Regulation Data B (1).pdf"
     local_new_path = "/tmp/Regulation_Data_B.pdf"
-    legacy_citation_code = "FDA-21CFR-1114"  # Legacy 규제 식별용
-    product_id = 4  # 실제 존재하는 제품 ID (Esse, US)
 
     logger.info("=" * 80)
     logger.info("🚀 REMON AI Pipeline 전체 실행 시작")
@@ -236,28 +234,10 @@ async def run_full_pipeline():
         logger.error(f"❌ 파일 다운로드 실패: {e}")
         return
 
-    # Step 2: Legacy regulation_id DB 조회
-    logger.info("\n[Step 2] Legacy regulation_id DB 조회")
-    from app.core.repositories.regulation_repository import RegulationRepository
-
-    legacy_regulation_id = None
-    async with AsyncSessionLocal() as session:
-        repo = RegulationRepository()
-        try:
-            # citation_code로 Legacy 검색
-            legacy_reg = await repo.find_by_citation_code(
-                session, citation_code=legacy_citation_code
-            )
-            if legacy_reg:
-                legacy_regulation_id = legacy_reg.regulation_id
-                logger.info(f"  ✅ Legacy 발견: regulation_id={legacy_regulation_id}")
-            else:
-                logger.info(f"  ℹ️ Legacy 없음 (신규 규제로 처리)")
-        except Exception as e:
-            logger.warning(f"  ⚠️ Legacy 조회 실패: {e}")
-
-    # Step 3: LangGraph 파이프라인 실행 (preprocess부터)
-    logger.info("\n[Step 3] LangGraph 파이프라인 실행 (preprocess부터)")
+    # Step 2: LangGraph 파이프라인 실행 (DB 전체 제품 자동 처리)
+    logger.info("\n[Step 2] LangGraph 파이프라인 실행 (DB 전체 제품 자동 처리)")
+    logger.info("  ℹ️ Legacy 검색은 change_detection_node에서 자동 수행됩니다")
+    logger.info("  ℹ️ 제품 매핑은 map_products_node에서 DB 전체 제품을 자동 조회합니다")
 
     app = build_graph()
 
@@ -267,10 +247,8 @@ async def run_full_pipeline():
             "use_vision_pipeline": True,
             "enable_change_detection": True,
         },
-        "change_context": {
-            "legacy_regulation_id": legacy_regulation_id,
-        },
-        "mapping_filters": {"product_id": product_id},
+        "change_context": {},  # Legacy는 change_detection_node가 자동 검색
+        "mapping_filters": {},  # 빈 딕셔너리: map_products_node가 DB에서 자동 조회
         "validation_retry_count": 0,
     }
 
@@ -281,8 +259,8 @@ async def run_full_pipeline():
         logger.error(f"❌ 파이프라인 실행 실패: {e}", exc_info=True)
         return
 
-    # Step 4: 결과 출력
-    logger.info("\n[Step 4] 실행 결과 요약")
+    # Step 3: 결과 출력
+    logger.info("\n[Step 3] 실행 결과 요약")
     print_pipeline_summary(final_state)
 
     return final_state
