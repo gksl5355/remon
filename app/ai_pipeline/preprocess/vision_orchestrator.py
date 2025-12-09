@@ -136,9 +136,9 @@ class VisionOrchestrator:
         self.entity_extractor = EntityExtractor()
         self.graph_manager = GraphManager()
         
-    def process_pdf(self, pdf_path: str, use_parallel: bool = True, language_code: str = None) -> Dict[str, Any]:
+    async def process_pdf_async(self, pdf_path: str, use_parallel: bool = True, language_code: str = None) -> Dict[str, Any]:
         """
-        PDF 전체 처리 파이프라인.
+        PDF 전체 처리 파이프라인 (async).
         
         Args:
             pdf_path: PDF 파일 경로
@@ -162,7 +162,7 @@ class VisionOrchestrator:
                 from app.crawler.pdf_language_detector import detect_pdf_language
                 
                 logger.info("문서 언어 감지 중...")
-                lang_result = detect_pdf_language(pdf_path)
+                lang_result = await asyncio.to_thread(detect_pdf_language, pdf_path)
                 
                 if lang_result['success']:
                     language_code = lang_result['language_code'].lower()
@@ -181,10 +181,10 @@ class VisionOrchestrator:
             # Phase 1: Vision Ingestion
             if use_parallel and self.max_concurrency > 1:
                 # 비동기 병렬 처리
-                vision_results = asyncio.run(self._phase1_vision_ingestion_parallel(pdf_path))
+                vision_results = await self._phase1_vision_ingestion_parallel(pdf_path)
             else:
                 # 순차 처리 (기존 방식)
-                vision_results = self._phase1_vision_ingestion(pdf_path)
+                vision_results = await asyncio.to_thread(self._phase1_vision_ingestion, pdf_path)
             
             if not vision_results:
                 logger.warning("처리된 페이지가 없습니다.")
@@ -194,20 +194,21 @@ class VisionOrchestrator:
                 }
             
             # Phase 2: Semantic Processing
-            processing_results = self._phase2_semantic_processing(vision_results, pdf_path)
+            processing_results = await asyncio.to_thread(self._phase2_semantic_processing, vision_results, pdf_path)
             
             # Phase 3: Graph Building (선택적)
             if self.enable_graph:
-                graph_data = self._phase3_graph_building(vision_results)
+                graph_data = await asyncio.to_thread(self._phase3_graph_building, vision_results)
             else:
                 graph_data = {"nodes": [], "edges": []}
             
             # Phase 4: Dual Indexing
-            index_summary = self._phase4_dual_indexing(
+            index_summary = await asyncio.to_thread(
+                self._phase4_dual_indexing,
                 processing_results["chunks"],
                 graph_data,
                 Path(pdf_path).name,
-                vision_results=vision_results
+                vision_results
             )
             
             result = {
@@ -229,6 +230,14 @@ class VisionOrchestrator:
                 "status": "error",
                 "error": str(e)
             }
+    
+    def process_pdf(self, pdf_path: str, use_parallel: bool = True, language_code: str = None) -> Dict[str, Any]:
+        """
+        PDF 전체 처리 파이프라인 (동기 래퍼).
+        
+        Note: 이 메서드는 동기 컨텍스트에서 호출 시 사용. async 컨텍스트에서는 process_pdf_async() 사용.
+        """
+        return asyncio.run(self.process_pdf_async(pdf_path, use_parallel, language_code))
     
     def _phase1_vision_ingestion(self, pdf_path: str) -> List[Dict[str, Any]]:
         """
