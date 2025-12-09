@@ -94,14 +94,21 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
         "(빈값 대응) 전략 수립 데이터 부족"
     ]
 
-    product_rows = [
-        [
-            item.get("feature_name", ""),
-            item.get("product_name", ""),
-            f"현재: {item.get('current_value', '-')}, 필요: {item.get('required_value','-')}"
-        ]
-        for item in mapping_items
-    ]
+    # 중복 feature-row를 최소화하기 위해 (feature, product) 기준으로 dedupe
+    seen_rows = set()
+    product_rows = []
+    for item in mapping_items:
+        key = (item.get("feature_name", ""), item.get("product_name", ""))
+        if key in seen_rows:
+            continue
+        seen_rows.add(key)
+        product_rows.append(
+            [
+                item.get("feature_name", ""),
+                item.get("product_name", ""),
+                f"현재: {item.get('current_value', '-')}, 필요: {item.get('required_value','-')}",
+            ]
+        )
 
     references = []
     for item in mapping_items:

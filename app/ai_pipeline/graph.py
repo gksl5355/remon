@@ -52,7 +52,7 @@ def _route_validation(state: AppState) -> str:
 # --------------------------------------------------------------
 # Build Graph
 # --------------------------------------------------------------
-def build_graph():
+def build_graph(start_node: str = "preprocess"):
     graph = StateGraph(AppState)
 
     graph.add_node("preprocess",        preprocess_node)
@@ -63,7 +63,19 @@ def build_graph():
     graph.add_node("validator",         validator_node)    # node name OK
     graph.add_node("report_node",       report_node)       # node_name만 변경
 
-    graph.set_entry_point("preprocess")   
+    # entry point can be overridden for reuse (e.g., start at map_products when
+    # preprocess/change_detection 결과를 재사용)
+    if start_node not in {
+        "preprocess",
+        "detect_changes",
+        "map_products",
+        "generate_strategy",
+        "score_impact",
+        "validator",
+        "report_node",
+    }:
+        raise ValueError(f"Invalid start_node: {start_node}")
+    graph.set_entry_point(start_node)
 
     # main flow
     graph.add_edge("preprocess", "detect_changes")
@@ -99,6 +111,4 @@ def build_graph():
     graph.add_edge("report_node", END)
 
     return graph.compile()
-
-
 

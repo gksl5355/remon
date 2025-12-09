@@ -182,6 +182,16 @@ class RegulationRepository(BaseRepository[Regulation]):
         )
         row = result.fetchone()
         return row[0] if row else None
+
+    async def get_latest_regulation(
+        self, db: AsyncSession, exclude_id: Optional[int] = None
+    ) -> Optional[Regulation]:
+        """가장 최근 regulation 1개 반환 (exclude_id 제외 가능)."""
+        stmt = select(Regulation).order_by(Regulation.created_at.desc())
+        if exclude_id:
+            stmt = stmt.where(Regulation.regulation_id != exclude_id)
+        result = await db.execute(stmt)
+        return result.scalars().first()
     
     async def create_from_vision_result(
         self,
@@ -237,6 +247,27 @@ class RegulationRepository(BaseRepository[Regulation]):
         
         result = await db.execute(query)
         return result.scalar_one_or_none()
+
+    async def find_latest_and_previous_by_citation(
+        self,
+        db: AsyncSession,
+        citation_code: str,
+    ) -> tuple[Optional[Regulation], Optional[Regulation]]:
+        """
+        주어진 citation_code로 최신/이전 규제를 한 번에 조회한다.
+        반환: (latest, previous) — previous가 없을 수 있음.
+        """
+        query = (
+            select(Regulation)
+            .where(Regulation.citation_code == citation_code)
+            .order_by(Regulation.created_at.desc())
+            .limit(2)
+        )
+        result = await db.execute(query)
+        regs = result.scalars().all()
+        latest = regs[0] if len(regs) > 0 else None
+        previous = regs[1] if len(regs) > 1 else None
+        return latest, previous
     
 
     # 추가

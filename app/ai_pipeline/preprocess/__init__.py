@@ -249,6 +249,8 @@ async def preprocess_node(state: AppState) -> AppState:
         if state.get("change_context"):
             logger.info("변경 감지 노드 실행")
             state = await change_detection_node(state)
+            # 그래프 단계에서 중복 실행되지 않도록 표시
+            state["change_detection_ran_inline"] = True
         else:
             logger.info("change_context 없음, 변경 감지 스킵")
 
