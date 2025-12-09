@@ -214,7 +214,7 @@ async def run_full_pipeline():
     new_s3_key = "skala2/skala-2.4.17/regulation/US/Regulation Data B (1).pdf"
     local_new_path = "/tmp/Regulation_Data_B.pdf"
     legacy_citation_code = "FDA-21CFR-1114"  # Legacy 규제 식별용
-    product_id = 1  # 테스트용 제품 ID
+    product_id = 4  # 실제 존재하는 제품 ID (Esse, US)
 
     logger.info("=" * 80)
     logger.info("🚀 REMON AI Pipeline 전체 실행 시작")

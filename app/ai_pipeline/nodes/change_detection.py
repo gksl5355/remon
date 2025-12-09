@@ -146,61 +146,65 @@ class ChangeDetectionNode:
         self.confidence_scorer = ConfidenceScorer()
 
     async def run(self, state: AppState, db_session=None) -> AppState:
-        """변경 감지 노드 실행 (짧은 DB 세션 사용)."""
-        logger.info("=== Change Detection Node 시작 (Reference ID 기반) ===")
-        change_context = state.get("change_context", {})
-        if not change_context:
-            logger.info("change_context 없음, 변경 감지 스킵")
-            state["change_detection_results"] = []
-            state["change_summary"] = {"status": "skipped", "reason": "no_change_context"}
-            return state
-
-        new_regulation_id = change_context.get("new_regulation_id")
-        if not new_regulation_id:
-            logger.error("new_regulation_id 없음")
-            state["change_detection_results"] = []
-            state["change_summary"] = {"status": "error", "reason": "no_new_regulation_id"}
-            return state
-
-        # ========== DB 조회 (짧은 세션 생성) ==========
+        """변경 감지 노드 실행 (DB에서 신규/기존 규제 조회)."""
+        logger.info("=== Change Detection Node 시작 (DB 기반) ===")
+        
         from app.core.repositories.regulation_repository import RegulationRepository
         from app.core.database import AsyncSessionLocal
         
         repo = RegulationRepository()
         
-        # 짧은 세션으로 데이터 조회 후 즉시 종료
+        # ========== DB에서 신규 규제 조회 ==========
         async with AsyncSessionLocal() as session:
+            # 1. preprocess 결과에서 신규 regulation_id 추출
+            preprocess_results = state.get("preprocess_results", [])
+            if not preprocess_results:
+                logger.warning("⚠️ preprocess_results 없음 - 변경 감지 스킵")
+                state["change_detection_results"] = []
+                state["change_summary"] = {"status": "skipped", "reason": "no_preprocess_results"}
+                return state
+            
+            new_regulation_id = preprocess_results[0].get("regulation_id")
+            if not new_regulation_id:
+                logger.error("❌ preprocess_results에 regulation_id 없음")
+                state["change_detection_results"] = []
+                state["change_summary"] = {"status": "error", "reason": "no_regulation_id"}
+                return state
+            
+            logger.info(f"✅ 신규 규제 ID: {new_regulation_id}")
+            
+            # 2. DB에서 신규 규제 데이터 조회
             new_regul_data = await repo.get_regul_data(session, new_regulation_id)
             if not new_regul_data:
                 logger.warning(f"신규 regul_data 없음: regulation_id={new_regulation_id}")
                 state["change_detection_results"] = []
                 state["change_summary"] = {"status": "error", "reason": "no_new_regul_data"}
                 return state
-
+            
+            # 3. Legacy 규제 조회 (DB에서 자동 검색)
+            change_context = state.get("change_context", {})
             legacy_regulation_id = change_context.get("legacy_regulation_id")
-            legacy_regul_data = change_context.get("legacy_regul_data")
-
-            if legacy_regul_data:
-                logger.info("Legacy 데이터 직접 사용 (JSON 비교 모드)")
+            
+            if not legacy_regulation_id:
+                # DB에서 동일 citation_code의 이전 버전 찾기
+                legacy_regulation_id = await self._find_legacy_regulation_db(
+                    new_regul_data, session, new_regulation_id
+                )
                 if not legacy_regulation_id:
-                    legacy_regulation_id = "LEGACY"
-            else:
-                if not legacy_regulation_id:
-                    legacy_regulation_id = await self._find_legacy_regulation_db(
-                        new_regul_data, session, new_regulation_id
-                    )
-                    if not legacy_regulation_id:
-                        logger.info("완전히 새로운 규제로 처리")
-                        state["change_detection_results"] = []
-                        state["change_summary"] = {"status": "new_regulation", "total_changes": 0}
-                        return state
-
-                legacy_regul_data = await repo.get_regul_data(session, legacy_regulation_id)
-                if not legacy_regul_data:
-                    logger.warning(f"Legacy regul_data 없음: regulation_id={legacy_regulation_id}")
+                    logger.info("✅ 완전히 새로운 규제 (Legacy 없음)")
                     state["change_detection_results"] = []
-                    state["change_summary"] = {"status": "error", "reason": "legacy_not_found"}
+                    state["change_summary"] = {"status": "new_regulation", "total_changes": 0}
                     return state
+            
+            logger.info(f"✅ Legacy 규제 ID: {legacy_regulation_id}")
+            
+            # 4. DB에서 Legacy 규제 데이터 조회
+            legacy_regul_data = await repo.get_regul_data(session, legacy_regulation_id)
+            if not legacy_regul_data:
+                logger.warning(f"Legacy regul_data 없음: regulation_id={legacy_regulation_id}")
+                state["change_detection_results"] = []
+                state["change_summary"] = {"status": "error", "reason": "legacy_not_found"}
+                return state
 
         # ========== Reference Blocks 추출 (세션 불필요) ==========
         new_ref_blocks = self._extract_reference_blocks(new_regul_data)
