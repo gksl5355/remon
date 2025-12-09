@@ -146,135 +146,113 @@ class ChangeDetectionNode:
         self.confidence_scorer = ConfidenceScorer()
 
     async def run(self, state: AppState, db_session=None) -> AppState:
-        """변경 감지 노드 실행 (Reference ID 기반)."""
+        """변경 감지 노드 실행 (짧은 DB 세션 사용)."""
         logger.info("=== Change Detection Node 시작 (Reference ID 기반) ===")
-        print("=== Change Detection Node 시작 (Reference ID 기반) ===")
         change_context = state.get("change_context", {})
         if not change_context:
             logger.info("change_context 없음, 변경 감지 스킵")
             state["change_detection_results"] = []
-            state["change_summary"] = {
-                "status": "skipped",
-                "reason": "no_change_context",
-            }
+            state["change_summary"] = {"status": "skipped", "reason": "no_change_context"}
             return state
 
-        # DB 세션 확인
-        if not db_session:
-            logger.error("db_session 없음")
-            state["change_detection_results"] = []
-            state["change_summary"] = {
-                "status": "error",
-                "reason": "no_db_session",
-            }
-            return state
-
-        # 신규 규제 ID
         new_regulation_id = change_context.get("new_regulation_id")
-        print(f"new_regulation_id: {new_regulation_id}")
         if not new_regulation_id:
             logger.error("new_regulation_id 없음")
             state["change_detection_results"] = []
-            state["change_summary"] = {
-                "status": "error",
-                "reason": "no_new_regulation_id",
-            }
+            state["change_summary"] = {"status": "error", "reason": "no_new_regulation_id"}
             return state
 
-        # 신규 규제 DB에서 조회
+        # ========== DB 조회 (짧은 세션 생성) ==========
         from app.core.repositories.regulation_repository import RegulationRepository
-
+        from app.core.database import AsyncSessionLocal
+        
         repo = RegulationRepository()
-        new_regul_data = await repo.get_regul_data(db_session, new_regulation_id)
-
-        if not new_regul_data:
-            logger.warning(f"신규 regul_data 없음: regulation_id={new_regulation_id}")
-            state["change_detection_results"] = []
-            state["change_summary"] = {"status": "error", "reason": "no_new_regul_data"}
-            return state
-
-        # 신규 Reference Blocks 추출
-        new_ref_blocks = self._extract_reference_blocks(new_regul_data)
-
-        # Legacy 규제 식별
-        legacy_regulation_id = change_context.get("legacy_regulation_id")
-        print(f"legacy_regulation_id: {legacy_regulation_id}")
-
-        # Legacy Reference Blocks 조회 (직접 제공 또는 DB 검색)
-        legacy_regul_data = change_context.get("legacy_regul_data")
-        print(f"legacy_regul_data: {bool(legacy_regul_data)}")
-
-        if legacy_regul_data:
-            # JSON 직접 비교 모드: legacy_regul_data에서 추출
-            logger.info("Legacy 데이터 직접 사용 (JSON 비교 모드)")
-            print("Legacy 데이터 직접 사용 (JSON 비교 모드)")
-            legacy_ref_blocks = self._extract_reference_blocks(legacy_regul_data)
-            if not legacy_regulation_id:
-                legacy_regulation_id = "LEGACY"
-        else:
-            # DB 검색 모드
-            if not legacy_regulation_id:
-                legacy_regulation_id = await self._find_legacy_regulation_db(
-                    new_regul_data, db_session, new_regulation_id
-                )
-                print(f"legacy_regulation_id: {legacy_regulation_id}")
-                if not legacy_regulation_id:
-                    logger.info("완전히 새로운 규제로 처리")
-                    print("완전히 새로운 규제로 처리")
-                    state["change_detection_results"] = []
-                    state["change_summary"] = {
-                        "status": "new_regulation",
-                        "total_changes": 0,
-                    }
-                    return state
-
-            legacy_ref_blocks = await self._get_legacy_reference_blocks_db(
-                legacy_regulation_id, db_session
-            )
-            if not legacy_ref_blocks:
-                logger.warning(
-                    f"Legacy Reference Blocks 조회 실패: {legacy_regulation_id}"
-                )
+        
+        # 짧은 세션으로 데이터 조회 후 즉시 종료
+        async with AsyncSessionLocal() as session:
+            new_regul_data = await repo.get_regul_data(session, new_regulation_id)
+            if not new_regul_data:
+                logger.warning(f"신규 regul_data 없음: regulation_id={new_regulation_id}")
                 state["change_detection_results"] = []
-                state["change_summary"] = {
-                    "status": "error",
-                    "reason": "legacy_not_found",
-                }
+                state["change_summary"] = {"status": "error", "reason": "no_new_regul_data"}
                 return state
 
-        logger.info(
-            f"Reference Blocks: 신규 {len(new_ref_blocks)}개, Legacy {len(legacy_ref_blocks)}개"
-        )
+            legacy_regulation_id = change_context.get("legacy_regulation_id")
+            legacy_regul_data = change_context.get("legacy_regul_data")
 
-        # CoT Step 1: Section 매칭 (LLM 1회 호출)
-        matched_pairs = await self._match_reference_blocks(
-            new_ref_blocks, legacy_ref_blocks
-        )
+            if legacy_regul_data:
+                logger.info("Legacy 데이터 직접 사용 (JSON 비교 모드)")
+                if not legacy_regulation_id:
+                    legacy_regulation_id = "LEGACY"
+            else:
+                if not legacy_regulation_id:
+                    legacy_regulation_id = await self._find_legacy_regulation_db(
+                        new_regul_data, session, new_regulation_id
+                    )
+                    if not legacy_regulation_id:
+                        logger.info("완전히 새로운 규제로 처리")
+                        state["change_detection_results"] = []
+                        state["change_summary"] = {"status": "new_regulation", "total_changes": 0}
+                        return state
+
+                legacy_regul_data = await repo.get_regul_data(session, legacy_regulation_id)
+                if not legacy_regul_data:
+                    logger.warning(f"Legacy regul_data 없음: regulation_id={legacy_regulation_id}")
+                    state["change_detection_results"] = []
+                    state["change_summary"] = {"status": "error", "reason": "legacy_not_found"}
+                    return state
+
+        # ========== Reference Blocks 추출 (세션 불필요) ==========
+        new_ref_blocks = self._extract_reference_blocks(new_regul_data)
+        legacy_ref_blocks = self._extract_reference_blocks(legacy_regul_data)
+        
+        logger.info(f"Reference Blocks: 신규 {len(new_ref_blocks)}개, Legacy {len(legacy_ref_blocks)}개")
+
+        # ========== Section 매칭 (세션 불필요) ==========
+        matched_pairs = await self._match_reference_blocks(new_ref_blocks, legacy_ref_blocks)
         logger.info(f"Section 매칭 완료: {len(matched_pairs)}개 쌍")
 
-        # CoT Step 2-4: 변경 감지 (매칭된 쌍마다 LLM 호출)
+        # ========== LLM 변경 감지 (세션 불필요) ==========
         detection_results = []
         for pair in matched_pairs:
-            result = await self._detect_change_by_ref_id(
-                pair, new_regulation_id, legacy_regulation_id
-            )
+            result = await self._detect_change_by_ref_id(pair, new_regulation_id, legacy_regulation_id)
             if result:
                 detection_results.append(result)
 
         # 신뢰도 조정
         for result in detection_results:
-            result["confidence_score"] = self.confidence_scorer.adjust_confidence(
-                result
-            )
-            result["confidence_level"] = self.confidence_scorer.get_confidence_level(
-                result["confidence_score"]
-            )
+            result["confidence_score"] = self.confidence_scorer.adjust_confidence(result)
+            result["confidence_level"] = self.confidence_scorer.get_confidence_level(result["confidence_score"])
 
-        # 요약 생성
         total_changes = sum(1 for r in detection_results if r.get("change_detected"))
-        high_confidence = sum(
-            1 for r in detection_results if r.get("confidence_level") == "HIGH"
-        )
+        high_confidence = sum(1 for r in detection_results if r.get("confidence_level") == "HIGH")
+
+        # 상세 로그 출력
+        logger.info("\n" + "=" * 80)
+        logger.info("📋 변경 감지 상세 결과")
+        logger.info("=" * 80)
+        for idx, result in enumerate(detection_results, 1):
+            section = result.get("section_ref", "Unknown")
+            detected = result.get("change_detected", False)
+            confidence = result.get("confidence_level", "UNKNOWN")
+            change_type = result.get("change_type", "N/A")
+            
+            logger.info(f"\n[{idx}] Section: {section}")
+            logger.info(f"  변경 감지: {detected}")
+            logger.info(f"  신뢰도: {confidence} ({result.get('confidence_score', 0):.2f})")
+            logger.info(f"  변경 유형: {change_type}")
+            
+            if detected:
+                logger.info(f"  Legacy: {result.get('legacy_snippet', '')[:100]}...")
+                logger.info(f"  New: {result.get('new_snippet', '')[:100]}...")
+                
+                numerical = result.get("numerical_changes", [])
+                if numerical:
+                    logger.info(f"  수치 변경: {len(numerical)}개")
+                    for num_change in numerical[:3]:
+                        logger.info(f"    - {num_change.get('field')}: {num_change.get('legacy_value')} → {num_change.get('new_value')}")
+        
+        logger.info("\n" + "=" * 80)
 
         state["change_detection_results"] = detection_results
         state["change_summary"] = {
@@ -286,11 +264,7 @@ class ChangeDetectionNode:
             "new_regulation_id": new_regulation_id,
         }
 
-        logger.info(
-            f"✅ 변경 감지 완료: {total_changes}개 변경 감지 (HIGH: {high_confidence})"
-        )
-        print("node 끝")
-
+        logger.info(f"✅ 변경 감지 완료: {total_changes}개 변경 감지 (HIGH: {high_confidence})")
         return state
 
     def _extract_reference_blocks(
@@ -358,20 +332,30 @@ class ChangeDetectionNode:
     async def _find_legacy_regulation_db(
         self, regul_data: Dict[str, Any], db_session, exclude_regulation_id: int = None
     ) -> Optional[int]:
-        """DB에서 Legacy 규제 검색."""
+        """DB에서 Legacy 규제 검색 (vision_extraction_result 기반)."""
         if not regul_data:
+            logger.warning("regul_data가 None입니다")
             return None
 
-        title = regul_data.get("title", "")
-        country = regul_data.get("jurisdiction_code", "")
-        print(f"DB Legacy 검색: title={title}, country={country}")
+        # vision_extraction_result에서 메타데이터 추출
+        vision_pages = regul_data.get("vision_extraction_result", [])
+        if not vision_pages:
+            logger.warning("vision_extraction_result가 비어있습니다")
+            return None
+        
+        first_page = vision_pages[0]
+        metadata = first_page.get("structure", {}).get("metadata", {})
+        
+        title = metadata.get("title", "")
+        country = metadata.get("jurisdiction_code", "")
+        
         logger.info(f"DB Legacy 검색: title={title}, country={country}")
+        print(f"DB Legacy 검색: title={title}, country={country}")
 
         try:
             from app.core.repositories.regulation_repository import RegulationRepository
 
             repo = RegulationRepository()
-            print("_find_legacy_regulation_db 실행")
             regulation = await repo.find_by_title_and_country(
                 db_session, title, country, exclude_regulation_id
             )
@@ -387,30 +371,11 @@ class ChangeDetectionNode:
 
         except Exception as e:
             logger.error(f"DB Legacy 검색 실패: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
-    async def _get_legacy_reference_blocks_db(
-        self, regulation_id: int, db_session
-    ) -> List[Dict[str, Any]]:
-        """DB에서 Legacy regul_data 조회 후 Reference Blocks 추출."""
-        try:
-            from app.core.repositories.regulation_repository import RegulationRepository
 
-            repo = RegulationRepository()
-            regul_data = await repo.get_regul_data(db_session, regulation_id)
-
-            if not regul_data:
-                logger.warning(f"regul_data 없음: regulation_id={regulation_id}")
-                return []
-
-            ref_blocks = self._extract_reference_blocks(regul_data)
-            logger.info(f"DB Legacy Reference Blocks: {len(ref_blocks)}개")
-
-            return ref_blocks
-
-        except Exception as e:
-            logger.error(f"DB Legacy 조회 실패: {e}")
-            return []
 
     async def _match_reference_blocks(
         self, new_blocks: List[Dict[str, Any]], legacy_blocks: List[Dict[str, Any]]
@@ -605,11 +570,13 @@ class ChangeDetectionNode:
 _default_node: Optional[ChangeDetectionNode] = None
 
 
-async def change_detection_node(state: AppState, db_session=None) -> AppState:
+async def change_detection_node(state: AppState, config: Dict[str, Any] = None) -> AppState:
+    """LangGraph 노드 엔트리포인트 (내부에서 짧은 세션 생성)."""
     global _default_node
     if _default_node is None:
         _default_node = ChangeDetectionNode()
-    return await _default_node.run(state, db_session)
+    
+    return await _default_node.run(state, db_session=None)
 
 
 __all__ = ["ChangeDetectionNode", "change_detection_node", "ConfidenceScorer"]

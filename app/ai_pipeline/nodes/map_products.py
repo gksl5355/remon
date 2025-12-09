@@ -696,18 +696,17 @@ class MappingNode:
             present_features, change_scope
         )
 
-        # 🔥 feature별로 검색 TOOL → 매핑
-        for feature_name, present_value in feature_iterable:
+        # 🔥 feature별로 검색 TOOL → 매핑 (병렬 처리)
+        async def process_feature(feature_name: str, present_value: Any):
             unit = units.get(feature_name)
             target_value = target_state.get(feature_name)
 
-            # -----------------------------------------
             # a) 검색 TOOL 호출
-            # -----------------------------------------
             if self.debug_enabled:
                 logger.info(
                     "🔍 Searching feature=%s value=%s unit=%s",
                     feature_name,
+                    present_value,
                     unit or "-",
                 )
             retrieval: RetrievalResult = await self._run_search(
@@ -738,19 +737,15 @@ class MappingNode:
                     change_hint, ranked_candidates
                 )
                 if rerank_result and rerank_result.get("selected_point_id"):
-                    # rerank 결과의 point_id와 일치하는 후보를 우선 유지
                     selected_id = rerank_result["selected_point_id"]
                     ranked_candidates = [
                         cand
                         for cand in ranked_candidates
                         if cand.get("chunk_id") == selected_id
                     ] or ranked_candidates
-            # fallback: 기존 순서 유지
 
-            # -----------------------------------------
-            # b) LLM 매핑 수행
-            # -----------------------------------------
-            for cand in ranked_candidates:
+            # b) LLM 매핑 수행 (후보별 병렬)
+            async def process_candidate(cand: RetrievedChunk):
                 prompt = self._build_prompt(
                     feature_name,
                     present_value,
@@ -823,6 +818,48 @@ class MappingNode:
                         item["regulation_chunk_id"],
                         item["feature_name"],
                     )
+                return item
+            
+            # 후보별 병렬 처리
+            import asyncio
+            candidate_results = await asyncio.gather(
+                *[process_candidate(cand) for cand in ranked_candidates],
+                return_exceptions=True
+            )
+            return [r for r in candidate_results if not isinstance(r, Exception)]
+        
+        # feature별 병렬 처리
+        import asyncio
+        feature_results = await asyncio.gather(
+            *[process_feature(fname, fval) for fname, fval in feature_iterable],
+            return_exceptions=True
+        )
+        
+        # 결과 병합
+        for result in feature_results:
+            if isinstance(result, Exception):
+                logger.error(f"❌ Feature 처리 실패: {result}")
+                continue
+            if isinstance(result, list):
+                mapping_results.extend(result)
+                for item in result:
+                    if item["applies"]:
+                        feature_name = item["feature_name"]
+                        existing = mapping_targets.get(feature_name)
+                        has_req = item.get("required_value") is not None
+                        replace = False
+                        if existing is None:
+                            replace = True
+                        elif existing.get("required_value") is None and has_req:
+                            replace = True
+                        if replace:
+                            mapping_targets[feature_name] = {
+                                "required_value": item.get("required_value"),
+                                "chunk_id": item.get("regulation_chunk_id"),
+                                "doc_id": item.get("regulation_meta", {}).get(
+                                    "meta_doc_id"
+                                ),
+                            }
 
         # -----------------------------------------
         # c) 전역 State 업데이트

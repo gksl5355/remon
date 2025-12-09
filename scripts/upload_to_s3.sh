@@ -11,9 +11,9 @@ S3_PREFIX="skala2/skala-2.4.17/regulation/US"
 
 # 업로드할 파일들
 FILES=(
-    "/home/minje/remon/regulation_file/us/CFR-2023-title21-vol8-chapI-subchapK_20251204.pdf"
-    "/home/minje/remon/regulation_file/us/CFR-2024-title21-vol8-chapI-subchapK_20251205.pdf"
-    "/home/minje/remon/regulation_file/us/practice_us_20251205.pdf"
+    "/home/minje/remon/regulation_file/us/Regulation Data A (1).pdf"
+    "/home/minje/remon/regulation_file/us/Regulation Data B (1).pdf"
+
 )
 
 echo "🚀 S3 업로드 시작..."
