@@ -102,8 +102,8 @@ class DualIndexer:
             logger.info("✅ 원격 Qdrant 저장 완료")
             storage_locations.append("remote")
         except Exception as e:
-            logger.error(f"❌ 원격 Qdrant 저장 실패: {e}")
-            raise
+            logger.error(f"❌ 원격 Qdrant 저장 실패(무시하고 계속): {e}")
+            # 원격 저장 실패 시에도 파이프라인 진행
         
         # Graph 저장 (추후 구현)
         graph_summary = self._store_graph(graph_data)

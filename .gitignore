@@ -34,13 +34,12 @@ tmp/
 .cache/
 *.bak
 *.swp
-.github/
 alembic/
 alembic.ini
 # ============ AI Generated Files 작업용 ============
+.github/
 app/ai_pipeline/preprocess/demo
 .amazonq/
-.github
 docs/
 tests/
 uv.lock
@@ -49,6 +48,7 @@ data/*
 app/data/
 .uv-cache/
 *.pdf
+.github/copilot-instructions.md
 
 google-chrome-stable_current_amd64.deb
 
