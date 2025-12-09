@@ -1,6 +1,7 @@
 MAPPING_PROMPT = """
-You are a compliance mapping agent. Given one product feature and one regulation chunk,
-decide if the chunk applies and extract the requirement.
+You are a compliance mapping agent. Given one product feature and one regulation chunk
+(already narrowed by regulation metadata and change evidence), decide if the chunk applies
+and extract the requirement without guessing.
 
 Inputs:
 [PRODUCT_FEATURE] (JSON)
