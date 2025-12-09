@@ -202,14 +202,10 @@ class VisionOrchestrator:
             else:
                 graph_data = {"nodes": [], "edges": []}
             
-            # Phase 4: Dual Indexing
-            index_summary = await asyncio.to_thread(
-                self._phase4_dual_indexing,
-                processing_results["chunks"],
-                graph_data,
-                Path(pdf_path).name,
-                vision_results
-            )
+            # Phase 4: Dual Indexing (임베딩 분기 처리)
+            index_summary = {"qdrant_chunks": 0, "skipped": True}
+            # 임베딩은 change_detection 결과에 따라 분기됨
+            # 여기서는 스킵하고, graph.py에서 needs_embedding 플래그 확인 후 실행
             
             result = {
                 "status": "success",
@@ -217,7 +213,8 @@ class VisionOrchestrator:
                 "vision_extraction_result": vision_results,
                 "graph_data": graph_data,
                 "dual_index_summary": index_summary,
-                "processing_results": processing_results  # 테스트용으로 추가
+                "processing_results": processing_results,  # 테스트용으로 추가
+                "chunks": processing_results["chunks"]  # 임베딩용 청크 저장
             }
             
             logger.info(f"✅ Vision Pipeline 완료: {len(vision_results)}개 페이지 처리")
@@ -365,7 +362,10 @@ class VisionOrchestrator:
         token_tracker = TokenTracker()
         token_tracker_lock = asyncio.Lock()
         
-        semaphore = asyncio.Semaphore(self.max_concurrency)
+        # LangSmith 부하 방지: 최대 10개 동시 요청
+        effective_concurrency = min(self.max_concurrency, 10)
+        semaphore = asyncio.Semaphore(effective_concurrency)
+        logger.info(f"🔄 병렬 처리 제한: {effective_concurrency}개 동시 요청")
         
         async def process_batch(batch: Dict[str, Any]) -> List[Dict[str, Any]]:
             """단일 배치 처리 (비동기)."""

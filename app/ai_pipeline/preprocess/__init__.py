@@ -170,6 +170,23 @@ async def preprocess_node(state: AppState) -> AppState:
                 result = await _run_orchestrator(pdf_path)
             
             result.setdefault("pdf_path", pdf_path)
+            
+            # 🔥 DB에 저장하고 regulation_id 추가
+            if result.get("status") == "success" and use_vision:
+                from app.core.repositories.regulation_repository import RegulationRepository
+                from app.core.database import AsyncSessionLocal
+                
+                async with AsyncSessionLocal() as session:
+                    repo = RegulationRepository()
+                    try:
+                        regulation = await repo.create_from_vision_result(session, result)
+                        await session.commit()
+                        result["regulation_id"] = regulation.regulation_id
+                        logger.info(f"✅ DB 저장 완료: regulation_id={regulation.regulation_id}")
+                    except Exception as e:
+                        await session.rollback()
+                        logger.error(f"❌ DB 저장 실패: {e}")
+            
             processed_results.append(result)
             
             if result.get("status") == "success":
@@ -235,22 +252,6 @@ async def preprocess_node(state: AppState) -> AppState:
         success_count,
         fail_count,
     )
-
-    # 변경 감지 분기 (전처리 완료 후, 임베딩 전)
-    if (
-        use_vision
-        and all_vision_results
-        and request.get("enable_change_detection", False)
-    ):
-        logger.info("변경 감지 노드 실행 준비")
-        from app.ai_pipeline.nodes.change_detection import change_detection_node
-
-        # change_context가 제공되었는지 확인
-        if state.get("change_context"):
-            logger.info("변경 감지 노드 실행")
-            state = await change_detection_node(state)
-        else:
-            logger.info("change_context 없음, 변경 감지 스킵")
 
     return state
 
