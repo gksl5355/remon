@@ -14,7 +14,6 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from app.core.models.enums import ProductCategoryEnum
-from sqlalchemy.dialects.postgresql import JSONB
 
 
 class Product(Base):
@@ -45,4 +44,3 @@ class Product(Base):
     country = relationship("Country", back_populates="products")
     impact_scores = relationship("ImpactScore", back_populates="products")
     # reports = relationship("Report", back_populates="products")
-

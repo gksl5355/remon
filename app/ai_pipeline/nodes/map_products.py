@@ -66,6 +66,7 @@ class MappingNode:
         self.product_repository = product_repository or ProductRepository()
         self.debug_enabled = settings.MAPPING_DEBUG_ENABLED
         self.max_candidates_per_doc = max_candidates_per_doc
+        self._llm_semaphore = None
 
     # ----------------------------------------------------------------------
     # change detection 연계 유틸
@@ -216,21 +217,85 @@ class MappingNode:
         self,
         present_features: Dict[str, Any],
         change_scope: Dict[str, Any],
-    ) -> List[Tuple[str, Any]]:
+        recovered_hints: Optional[Set[str]] = None,
+    ) -> Tuple[List[Tuple[str, Any]], List[str]]:
+        """
+        변경 힌트/복구 힌트가 있으면 해당 feature만 선택.
+        힌트가 있는데 매칭되는 feature가 없으면 unknown candidate로 기록.
+        힌트가 없으면 전수 검색을 피한다.
+        """
+        unknown: List[str] = []
         if not present_features:
-            return []
+            return [], unknown
 
-        feature_hints: Set[str] = change_scope.get("feature_hints") or set()
-        if feature_hints:
+        hints: Set[str] = set(change_scope.get("feature_hints") or set())
+        if recovered_hints:
+            hints |= recovered_hints
+
+        if hints:
             filtered = [
                 (name, value)
                 for name, value in present_features.items()
-                if name in feature_hints
+                if name in hints
             ]
-            if filtered:
-                return filtered
+            unknown = [hint for hint in hints if hint not in present_features]
+            return filtered, unknown
 
-        return list(present_features.items())
+        # 힌트가 없을 때는 전수 검색을 피하고, 추후 unknown 요구사항 알림용으로 빈 반환
+        return [], unknown
+
+    async def _classify_change_requirement(
+        self,
+        change_hint: Dict[str, Any],
+        present_features: Dict[str, Any],
+        sem,
+    ) -> Dict[str, Any]:
+        """
+        change_detection 결과를 기반으로
+        - existing_feature: 우리 스펙에 있음 → matched_feature 반환
+        - new_requirement: 신규 요구 → 알림용 기록
+        - ambiguous: 불확실 → 알림용 기록
+        """
+        features_list = [
+            {"name": name, "unit": present_features.get("feature_units", {}).get(name), "value": val}
+            for name, val in present_features.items()
+            if name != "feature_units"
+        ]
+        prompt = {
+            "task": "classify_change_requirement",
+            "change_hint": {
+                "change_type": change_hint.get("change_type"),
+                "keywords": change_hint.get("keywords", []),
+                "numerical_changes": change_hint.get("numerical_changes", []),
+                "new_snippet": change_hint.get("new_snippet") or change_hint.get("new_text"),
+                "legacy_snippet": change_hint.get("legacy_snippet") or change_hint.get("legacy_text"),
+                "section_ref": change_hint.get("section_ref"),
+            },
+            "product_features": features_list,
+            "instructions": (
+                "Given the change hint and product feature list, decide whether it matches an existing feature."
+                " If not, mark as new_requirement. If unsure, mark ambiguous.\n"
+                "Output JSON only: "
+                "{\"match_status\": \"existing_feature\"|\"new_requirement\"|\"ambiguous\", "
+                "\"matched_feature\": \"name or null\", "
+                "\"reason\": \"string\", "
+                "\"suggested_hint\": \"string or null\"}"
+            ),
+        }
+        async with sem:
+            try:
+                res = await self.llm.chat.completions.create(
+                    model="gpt-5-nano",
+                    messages=[{"role": "user", "content": json.dumps(prompt, ensure_ascii=False)}],
+                )
+                return json.loads(res.choices[0].message.content)
+            except Exception:
+                return {
+                    "match_status": "ambiguous",
+                    "matched_feature": None,
+                    "reason": "llm_error",
+                    "suggested_hint": None,
+                }
 
     def _candidate_matches_change(
         self,
@@ -512,6 +577,8 @@ class MappingNode:
         extra_filters: Optional[Dict[str, Any]] = None,
         change_query: Optional[str] = None,
     ) -> RetrievalResult:
+        import asyncio
+
         product_id = product["product_id"]
         base_query = self._build_search_query(feature_name, feature_value, feature_unit)
         
@@ -525,16 +592,39 @@ class MappingNode:
         if extra_filters:
             filters.update(extra_filters)
 
-        try:
-            tool_result: RetrievalOutput = await self.search_tool.search(
-                query=combined_query,
+        async def _search_once(q: str) -> RetrievalOutput:
+            return await self.search_tool.search(
+                query=q,
                 strategy="hybrid",
                 top_k=self.top_k,
                 alpha=self.alpha,
                 filters=filters or None,
             )
-        except Exception as exc:
-            logger.warning("retrieval tool 호출 실패: %s", exc)
+
+        async def _search_with_retry(q: str) -> Optional[RetrievalOutput]:
+            for attempt in range(3):
+                try:
+                    return await _search_once(q)
+                except Exception as exc:
+                    if attempt < 2:
+                        backoff = 0.5 * (attempt + 1)
+                        logger.warning(
+                            "retrieval tool 실패 retry=%d query=%s err=%s",
+                            attempt + 1,
+                            q,
+                            exc,
+                        )
+                        await asyncio.sleep(backoff)
+                    else:
+                        logger.warning("retrieval tool 최종 실패 query=%s err=%s", q, exc)
+                        return None
+
+        tool_result = await _search_with_retry(query)
+        change_tool_result: Optional[RetrievalOutput] = None
+        if change_query:
+            change_tool_result = await _search_with_retry(change_query)
+
+        if tool_result is None:
             return RetrievalResult(
                 product_id=product_id,
                 feature_name=feature_name,
@@ -669,6 +759,8 @@ class MappingNode:
 
         mapping_results: List[MappingItem] = []
         mapping_targets: Dict[str, Dict[str, Any]] = {}
+        unknown_requirements: List[Dict[str, Any]] = []
+        recovered_hints: Set[str] = set()
 
         extra_search_filters = {
             key: value
@@ -695,9 +787,45 @@ class MappingNode:
                     "💤 매핑 대상 특성이 없습니다. mapping.present_state나 target을 확인하세요."
                 )
 
-        feature_iterable = self._select_features_for_mapping(
-            present_features, change_scope
+        # ------------------------------------------------------
+        # change 힌트가 비었거나 매칭 실패한 경우 LLM으로 feature 매칭 시도
+        # ------------------------------------------------------
+        sem = self._llm_semaphore or __import__("asyncio").Semaphore(8)
+        if not change_scope.get("feature_hints"):
+            for ch in (change_scope.get("actionable_results") or []) + (
+                change_scope.get("pending_results") or []
+            ):
+                classification = await self._classify_change_requirement(
+                    ch, present_features, sem
+                )
+                status = classification.get("match_status")
+                if status == "existing_feature" and classification.get("matched_feature"):
+                    recovered_hints.add(classification["matched_feature"])
+                else:
+                    unknown_requirements.append(
+                        {
+                            "reason": status or "ambiguous",
+                            "hint": classification.get("suggested_hint")
+                            or classification.get("matched_feature"),
+                            "section_ref": ch.get("section_ref"),
+                            "new_snippet": ch.get("new_snippet") or ch.get("new_text"),
+                            "legacy_snippet": ch.get("legacy_snippet") or ch.get("legacy_text"),
+                        }
+                    )
+
+        feature_iterable, unknown_hints = self._select_features_for_mapping(
+            present_features, change_scope, recovered_hints
         )
+        if unknown_hints:
+            unknown_requirements.extend(
+                [
+                    {
+                        "hint": hint,
+                        "reason": "change_detection_hint_not_in_product_features",
+                    }
+                    for hint in unknown_hints
+                ]
+            )
 
         # 🔥 feature별로 검색 TOOL → 매핑 (병렬 처리)
         async def process_feature(feature_name: str, present_value: Any):
@@ -781,7 +909,7 @@ class MappingNode:
                 if rerank_result:
                     regulation_meta["rerank"] = rerank_result
 
-                item = MappingItem(
+                return MappingItem(
                     product_id=product_id,
                     product_name=product_name,
                     feature_name=feature_name,
@@ -794,35 +922,7 @@ class MappingNode:
                     regulation_meta=regulation_meta,
                     parsed=parsed,
                 )
-                mapping_results.append(item)
-                # feature별 대표 target 요약: required_value가 있는 applies 항목을 우선 저장
-                if item["applies"]:
-                    existing = mapping_targets.get(feature_name)
-                    has_req = item.get("required_value") is not None
-                    replace = False
-                    if existing is None:
-                        replace = True
-                    elif existing.get("required_value") is None and has_req:
-                        replace = True
-                    if replace:
-                        mapping_targets[feature_name] = {
-                            "required_value": item.get("required_value"),
-                            "chunk_id": item.get("regulation_chunk_id"),
-                            "doc_id": item.get("regulation_meta", {}).get(
-                                "meta_doc_id"
-                            ),
-                        }
-
-                if self.debug_enabled:
-                    logger.info(
-                        "🧩 applies=%s required=%s current=%s chunk=%s (%s)",
-                        item["applies"],
-                        item["required_value"],
-                        item["current_value"],
-                        item["regulation_chunk_id"],
-                        item["feature_name"],
-                    )
-                return item
+                
             
             # 후보별 병렬 처리
             import asyncio
@@ -830,7 +930,21 @@ class MappingNode:
                 *[process_candidate(cand) for cand in ranked_candidates],
                 return_exceptions=True
             )
-            return [r for r in candidate_results if not isinstance(r, Exception)]
+            items: List[MappingItem] = []
+            for r in candidate_results:
+                if isinstance(r, Exception):
+                    continue
+                items.append(r)
+                if self.debug_enabled:
+                    logger.info(
+                        "🧩 applies=%s required=%s current=%s chunk=%s (%s)",
+                        r["applies"],
+                        r["required_value"],
+                        r["current_value"],
+                        r["regulation_chunk_id"],
+                        r["feature_name"],
+                    )
+            return items
         
         # feature별 병렬 처리
         import asyncio
@@ -883,12 +997,12 @@ class MappingNode:
             product_id=product_id,
             items=mapping_results,
             targets=mapping_targets,
+            actionable_changes=change_scope.get("actionable_results", []),
+            pending_changes=change_scope.get("pending_results", []),
+            unknown_requirements=unknown_requirements,
         )
         state["mapping"] = mapping_payload
         state["mapping_results"] = mapping_payload
-        state["mapping_targets"] = mapping_targets
-        state["mapping_actionable_changes"] = change_scope.get("actionable_results", [])
-        state["mapping_pending_changes"] = change_scope.get("pending_results", [])
         # regulation_trace 업데이트 (in-memory)
         trace_entries = self._build_trace_entries(mapping_results, regulation_meta)
         if trace_entries:
