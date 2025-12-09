@@ -3,7 +3,7 @@ module: run_full_pipeline.py
 description: REMON AI Pipeline 전체 실행 스크립트 (S3 PDF → 최종 리포트)
 author: AI Agent
 created: 2025-01-19
-updated: 2025-01-20
+updated: 2025-01-20 15:30 (LangSmith 트레이싱 추가)
 
 실행 방법:
     # Legacy 규제 전처리 (1회만)
@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.ai_pipeline.graph import build_graph
 from app.ai_pipeline.state import AppState
 from app.core.database import AsyncSessionLocal
+from langsmith import traceable
 
 # 로그 디렉토리 생성
 Path("logs").mkdir(exist_ok=True)
@@ -214,6 +215,7 @@ async def run_legacy_preprocessing():
     logger.info("=" * 80)
 
 
+@traceable(name="REMON_Full_Pipeline", run_type="chain")
 async def run_full_pipeline():
     """전체 파이프라인 실행 (LangGraph 방식)"""
 
