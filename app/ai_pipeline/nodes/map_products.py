@@ -634,6 +634,7 @@ class MappingNode:
                         return None
             return None
 
+        # run the combined query (base + change hint) once; retry on transient failures
         tool_result = await _search_with_retry(combined_query)
 
         if tool_result is None:
@@ -768,11 +769,11 @@ class MappingNode:
         change_scope = self._extract_change_scope(change_results, present_features)
         change_hint = self._choose_change_hint(change_scope)
         change_query = self._build_change_query(change_hint)
+        recovered_hints: Set[str] = set()
 
         mapping_results: List[MappingItem] = []
         mapping_targets: Dict[str, Dict[str, Any]] = {}
         unknown_requirements: List[Dict[str, Any]] = []
-        recovered_hints: Set[str] = set()
 
         extra_search_filters = {
             key: value
@@ -823,12 +824,13 @@ class MappingNode:
         feature_iterable, unknown_hints = self._select_features_for_mapping(
             present_features, change_scope, recovered_hints
         )
-        
         if self.debug_enabled:
-            logger.info(f"📋 선택된 feature: {len(feature_iterable)}개")
-            if feature_iterable:
-                logger.info(f"   Feature 목록: {[name for name, _ in feature_iterable[:5]]}...")
-        
+            logger.info(
+                "🔎 feature selection — hints=%s recovered=%s selected=%d",
+                list(change_scope.get("feature_hints") or []),
+                list(recovered_hints),
+                len(feature_iterable),
+            )
         if unknown_hints:
             unknown_requirements.extend(
                 [
@@ -884,10 +886,14 @@ class MappingNode:
                 )
                 if rerank_result and rerank_result.get("selected_point_id"):
                     selected_id = rerank_result["selected_point_id"]
-                    filtered = [
+                    ranked_candidates = [
                         cand for cand in ranked_candidates
                         if cand.get("chunk_id") == selected_id
                     ] or ranked_candidates
+
+            # rerank가 없거나 실패해도 중복 매핑을 피하기 위해 상위 1개만 사용
+            if ranked_candidates:
+                ranked_candidates = ranked_candidates[:1]
 
             # b) LLM 매핑 수행 (후보별 병렬)
             async def process_candidate(cand: RetrievedChunk):
