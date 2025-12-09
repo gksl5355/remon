@@ -3,6 +3,7 @@ map_products.py
 검색 TOOL + LLM 매핑 Node
 """
 
+import asyncio
 import json
 import logging
 from decimal import Decimal
@@ -186,7 +187,10 @@ class MappingNode:
                     continue
                 normalized_kw = self._normalize_token(kw)
                 for norm_name, raw_name in feature_key_map.items():
-                    if normalized_kw in norm_name or norm_name in normalized_kw:
+                    # 완전 일치 우선, 부분 일치는 보조
+                    if normalized_kw == norm_name:
+                        feature_hints.add(raw_name)
+                    elif normalized_kw in norm_name or norm_name in normalized_kw:
                         feature_hints.add(raw_name)
 
         return {
@@ -305,17 +309,22 @@ class MappingNode:
         return merged or None
 
     def _build_change_query(self, change_hint: Optional[Dict[str, Any]]) -> Optional[str]:
+        """변경 감지 힌트에서 핵심 키워드만 추출 (간결한 쿼리)."""
         if not change_hint:
             return None
         parts: List[str] = []
-        for key in ("new_snippet", "legacy_snippet", "new_text", "legacy_text"):
-            val = change_hint.get(key)
-            if isinstance(val, str) and val.strip():
-                parts.append(val.strip())
+        # 키워드 우선 (가장 핵심적)
         for kw in change_hint.get("keywords", []) or []:
-            if isinstance(kw, str):
-                parts.append(kw)
-        return " ".join(parts) if parts else None
+            if isinstance(kw, str) and kw.strip():
+                parts.append(kw.strip())
+        # 수치 변경 정보 추가
+        for num_change in change_hint.get("numerical_changes", []) or []:
+            for key in ("new_value", "field"):
+                val = num_change.get(key)
+                if isinstance(val, str) and val.strip():
+                    parts.append(val.strip())
+        # 최대 5개 토큰으로 제한 (과도한 쿼리 방지)
+        return " ".join(parts[:5]) if parts else None
 
     def _merge_candidate_lists(
         self,
@@ -504,28 +513,26 @@ class MappingNode:
         change_query: Optional[str] = None,
     ) -> RetrievalResult:
         product_id = product["product_id"]
-        query = self._build_search_query(feature_name, feature_value, feature_unit)
+        base_query = self._build_search_query(feature_name, feature_value, feature_unit)
+        
+        # 개선: Change query를 별도 검색하지 않고 결합 (1회 검색)
+        if change_query:
+            combined_query = f"{base_query} {change_query}"
+        else:
+            combined_query = base_query
+        
         filters = build_product_filters(product)
         if extra_filters:
             filters.update(extra_filters)
 
         try:
             tool_result: RetrievalOutput = await self.search_tool.search(
-                query=query,
+                query=combined_query,
                 strategy="hybrid",
                 top_k=self.top_k,
                 alpha=self.alpha,
                 filters=filters or None,
             )
-            change_tool_result: Optional[RetrievalOutput] = None
-            if change_query:
-                change_tool_result = await self.search_tool.search(
-                    query=change_query,
-                    strategy="hybrid",
-                    top_k=self.top_k,
-                    alpha=self.alpha,
-                    filters=filters or None,
-                )
         except Exception as exc:
             logger.warning("retrieval tool 호출 실패: %s", exc)
             return RetrievalResult(
@@ -550,10 +557,6 @@ class MappingNode:
             return converted
 
         candidates = _convert(tool_result)
-        if change_query and change_tool_result:
-            candidates = self._merge_candidate_lists(
-                candidates, _convert(change_tool_result)
-            )
 
         return RetrievalResult(
             product_id=product_id,
@@ -730,19 +733,25 @@ class MappingNode:
             ranked_candidates = retrieval["candidates"]
             rerank_result: Optional[Dict[str, Any]] = None
             if change_hint and ranked_candidates:
+                # 규칙 기반으로 상위 3개 선택
                 ranked_candidates = self._rule_rank_candidates(
                     ranked_candidates, change_hint, top_n=3
                 )
+                # LLM rerank로 최종 1개 선택
                 rerank_result = await self._rerank_candidates(
                     change_hint, ranked_candidates
                 )
                 if rerank_result and rerank_result.get("selected_point_id"):
                     selected_id = rerank_result["selected_point_id"]
-                    ranked_candidates = [
-                        cand
-                        for cand in ranked_candidates
+                    filtered = [
+                        cand for cand in ranked_candidates
                         if cand.get("chunk_id") == selected_id
-                    ] or ranked_candidates
+                    ]
+                    # 개선: Rerank 실패 시 전체가 아닌 최상위 1개만 사용
+                    ranked_candidates = filtered if filtered else ranked_candidates[:1]
+                else:
+                    # Rerank 자체가 실패한 경우도 최상위 1개만
+                    ranked_candidates = ranked_candidates[:1]
 
             # b) LLM 매핑 수행 (후보별 병렬)
             async def process_candidate(cand: RetrievedChunk):
@@ -821,7 +830,6 @@ class MappingNode:
                 return item
             
             # 후보별 병렬 처리
-            import asyncio
             candidate_results = await asyncio.gather(
                 *[process_candidate(cand) for cand in ranked_candidates],
                 return_exceptions=True
@@ -829,7 +837,6 @@ class MappingNode:
             return [r for r in candidate_results if not isinstance(r, Exception)]
         
         # feature별 병렬 처리
-        import asyncio
         feature_results = await asyncio.gather(
             *[process_feature(fname, fval) for fname, fval in feature_iterable],
             return_exceptions=True
