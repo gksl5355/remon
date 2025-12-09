@@ -17,6 +17,14 @@ class ProductMapping(TypedDict, total=False):
     present_state: Dict[str, Any]
 
 
+class MappingTarget(TypedDict, total=False):
+    """매핑 결과로 산출된 타깃 값 + 근거 위치."""
+
+    required_value: Any
+    chunk_id: Optional[str]
+    doc_id: Optional[str]
+
+
 class ProductInfo(TypedDict):
     product_id: str
     product_name: str
@@ -24,7 +32,7 @@ class ProductInfo(TypedDict):
     feature_units: Dict[str, str]
     country: Optional[str]
     category: Optional[str]
-    regulation_trace: Optional[Dict[str, Any]]
+    regulation_trace: Optional["RegulationTrace"]
 
 
 # ---------------------------------------------------------------------------
@@ -73,7 +81,12 @@ class MappingItem(TypedDict):
 class MappingResults(TypedDict):
     product_id: str
     items: List[MappingItem]
-    targets: Dict[str, Dict[str, Any]]
+    targets: Dict[str, MappingTarget]
+    actionable_changes: List[Dict[str, Any]]
+    pending_changes: List[Dict[str, Any]]
+    unknown_requirements: List[Dict[str, Any]]
+    # change detection에 힌트가 없을 때, LLM 분류로 얻은 feature 재매핑 요청
+    recovered_feature_hints: List[str]
 
 
 class MappingDebugInfo(TypedDict, total=False):
@@ -81,6 +94,24 @@ class MappingDebugInfo(TypedDict, total=False):
 
     snapshot_path: str
     total_items: int
+
+
+class RegulationTraceEntry(TypedDict, total=False):
+    """map_products에서 regulation_trace로 축적하는 단일 레코드."""
+
+    feature: str
+    applied_value: Any
+    regulation_record_id: str  # chunk_id
+    mapping_score: Any
+    change_status: str  # "pending" | "applied"
+    evidence: Dict[str, Any]
+    regulation_info: Dict[str, Any]
+    updated_at: str
+
+
+class RegulationTrace(TypedDict, total=False):
+    trace: List[RegulationTraceEntry]
+    last_updated: str
 
 
 # ---------------------------------------------------------------------------
