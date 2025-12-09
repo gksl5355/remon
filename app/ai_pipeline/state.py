@@ -184,3 +184,7 @@ class AppState(TypedDict, total=False):
     #validation
     validation_result: Optional[Dict[str, Any]]
     validation_retry_count: int = 0
+
+    # HITL (Human-in-the-Loop) feedback
+    hitl_target_node: Optional[Literal["map_products", "generate_strategy", "score_impact"]]
+    hitl_feedback_text: Optional[str]
