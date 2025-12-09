@@ -25,7 +25,7 @@ class PipelineRequest(BaseModel):
     product_id: Optional[int] = None
     legacy_regulation_id: Optional[int] = None
 
-
+#TODO 아래코드는 임시코드 ai파이프라인 실행시키는 코드 완성하기
 @router.post("/pipeline/run")
 async def run_pipeline(
     request: PipelineRequest,
