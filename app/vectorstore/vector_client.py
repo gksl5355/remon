@@ -82,16 +82,26 @@ class VectorClient:
 
         if use_local:
             self.client = QdrantClient(path=QDRANT_PATH)
+            self._use_requests = False
             logger.info(f"✅ Qdrant 로컬 모드: {QDRANT_PATH}")
         else:
-            # 원격 연결: URL 기반 (HTTPS 자동) + API Key 인증
+            # 원격 연결: QdrantClient + requests 병행 사용
             qdrant_url = os.getenv("QDRANT_URL", f"https://{QDRANT_HOST}")
             
-            # 원격 모드: requests 라이브러리 사용 (test_qdrant.py 방식)
+            # QdrantClient (검색용) - 타임아웃 60초로 증가
+            self.client = QdrantClient(
+                url=qdrant_url,
+                api_key=QDRANT_API_KEY,
+                timeout=60,  # 60초 타임아웃
+                prefer_grpc=False,
+                https=True,
+                verify=False  # SSL 검증 우회
+            )
+            
+            # requests (삽입용)
             self._use_requests = True
             self._base_url = qdrant_url
-            self.client = None  # 검색용으로만 사용
-            logger.info(f"✅ Qdrant 원격 모드 (requests, SSL verify=False): {qdrant_url}")
+            logger.info(f"✅ Qdrant 원격 모드 (SSL verify=False): {qdrant_url}")
         
         # 컬렉션 존재 확인
         logger.info(f"✅ 컬렉션 사용: {self.collection_name}")
@@ -160,8 +170,8 @@ class VectorClient:
                     timeout=30
                 )
                 resp.raise_for_status()
-            else:
-                # 로컬 모드는 기존 방식
+            elif self.client:
+                # 로컬 모드는 QdrantClient 사용
                 points_struct = [
                     PointStruct(
                         id=p["id"],
@@ -175,6 +185,8 @@ class VectorClient:
                     points=points_struct,
                     wait=True
                 )
+            else:
+                raise RuntimeError("Qdrant 클라이언트가 초기화되지 않았습니다")
             
             logger.info(
                 f"  ✅ 배치 {batch_start//batch_size + 1}/{(total + batch_size - 1)//batch_size}: {len(points)}개 삽입"
@@ -191,7 +203,7 @@ class VectorClient:
         hybrid_alpha: float = 0.7,
     ) -> Dict[str, Any]:
         """
-        하이브리드 검색 (dense + sparse).
+        하이브리드 검색 (dense + sparse) - REST API 사용.
 
         Args:
             query_dense: Dense 쿼리 벡터
@@ -203,8 +215,19 @@ class VectorClient:
         Returns:
             검색 결과 딕셔너리
         """
+        import requests
+        
+        # REST API 사용 (원격 모드)
+        if hasattr(self, '_use_requests') and self._use_requests:
+            return self._search_via_rest(
+                query_dense, query_sparse, top_k, filters, hybrid_alpha
+            )
+        
+        # 로컬 모드는 기존 방식
+        if not self.client:
+            raise RuntimeError("Qdrant 클라이언트가 초기화되지 않았습니다")
+        
         qdrant_filter = self._build_qdrant_filter(filters)
-        # Dense 검색
         dense_results = list(
             self.client.query_points(
                 collection_name=self.collection_name,
@@ -215,7 +238,7 @@ class VectorClient:
                 query_filter=qdrant_filter,
             )
         )
-        # Sparse 없으면 Dense만 반환
+        
         if not query_sparse:
             return {
                 "ids": [r.id for r in dense_results],
@@ -223,7 +246,7 @@ class VectorClient:
                 "metadatas": [r.payload for r in dense_results],
                 "scores": [r.score for r in dense_results],
             }
-        # Sparse 검색
+        
         sparse_vector = SparseVector(
             indices=list(query_sparse.keys()), values=list(query_sparse.values())
         )
@@ -241,6 +264,106 @@ class VectorClient:
         return self._combine_results(
             [dense_results, sparse_results], hybrid_alpha, top_k
         )
+    
+    def _search_via_rest(
+        self,
+        query_dense: List[float],
+        query_sparse: Optional[Dict[int, float]],
+        top_k: int,
+        filters: Optional[Dict[str, Any]],
+        hybrid_alpha: float,
+    ) -> Dict[str, Any]:
+        """REST API로 검색 (타임아웃 문제 해결)."""
+        import requests
+        
+        url = f"{self._base_url}/collections/{self.collection_name}/points/query"
+        headers = {"api-key": QDRANT_API_KEY, "Content-Type": "application/json"}
+        
+        # Dense 검색 (NumPy float32 → Python float 변환)
+        payload = {
+            "query": [float(x) for x in query_dense],
+            "using": "dense",
+            "limit": top_k,
+            "with_payload": True
+        }
+        
+        response = requests.post(
+            url, json=payload, headers=headers, verify=False, timeout=60
+        )
+        response.raise_for_status()
+        dense_results = response.json()["result"]["points"]
+        
+        # Sparse 없으면 Dense만 반환
+        if not query_sparse:
+            return {
+                "ids": [r["id"] for r in dense_results],
+                "documents": [r["payload"].get("text", "") for r in dense_results],
+                "metadatas": [r["payload"] for r in dense_results],
+                "scores": [r["score"] for r in dense_results],
+            }
+        
+        # Sparse 검색 (NumPy float32 → Python float 변환)
+        sparse_payload = {
+            "query": {
+                "indices": [int(k) for k in query_sparse.keys()],
+                "values": [float(v) for v in query_sparse.values()]
+            },
+            "using": "sparse",
+            "limit": top_k,
+            "with_payload": True
+        }
+        
+        response = requests.post(
+            url, json=sparse_payload, headers=headers, verify=False, timeout=60
+        )
+        response.raise_for_status()
+        sparse_results = response.json()["result"]["points"]
+        
+        # 하이브리드 결합
+        return self._combine_results_rest(
+            dense_results, sparse_results, hybrid_alpha, top_k
+        )
+    
+    def _combine_results_rest(
+        self, dense_results: List[Dict], sparse_results: List[Dict], 
+        alpha: float, top_k: int
+    ) -> Dict[str, Any]:
+        """하이브리드 결과 결합 (REST API 버전)."""
+        scores = {}
+        payloads = {}
+        dense_scores = {}
+        sparse_scores = {}
+        
+        for rank, result in enumerate(dense_results, 1):
+            rrf_score = alpha * (1 / (rank + 60))
+            doc_id = result["id"]
+            scores[doc_id] = scores.get(doc_id, 0) + rrf_score
+            dense_scores[doc_id] = result["score"]
+            payloads[doc_id] = result["payload"]
+        
+        for rank, result in enumerate(sparse_results, 1):
+            rrf_score = (1 - alpha) * (1 / (rank + 60))
+            doc_id = result["id"]
+            scores[doc_id] = scores.get(doc_id, 0) + rrf_score
+            sparse_scores[doc_id] = result["score"]
+            if doc_id not in payloads:
+                payloads[doc_id] = result["payload"]
+        
+        sorted_ids = sorted(scores.keys(), key=lambda x: scores[x], reverse=True)[:top_k]
+        
+        final_metadatas = []
+        for doc_id in sorted_ids:
+            metadata = payloads[doc_id].copy()
+            metadata["_dense_score"] = dense_scores.get(doc_id)
+            metadata["_sparse_score"] = sparse_scores.get(doc_id)
+            final_metadatas.append(metadata)
+        
+        return {
+            "ids": sorted_ids,
+            "documents": [payloads[id].get("text", "") for id in sorted_ids],
+            "metadatas": final_metadatas,
+            "scores": [scores[id] for id in sorted_ids],
+        }
 
     def _combine_results(
         self, batch_results: List[List], alpha: float, top_k: int
@@ -286,6 +409,8 @@ class VectorClient:
 
     def delete_collection(self) -> None:
         """컬렉션 삭제."""
+        if not self.client:
+            raise RuntimeError("Qdrant 클라이언트가 초기화되지 않았습니다")
         self.client.delete_collection(collection_name=self.collection_name)
         logger.info(f"✅ 컬렉션 삭제: {self.collection_name}")
 
@@ -314,6 +439,8 @@ class VectorClient:
 
     def get_collection_info(self) -> Dict[str, Any]:
         """컬렉션 정보 조회."""
+        if not self.client:
+            raise RuntimeError("Qdrant 클라이언트가 초기화되지 않았습니다")
         info = self.client.get_collection(collection_name=self.collection_name)
         return {
             "name": self.collection_name,
@@ -323,6 +450,8 @@ class VectorClient:
 
     def verify_storage(self, sample_size: int = 3) -> Dict[str, Any]:
         """저장 검증: Dense + Sparse + Metadata 확인."""
+        if not self.client:
+            return {"status": "error", "error": "Qdrant 클라이언트가 초기화되지 않음"}
         try:
             info = self.client.get_collection(collection_name=self.collection_name)
             scroll_result = self.client.scroll(
