@@ -3,7 +3,7 @@ module: run_full_pipeline.py
 description: REMON AI Pipeline 전체 실행 스크립트 (S3 PDF → 최종 리포트)
 author: AI Agent
 created: 2025-01-19
-updated: 2025-01-20
+updated: 2025-01-21 (함수 시그니처 통합: traceable + citation_code 파라미터)
 
 실행 방법:
     # Legacy 규제 전처리 (1회만)
@@ -31,6 +31,7 @@ from app.ai_pipeline.graph import build_graph
 from app.ai_pipeline.preprocess import preprocess_node
 from app.ai_pipeline.state import AppState
 from app.core.database import AsyncSessionLocal
+from langsmith import traceable
 from app.core.repositories.product_repository import ProductRepository
 
 # 로그 디렉토리 생성
@@ -218,39 +219,27 @@ async def run_legacy_preprocessing():
     logger.info("=" * 80)
 
 
+@traceable(name="REMON_Full_Pipeline", run_type="chain")
 async def run_full_pipeline(citation_code: str):
-    """전체 파이프라인 실행 (LangGraph 방식)"""
-
-    # 테스트용 하드코딩 설정
-    new_s3_key = "skala2/skala-2.4.17/regulation/US/Regulation Data B (1).pdf"
-    local_new_path = "/tmp/Regulation_Data_B.pdf"
-    legacy_citation_code = citation_code  # Legacy 규제 식별용 동일 citation 사용
+    """전체 파이프라인 실행 (S3 자동 로드 + LangGraph)"""
 
     logger.info("=" * 80)
     logger.info("🚀 REMON AI Pipeline 전체 실행 시작")
     logger.info("=" * 80)
 
-    # Step 1: S3에서 New 규제 PDF 다운로드
-    try:
-        logger.info("\n[Step 1] S3에서 New 규제 PDF 다운로드")
-        await download_pdf_from_s3(new_s3_key, local_new_path)
-        logger.info(f"   ✅ New: {local_new_path}")
-    except Exception as e:
-        logger.error(f"❌ 파일 다운로드 실패: {e}")
-        return
-
-    # Step 2: Legacy regulation_id DB 조회
-    logger.info("\n[Step 2] Legacy regulation_id DB 조회")
+    # Step 1: Legacy regulation_id DB 조회 (citation_code 기반)
+    logger.info("\n[Step 1] Legacy regulation_id DB 조회")
     from app.core.repositories.regulation_repository import RegulationRepository
     
     legacy_regulation_id = None
+    new_regulation_id = None
+    
     async with AsyncSessionLocal() as session:
         repo = RegulationRepository()
-        # Step 2: Legacy regulation_id DB 조회
         try:
             legacy_reg = await repo.find_by_citation_code(
                 session,
-                citation_code=legacy_citation_code,
+                citation_code=citation_code,
             )
             if legacy_reg:
                 legacy_regulation_id = legacy_reg.regulation_id
@@ -260,9 +249,10 @@ async def run_full_pipeline(citation_code: str):
         except Exception as e:
             logger.warning(f"  ⚠️ Legacy 조회 실패: {e}")
 
-        # Step 3: 최신/이전 규제 ID 결정 (DB 기준)
-        logger.info("\n[Step 3] 규제 ID 결정 (citation_code 기반)")
-        new_regulation_id = None
+    # Step 2: 최신/이전 규제 ID 결정 (DB 기준)
+    logger.info("\n[Step 2] 규제 ID 결정 (citation_code 기반)")
+    async with AsyncSessionLocal() as session:
+        repo = RegulationRepository()
         try:
             latest, previous = await repo.find_latest_and_previous_by_citation(
                 session, citation_code
@@ -278,63 +268,40 @@ async def run_full_pipeline(citation_code: str):
         except Exception as e:
             logger.warning(f"  ⚠️ 규제 ID 결정 실패: {e}")
 
-        # Step 4: 전처리(+변경 감지) 1회 실행 → 결과 재사용하여 제품별 매핑
-        logger.info("\n[Step 4] 전처리/변경 감지 1회 실행 → 결과 재사용하여 제품별 매핑")
+    # Step 3: 전체 파이프라인 실행 (S3 자동 로드 + 동적 필터링)
+    logger.info("\n[Step 3] 전체 파이프라인 실행")
+    logger.info("  ℹ️ S3에서 오늘 업로드된 파일 자동 로드 (skala2/skala-2.4.17/test)")
+    logger.info("  ℹ️ 전처리에서 추출한 국가 정보로 제품 자동 필터링")
+    logger.info("  ℹ️ Legacy 검색은 change_detection_node에서 자동 수행")
 
-        # 4-1. 전처리 1회 (enable_change_detection=True 이면 내부에서 변경 감지까지 수행)
-        base_state: AppState = {
-            "preprocess_request": {
-                "pdf_paths": [local_new_path],
-                "use_vision_pipeline": True,
-                "enable_change_detection": True,
-            },
-            "change_context": {
-                "legacy_regulation_id": legacy_regulation_id,
-                "new_regulation_id": new_regulation_id,
-            },
-            "validation_retry_count": 0,
-        }
-        base_state = await preprocess_node(base_state)
+    initial_state: AppState = {
+        "preprocess_request": {
+            "load_from_s3": True,  # S3 자동 로드 활성화
+            "s3_date": None,  # None이면 오늘 날짜
+            "use_vision_pipeline": True,
+            "enable_change_detection": True,
+            # pdf_paths 없음 → S3에서 자동 로드
+            # product_info 없음 → 국가 기반 동적 필터링
+        },
+        "change_context": {
+            "legacy_regulation_id": legacy_regulation_id,
+            "new_regulation_id": new_regulation_id,
+        },
+        "mapping_filters": {},  # 빈 딕셔너리: 국가 기반 자동 필터링
+        "validation_retry_count": 0,
+    }
 
-        # 제품 목록 조회 (별도 세션 사용)
-        product_ids = []
-        try:
-            async with AsyncSessionLocal() as product_session:
-                result = await product_session.execute(
-                    text("SELECT product_id FROM products ORDER BY product_id")
-                )
-                product_ids = [row[0] for row in result.fetchall()]
-        except Exception as e:
-            logger.error(f"제품 목록 조회 실패: {e}")
-            return
-
-        if not product_ids:
-            logger.error("제품이 없습니다. products 테이블을 확인하세요.")
-            return
-
-        # 제품별 매핑/전략/리포트만 실행하는 그래프
-        app = build_graph(start_node="map_products")
-
-        final_state = None
-        for pid in product_ids:
-            logger.info(f"▶️ 제품 {pid}에 대해 파이프라인 실행 (전처리 재사용)")
-            per_product_state: AppState = copy.deepcopy(base_state)
-            per_product_state.update(
-                {
-                    "mapping_filters": {"product_id": pid},
-                    "validation_retry_count": 0,
-                }
-            )
-
-            try:
-                final_state = await app.ainvoke(per_product_state, config={"configurable": {}})
-                logger.info(f"✅ 제품 {pid} 파이프라인 실행 완료")
-            except Exception as e:
-                logger.error(f"❌ 제품 {pid} 파이프라인 실행 실패: {e}", exc_info=True)
-                continue
+    app = build_graph()
+    
+    try:
+        final_state = await app.ainvoke(initial_state, config={"configurable": {}})
+        logger.info("✅ 전체 파이프라인 실행 완료")
+    except Exception as e:
+        logger.error(f"❌ 파이프라인 실행 실패: {e}", exc_info=True)
+        return
 
     if final_state:
-        logger.info("\n[Step 5] 실행 결과 요약 (마지막 제품 기준)")
+        logger.info("\n[Step 4] 실행 결과 요약")
         print_pipeline_summary(final_state)
 
     return final_state

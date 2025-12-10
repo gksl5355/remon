@@ -38,6 +38,7 @@ alembic/
 alembic.ini
 # ============ AI Generated Files 작업용 ============
 .github/
+.github
 app/ai_pipeline/preprocess/demo
 .amazonq/
 docs/
