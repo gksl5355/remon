@@ -3,7 +3,7 @@ module: state.py
 description: LangGraph 전역 State 스키마 정의 – Production Minimal Version
 author: AI Agent
 created: 2025-01-18
-updated: 2025-12-09
+updated: 2025-01-21 (누락된 State 키 추가: needs_embedding, change_detection_ran_inline)
 dependencies:
     - typing
 """
@@ -83,14 +83,13 @@ class MappingItem(TypedDict):
     parsed: MappingParsed
 
 
-class MappingResults(TypedDict):
+class MappingResults(TypedDict, total=False):
     product_id: str
     items: List[MappingItem]
     targets: Dict[str, MappingTarget]
     actionable_changes: List[Dict[str, Any]]
     pending_changes: List[Dict[str, Any]]
     unknown_requirements: List[Dict[str, Any]]
-    # change detection에 힌트가 없을 때, LLM 분류로 얻은 feature 재매핑 요청
     recovered_feature_hints: List[str]
 
 
@@ -215,11 +214,13 @@ class AppState(TypedDict, total=False):
     change_summary: Dict[str, Any]  # 변경 감지 요약
     change_detection: Dict[str, Any]
     regulation_analysis_hints: Dict[str, Any]  # 변경감지 노드가 매핑 노드에 전달하는 힌트
+    needs_embedding: bool  # 임베딩 필요 여부 (변경 감지 또는 신규 규제)
+    change_detection_ran_inline: bool  # preprocess에서 변경 감지 실행 여부 (중복 방지)
     
     # regulation info (매핑 노드 입력용)
     regulation: Dict[str, Any]  # 규제 정보 (매핑 노드가 사용)
     regulation_id: Optional[int]  # DB에 저장된 regulation_id
     
-    #validation
+    # validation
     validation_result: Optional[Dict[str, Any]]
-    validation_retry_count: int = 0
+    validation_retry_count: int

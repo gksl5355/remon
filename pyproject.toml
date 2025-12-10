@@ -7,6 +7,7 @@ requires-python = ">=3.11"
 # 공통 (API와 AI 모두 사용하는 가벼운 패키지)
 dependencies = [
   "loguru==0.7.2",
+ "lingua-language-detector==2.1.1",
   "python-dotenv>=1.2.1",
   "tornado<6.4",
   "pyjwt>=2.10.1",
