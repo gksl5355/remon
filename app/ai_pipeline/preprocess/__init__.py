@@ -158,9 +158,6 @@ async def preprocess_node(state: AppState) -> AppState:
     # Vision Pipeline 설정 (preprocess_request에서 가져오기)
     vision_config = request.get("vision_config") if use_vision else None
 
-    # Vision Pipeline 설정 (preprocess_request에서 가져오기)
-    vision_config = request.get("vision_config") if use_vision else None
-
     for pdf_path in pdf_paths:
         try:
             if use_vision:
@@ -262,23 +259,8 @@ async def preprocess_node(state: AppState) -> AppState:
         fail_count,
     )
 
-    # 변경 감지 분기 (전처리 완료 후, 임베딩 전)
-    if (
-        use_vision
-        and all_vision_results
-        and request.get("enable_change_detection", False)
-    ):
-        logger.info("변경 감지 노드 실행 준비")
-        from app.ai_pipeline.nodes.change_detection import change_detection_node
-
-        # change_context가 제공되었는지 확인
-        if state.get("change_context"):
-            logger.info("변경 감지 노드 실행")
-            state = await change_detection_node(state)
-            # 그래프 단계에서 중복 실행되지 않도록 표시
-            state["change_detection_ran_inline"] = True
-        else:
-            logger.info("change_context 없음, 변경 감지 스킵")
+    # NOTE: 변경 감지는 graph.py의 detect_changes 노드에서 실행됨
+    # preprocess는 데이터 전처리만 담당
 
     return state
 

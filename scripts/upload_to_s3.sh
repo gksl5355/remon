@@ -7,11 +7,11 @@ export $(grep '^AWS_' /home/minje/remon/.env | xargs)
 
 # S3 Access Point ARN
 ACCESS_POINT_ARN="arn:aws:s3:ap-northeast-2:881490135253:accesspoint/sk-team-storage"
-S3_PREFIX="skala2/skala-2.4.17/regulation/US"
+S3_PREFIX="skala2/skala-2.4.17/test/US"
 
 # 업로드할 파일들
 FILES=(
-    "/home/minje/remon/regulation_file/us/Regulation Data A (1).pdf"
+    # "/home/minje/remon/regulation_file/us/Regulation Data A (1).pdf"
     "/home/minje/remon/regulation_file/us/Regulation Data B (1).pdf"
 
 )
