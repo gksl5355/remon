@@ -94,30 +94,84 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
         "(빈값 대응) 전략 수립 데이터 부족"
     ]
 
-    # 중복 feature-row를 최소화하기 위해 (feature, product) 기준으로 dedupe
+    # product_name은 mapping에서 가져오기
+    product_name = mapping.get("product_name", "Unknown")
+    
+    # 중복 feature-row를 최소화하기 위해 feature 기준으로 dedupe
     seen_rows = set()
     product_rows = []
     for item in mapping_items:
-        key = (item.get("feature_name", ""), item.get("product_name", ""))
-        if key in seen_rows:
+        feature_name = item.get("feature_name", "")
+        if feature_name in seen_rows:
             continue
-        seen_rows.add(key)
+        seen_rows.add(feature_name)
+        
+        # reasoning은 이미 LLM에서 250자 이내로 생성됨
+        reasoning = item.get("reasoning", "")
+        
+        # required_value 표시 개선
+        required_value = item.get('required_value')
+        if required_value is None:
+            # reasoning에서 이유 추출
+            reasoning_lower = reasoning.lower()
+            if "not regulated" in reasoning_lower or "규제하지 않" in reasoning:
+                required_display = "규제 대상 아님"
+            elif "already compliant" in reasoning_lower or "충족" in reasoning:
+                required_display = "기준 충족"
+            elif "unrelated" in reasoning_lower or "무관" in reasoning or "비적용" in reasoning:
+                required_display = "해당 없음"
+            else:
+                required_display = "규제 없음"
+        else:
+            required_display = str(required_value)
+        
         product_rows.append(
             [
-                item.get("feature_name", ""),
-                item.get("product_name", ""),
-                f"현재: {item.get('current_value', '-')}, 필요: {item.get('required_value','-')}",
+                feature_name,
+                product_name,
+                f"현재: {item.get('current_value', '-')}, 필요: {required_display}",
+                reasoning,
             ]
         )
 
-    references = []
+    # 참고 문헌 생성 (regulation에서 추출, 중복 제거)
+    references_map = {}  # regulation_id를 키로 중복 제거
+    
     for item in mapping_items:
-        url = item.get("regulation_meta", {}).get("source_url")
+        chunk_id = item.get("regulation_chunk_id", "")
+        reg_id = chunk_id.split("-")[0] if "-" in chunk_id else chunk_id
+        
+        if not reg_id or reg_id in references_map:
+            continue
+        
+        # regulation 메타데이터에서 정보 추출
+        reg_meta = state.get("regulation", {})
+        title = reg_meta.get("title") or "규제 문서"
+        citation = reg_meta.get("citation_code")
+        url = reg_meta.get("source_url")
+        file_path = reg_meta.get("file_path")
+        effective_date = reg_meta.get("effective_date")
+        jurisdiction = reg_meta.get("jurisdiction_code") or reg_meta.get("country")
+        
+        # URL 또는 파일 경로 결정
         if url:
-            references.append({
-                "title": item.get("regulation_chunk_id", ""),
-                "url": url
-            })
+            link = url
+        elif file_path:
+            from pathlib import Path
+            link = f"파일: {Path(file_path).name}"
+        else:
+            link = "원문 링크 없음"
+        
+        references_map[reg_id] = {
+            "title": f"{citation} - {title}" if citation else title,
+            "url": link,
+            "citation": citation,
+            "effective_date": effective_date,
+            "jurisdiction": jurisdiction
+        }
+    
+    # 리스트로 변환
+    references = list(references_map.values())
 
     summary_content = [
         f"국가 / 지역: {meta.get('country', '')} ({meta.get('region', '')})",
@@ -130,39 +184,39 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
     return [
         {
             "id": "summary",
-            "title": "1. 규제 변경 요약",
             "type": "paragraph",
+            "title": "1. 규제 변경 요약",
             "content": summary_content
         },
         {
             "id": "products",
-            "title": "2. 영향받는 제품 목록",
             "type": "table",
-            "headers": ["규제항목", "제품명", "조치"],
+            "title": "2. 영향받는 제품 목록",
+            "headers": ["제품 속성", "제품명", "현재 vs 필요", "판단 근거"],
             "rows": product_rows
         },
         {
             "id": "changes",
-            "title": "3. 주요 변경 사항 해석",
             "type": "list",
+            "title": "3. 주요 변경 사항 해석",
             "content": major_analysis
         },
         {
             "id": "strategy",
-            "title": "4. 대응 전략 제안",
             "type": "list",
+            "title": "4. 대응 전략 제안",
             "content": strategy_steps
         },
         {
             "id": "reasoning",
-            "title": "5. 영향 평가 근거",
             "type": "paragraph",
+            "title": "5. 영향 평가 근거",
             "content": [impact_score.get("reasoning", "")]
         },
         {
             "id": "references",
-            "title": "6. 참고 및 원문 링크",
             "type": "links",
+            "title": "6. 참고 및 원문 링크",
             "content": references
         }
     ]
@@ -173,13 +227,11 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
 # -----------------------------
 def build_report_notification(mapping: Dict[str, Any], product_name: str = "") -> str:
     """변경 건수와 보고서 생성 완료 메시지를 단순 문자열로 생성."""
-    actionable = len(mapping.get("actionable_changes", []) or [])
-    pending = len(mapping.get("pending_changes", []) or [])
     unknown = len(mapping.get("unknown_requirements", []) or [])
-    total = actionable + pending
-    prod = product_name or mapping.get("items", [{}])[0].get("product_name", "") or "unknown"
+    total_items = len(mapping.get("items", []))
+    prod = product_name or mapping.get("product_name", "") or "unknown"
     return (
-        f"[Report] product={prod} changes={total} (actionable={actionable}, pending={pending}, "
+        f"[Report] product={prod} items={total_items} "
         f"unknown={unknown} report generated.| global 17팀 대장 고서아")
 
 

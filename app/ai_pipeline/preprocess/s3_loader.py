@@ -12,7 +12,7 @@ import logging
 import os
 import uuid
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -37,8 +37,6 @@ class S3RegulationLoader:
         Returns:
             S3 키 리스트 (예: ["skala2/skala-2.4.17/test/US/file.pdf"])
         """
-        from datetime import datetime, timezone
-        
         # 대상 날짜 (UTC 기준)
         if date:
             target_date = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
