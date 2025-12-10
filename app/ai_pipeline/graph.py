@@ -1,16 +1,13 @@
-#======================================================================
-#langGraph 주요 흐름
-#    preprocess → map_products → generate_strategy 
-#    → validate_strategy → score_impact → report
-# NOTE: 단일 파이프라인 구조이며, 유효성 검증 단계에서만 분기(conditional edge) 처리
+"""LangGraph 파이프라인 구성
 
-#규제 변동 감지 노드 추가 고려 
-#======================================================================
-#======================================================================
-# langGraph 주요 흐름
-#    preprocess → map_products → generate_strategy 
-#    → validator → score_impact → report
-#======================================================================
+흐름:
+    preprocess → detect_changes → [embedding] → map_products 
+    → generate_strategy → score_impact → validator → report
+
+분기 처리:
+    - detect_changes: 변경 감지 시 embedding 실행, 아니면 스킵
+    - validator: 실패 시 최대 1회 재시도 (map_products/generate_strategy/score_impact)
+"""
 
 from langgraph.graph import StateGraph, END
 from app.ai_pipeline.state import AppState
@@ -18,67 +15,28 @@ from app.ai_pipeline.state import AppState
 from app.ai_pipeline.preprocess import preprocess_node
 from app.ai_pipeline.nodes.map_products import map_products_node
 from app.ai_pipeline.nodes.change_detection import change_detection_node
+from app.ai_pipeline.nodes.embedding import embedding_node
 from app.ai_pipeline.nodes.generate_strategy import generate_strategy_node
 from app.ai_pipeline.nodes.validator import validator_node
 from app.ai_pipeline.nodes.score_impact import score_impact_node
 from app.ai_pipeline.nodes.report import report_node
 
-# 임베딩 노드 추가
-async def embedding_node(state: AppState) -> AppState:
-    """임베딩 노드: 변경 감지 결과에 따라 임베딩 수행."""
-    import logging
-    logger = logging.getLogger(__name__)
-    
-    logger.info("📦 Embedding Node 시작")
-    
-    preprocess_results = state.get("preprocess_results", [])
-    if not preprocess_results:
-        logger.warning("⚠️ preprocess_results 없음 - 임베딩 스킵")
-        return state
-    
-    result = preprocess_results[0]
-    chunks = result.get("chunks", [])
-    graph_data = result.get("graph_data", {"nodes": [], "edges": []})
-    vision_results = result.get("vision_extraction_result", [])
-    
-    if not chunks:
-        logger.warning("⚠️ chunks 없음 - 임베딩 스킵")
-        return state
-    
-    # Dual Indexing 실행
-    from app.ai_pipeline.preprocess.semantic_processing import DualIndexer
-    from pathlib import Path
-    
-    indexer = DualIndexer()
-    regulation_id = result.get("regulation_id")
-    pdf_path = result.get("pdf_path", "unknown.pdf")
-    
-    index_summary = indexer.index(
-        chunks=chunks,
-        graph_data=graph_data,
-        source_file=Path(pdf_path).name,
-        regulation_id=regulation_id,
-        vision_results=vision_results
-    )
-    
-    state["dual_index_summary"] = index_summary
-    logger.info(f"✅ 임베딩 완료: {index_summary.get('qdrant_chunks', 0)}개 청크")
-    
-    return state
-
 # --------------------------------------------------------------
 # Validator → 다음 노드 결정
 # --------------------------------------------------------------
 def _route_validation(state: AppState) -> str:
+    """
+    Validator 결과에 따라 다음 노드 결정.
+    
+    재시도 정책: 최대 2번 실행 (초기 1번 + 재시도 1번)
+    2번 실패 시 강제 통과하여 HITL로 전달
+    """
     decision = state.get("validation_result", {})
     restart = decision.get("restart_node")
     is_valid = decision.get("is_valid", True)
     retry_count = state.get("validation_retry_count", 0)
 
-    # ----------------------------------------
-    # 🔥 Self-refine는 딱 1번만 허용
-    # (validator 실행은 2번까지, 재시도는 1번만)
-    # ----------------------------------------
+    # 최대 2번 실행 (초기 1번 + 재시도 1번)
     if retry_count >= 2:
         return "ok"
 
@@ -112,6 +70,7 @@ def build_graph(start_node: str = "preprocess"):
     if start_node not in {
         "preprocess",
         "detect_changes",
+        "embedding",
         "map_products",
         "generate_strategy",
         "score_impact",

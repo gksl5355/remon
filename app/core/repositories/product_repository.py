@@ -68,6 +68,73 @@ class ProductRepository(BaseRepository[Product]):
     def __init__(self):
         super().__init__(Product)
     
+    async def find_by_country(
+        self, 
+        db: AsyncSession, 
+        country: str
+    ) -> list[Dict[str, Any]]:
+        """
+        국가별 활성 제품 조회 (매핑용).
+        
+        Args:
+            db: AsyncSession
+            country: ISO 2-letter 국가 코드 (US, KR, EU 등)
+            
+        Returns:
+            제품 정보 리스트 (mapping 구조 포함)
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # 국가 정규화
+        country = self._normalize_country_code(country)
+        
+        # 국가 필터링 쿼리
+        query = text(
+            PRODUCT_SELECT_BASE
+            + " WHERE p.country_code = :country ORDER BY p.product_id"
+        )
+        
+        result = await db.execute(query, {"country": country})
+        rows = result.mappings().all()
+        
+        logger.info(f"국가별 제품 조회: {country} → {len(rows)}개")
+        
+        # ProductInfo 형식으로 변환
+        return [self._serialize_product(dict(row)) for row in rows]
+    
+    def _normalize_country_code(self, country: str) -> str:
+        """국가 코드 정규화 (ISO 3166-1 alpha-2)."""
+        if not country:
+            return ""
+        
+        # 대소문자 통일
+        country_upper = country.upper().strip()
+        
+        # 매핑 테이블
+        mapping = {
+            "USA": "US",
+            "UNITED STATES": "US",
+            "KOREA": "KR",
+            "SOUTH KOREA": "KR",
+            "REPUBLIC OF KOREA": "KR",
+            "RUSSIA": "RU",
+            "RUSSIAN FEDERATION": "RU",
+            "INDONESIA": "ID",
+            "EUROPEAN UNION": "EU",
+        }
+        
+        # 매핑 테이블에서 찾기
+        if country_upper in mapping:
+            return mapping[country_upper]
+        
+        # 이미 2자리 코드면 그대로 반환
+        if len(country_upper) == 2:
+            return country_upper
+        
+        # 처음 2자리 반환 (fallback)
+        return country_upper[:2]
+    
     async def fetch_product_for_mapping(
         self,
         db: AsyncSession,
