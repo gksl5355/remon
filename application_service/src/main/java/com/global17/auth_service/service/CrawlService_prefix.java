@@ -11,6 +11,7 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -47,7 +48,6 @@ public class CrawlService_prefix {
     @Value("${aws.s3.target-arn}")
     private String bucket;
 
-    // [수정] 상위 경로 설정값 가져오기
     @Value("${aws.s3.base-prefix}")
     private String basePrefix;
 
@@ -89,7 +89,7 @@ public class CrawlService_prefix {
 
         for (Map<String, String> result : searchResults) {
             String rawUrl = result.get("url");
-            String title = result.get("title");
+            String title = result.get("title"); // 검색 제목 (Fallback용)
 
             randomSleep(2000, 4000);
 
@@ -103,36 +103,33 @@ public class CrawlService_prefix {
                 );
                 
                 byte[] fileContent = response.getBody();
+                HttpHeaders responseHeaders = response.getHeaders();
 
                 if (fileContent != null && fileContent.length > 2000) {
                     boolean isPdf = isPdfContent(fileContent);
                     String ext = isPdf ? ".pdf" : ".txt";
 
-                    String fileName = cleanFileName(title) + ext;
+                    // [핵심 수정] 실제 파일명 추출 (Header -> URL -> Title 순서)
+                    String realFileName = extractRealFileName(responseHeaders, rawUrl, title, ext);
 
-                    // [수정] 전체 경로 생성 로직 (Prefix 포함)
-                    // 예: skala2/skala-2.4.17/regulation/RU/파일명.pdf
-                    String fullKey = buildFullPath(category, countryCode, fileName);
+                    // S3 전체 경로 조립
+                    String fullKey = buildFullPath(category, countryCode, realFileName);
 
-                    // [디버깅 로그] 실제로 저장하려는 경로를 콘솔에 찍음
-                    // System.out.println("      👀 저장 시도 경로: " + fullKey);
-
+                    // [중복 체크]
                     if (isSameContentExists(fullKey, fileContent)) {
-                        System.out.println("      ⏭️ 변경 없음(Skip Upload): " + fileName);
+                        System.out.println("      ⏭️ 변경 없음(Skip): " + realFileName + " [URL: " + rawUrl + "]");
                         continue;
                     }
                     
                     byte[] finalContent = isPdf ? fileContent : cleanHtmlToText(fileContent);
-                    HttpHeaders responseHeaders = response.getHeaders();
                     String publishDate = resolvePublishDate(result, rawUrl, finalContent, isPdf, responseHeaders);
 
                     uploadToS3(fullKey, fileContent, isPdf, publishDate, rawUrl);
                     
-                    // [로그 수정] 전체 경로를 출력해서 어디에 저장됐는지 확인
-                    System.out.println("      ✅ S3 버전 업데이트 완료: " + fullKey);
+                    System.out.println("      ✅ S3 업데이트: " + fullKey + " [URL: " + rawUrl + "]");
 
                 } else {
-                    System.out.println("      ⚠️ 파일 크기 작음/차단됨 -> Skip");
+                    System.out.println("      ⚠️ 파일 작음/차단 -> Skip [URL: " + rawUrl + "]");
                 }
             } catch (Exception e) {
                 System.err.println("      ❌ 실패: " + rawUrl + " -> " + e.toString());
@@ -140,17 +137,81 @@ public class CrawlService_prefix {
         }
     }
 
-    // --- [신규 메서드] 전체 경로 조립기 ---
-    private String buildFullPath(String category, String countryCode, String fileName) {
-        // basePrefix + appPrefix + category + countryCode + fileName
-        // 슬래시(/)가 중복되지 않도록 깔끔하게 조립
-        StringBuilder path = new StringBuilder();
+    // --- [신규 메서드] 실제 파일명 추출 로직 ---
+    private String extractRealFileName(HttpHeaders headers, String fileUrl, String fallbackTitle, String defaultExt) {
+        String filename = null;
+
+        // 1. Content-Disposition 헤더 확인 (가장 정확)
+        try {
+            ContentDisposition contentDisposition = headers.getContentDisposition();
+            if (contentDisposition != null && contentDisposition.getFilename() != null) {
+                filename = contentDisposition.getFilename();
+                // 인코딩된 파일명이 있을 경우 디코딩 시도 (UTF-8 등)
+                if (contentDisposition.getFilename() == null && headers.getFirst("Content-Disposition") != null) {
+                     String rawHeader = headers.getFirst("Content-Disposition");
+                     // 단순 정규식으로 filename="abc.pdf" 추출 시도
+                     Pattern p = Pattern.compile("filename=\"?([^;\"]+)\"?");
+                     Matcher m = p.matcher(rawHeader);
+                     if (m.find()) filename = m.group(1);
+                }
+            }
+        } catch (Exception ignored) {}
+
+        // 2. URL 경로에서 추출 (http://site.com/data/report_2024.pdf -> report_2024.pdf)
+        if (filename == null || filename.isEmpty()) {
+            try {
+                String path = new URL(fileUrl).getPath();
+                if (path != null && path.contains("/")) {
+                    filename = path.substring(path.lastIndexOf("/") + 1);
+                    // URL 디코딩 (%20 -> 공백)
+                    filename = URLDecoder.decode(filename, StandardCharsets.UTF_8.name());
+                }
+            } catch (Exception ignored) {}
+        }
+
+        // 3. 파일명이 너무 짧거나 없으면 제목(Fallback) 사용
+        if (filename == null || filename.trim().length() < 3) {
+            filename = cleanFileName(fallbackTitle);
+        }
+
+        // 4. 최종 정제 (확장자 처리 및 특수문자 제거)
+        filename = sanitizeFileName(filename);
+
+        // 확장자가 없으면 붙여줌
+        if (!filename.toLowerCase().endsWith(defaultExt)) {
+            filename += defaultExt;
+        }
+
+        return filename;
+    }
+
+    // 파일명 특수문자 제거 및 길이 제한
+    private String sanitizeFileName(String name) {
+        // 윈도우/리눅스 파일명 금지 문자 제거
+        String safeName = name.replaceAll("[\\\\/:*?\"<>|]", "_");
+        // 공백을 언더바로
+        safeName = safeName.trim().replaceAll("\\s+", "_");
         
+        // 길이가 너무 길면 자름 (S3 제한 고려)
+        if (safeName.length() > 200) {
+            String ext = "";
+            int dotIndex = safeName.lastIndexOf(".");
+            if (dotIndex > 0) {
+                ext = safeName.substring(dotIndex);
+                safeName = safeName.substring(0, 200) + ext;
+            } else {
+                safeName = safeName.substring(0, 200);
+            }
+        }
+        return safeName;
+    }
+
+    // --- 경로 조립기 ---
+    private String buildFullPath(String category, String countryCode, String fileName) {
+        StringBuilder path = new StringBuilder();
         if (basePrefix != null && !basePrefix.isEmpty()) path.append(basePrefix).append("/");
         if (appPrefix != null && !appPrefix.isEmpty()) path.append(appPrefix).append("/");
-        
         path.append(category).append("/").append(countryCode).append("/").append(fileName);
-        
         return path.toString();
     }
 
@@ -186,10 +247,10 @@ public class CrawlService_prefix {
     }
 
     // --- 유틸 메서드 ---
+    
+    // (기존 cleanFileName은 sanitizeFileName으로 대체됨, 제목 폴백용으로 유지)
     private String cleanFileName(String title) {
-        String safeTitle = title.replaceAll("[\\\\/:*?\"<>|]", "").trim().replaceAll("\\s+", "_");
-        if (safeTitle.length() > 80) safeTitle = safeTitle.substring(0, 80);
-        return safeTitle;
+        return sanitizeFileName(title);
     }
 
     private HttpHeaders createBrowserHeaders() {
