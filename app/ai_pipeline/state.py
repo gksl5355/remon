@@ -1,3 +1,4 @@
+#app/ai_pipeline/state.py
 """
 module: state.py
 description: LangGraph 전역 State 스키마 정의 – Production Minimal Version
@@ -225,5 +226,6 @@ class AppState(TypedDict, total=False):
     validation_retry_count: int = 0
 
     # HITL (Human-in-the-Loop) feedback
-    hitl_target_node: Optional[Literal["map_products", "generate_strategy", "score_impact"]]
+    hitl_target_node: Optional[Literal["change_detection","map_products", "generate_strategy", "score_impact"]]
     hitl_feedback_text: Optional[str]
+    manual_change_flag: Optional[bool] #변경 감지용 hitl

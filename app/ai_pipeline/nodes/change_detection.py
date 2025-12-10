@@ -1,3 +1,4 @@
+#app/ai_pipeline/nodes/change_detection.py
 """
 module: change_detection.py
 description: 규제 변경 감지 노드 (Reference ID 기반, 전처리 후 임베딩 전)
