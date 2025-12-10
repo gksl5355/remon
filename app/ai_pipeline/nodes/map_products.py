@@ -1287,6 +1287,270 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
                 }
 
         return state
+    
+    def _extract_country_from_state(self, state: Dict) -> Optional[str]:
+        """
+State에서 국가 정보 추출 (우선순위 적용).
+        
+        우선순위:
+        1. regulation 메타데이터
+        2. preprocess_results (Vision 추출)
+        3. change_detection_results
+        """
+        # 우선순위 1: regulation 메타데이터
+        regulation = state.get("regulation") or {}
+        country = regulation.get("country") or regulation.get("jurisdiction_code")
+        if country:
+            logger.debug(f"국가 추출 (regulation): {country}")
+            return country
+        
+        # 우선순위 2: preprocess_results (Vision 추출)
+        preprocess_results = state.get("preprocess_results") or []
+        if preprocess_results:
+            first_result = preprocess_results[0]
+            vision_results = first_result.get("vision_extraction_result") or []
+            if vision_results:
+                first_page = vision_results[0]
+                metadata = first_page.get("structure", {}).get("metadata", {})
+                country = metadata.get("jurisdiction_code") or metadata.get("country")
+                if country:
+                    logger.debug(f"국가 추출 (vision): {country}")
+                    return country
+        
+        # 우선순위 3: change_detection_results
+        change_results = state.get("change_detection_results") or []
+        if change_results:
+            for result in change_results:
+                metadata = result.get("metadata") or {}
+                country = metadata.get("country") or metadata.get("jurisdiction_code")
+                if country:
+                    logger.debug(f"국가 추출 (change_detection): {country}")
+                    return country
+        
+        logger.warning("국가 정보 추출 실패")
+        return None
+    
+    async def _run_mapping_for_single_product(self, state: Dict) -> MappingResults:
+        """단일 제품에 대한 매핑 실행 (기존 로직 재사용)."""
+        product: ProductInfo = state["product_info"]
+        product_id = product["product_id"]
+        product_name = product.get("product_name", product.get("name", "unknown"))
+        mapping_spec = product.get("mapping") or {}
+        target_state = mapping_spec.get("target") or {}
+        present_state = mapping_spec.get("present_state") or {}
+        present_features = (
+            present_state or target_state or product.get("features", {}) or {}
+        )
+        units = product.get("feature_units", {})
+        
+        change_results: List[Dict[str, Any]] = state.get("change_detection_results") or []
+        regulation_meta: Dict[str, Any] = state.get("regulation") or {}
+        mapping_filters: Dict[str, Any] = state.get("mapping_filters") or {}
+        
+        change_scope = self._extract_change_scope(change_results, present_features)
+        change_hint = self._choose_change_hint(change_scope)
+        change_query = self._build_change_query(change_hint)
+        recovered_hints: Set[str] = set()
+        
+        regulation_hints = state.get("regulation_analysis_hints") or {}
+        if regulation_hints and not change_scope.get("feature_hints"):
+            affected_areas = regulation_hints.get("affected_areas", [])
+            for area in affected_areas:
+                normalized = self._normalize_token(area)
+                for norm_name, raw_name in {
+                    self._normalize_token(name): name
+                    for name in present_features.keys()
+                }.items():
+                    if normalized == norm_name or normalized in norm_name:
+                        recovered_hints.add(raw_name)
+        
+        feature_iterable, unknown_hints = self._select_features_for_mapping(
+            present_features, change_scope, recovered_hints
+        )
+        
+        mapping_results: List[MappingItem] = []
+        mapping_targets: Dict[str, Dict[str, Any]] = {}
+        unknown_requirements: List[Dict[str, Any]] = []
+        
+        if unknown_hints:
+            unknown_requirements.extend(
+                [
+                    {
+                        "hint": hint,
+                        "reason": "change_detection_hint_not_in_product_features",
+                    }
+                    for hint in unknown_hints
+                ]
+            )
+        
+        extra_search_filters = {
+            key: value
+            for key, value in mapping_filters.items()
+            if key not in {"product_id"}
+        }
+        change_search_filters = self._build_change_filters(change_scope)
+        regulation_filters = self._build_regulation_filters(regulation_meta)
+        merged_search_filters = self._merge_filters(
+            extra_search_filters, change_search_filters, regulation_filters
+        )
+        
+        async def process_feature(feature_name: str, present_value: Any):
+            unit = units.get(feature_name)
+            target_value = target_state.get(feature_name)
+            
+            retrieval: RetrievalResult = await self._run_search(
+                product,
+                feature_name,
+                present_value,
+                unit,
+                merged_search_filters,
+                change_query=change_query,
+            )
+            original_count = len(retrieval["candidates"])
+            retrieval["candidates"] = self._prune_candidates(retrieval["candidates"])
+            pruned_count = len(retrieval["candidates"])
+            
+            ranked_candidates = retrieval["candidates"]
+            rerank_result: Optional[Dict[str, Any]] = None
+            if change_hint and ranked_candidates:
+                ranked_candidates = self._rule_rank_candidates(
+                    ranked_candidates, change_hint, top_n=3
+                )
+                rerank_result = await self._rerank_candidates(
+                    change_hint, ranked_candidates
+                )
+                if rerank_result and rerank_result.get("selected_point_id"):
+                    selected_id = rerank_result["selected_point_id"]
+                    ranked_candidates = [
+                        cand
+                        for cand in ranked_candidates
+                        if cand.get("chunk_id") == selected_id
+                    ] or ranked_candidates
+            
+            if ranked_candidates:
+                ranked_candidates = ranked_candidates[:1]
+            
+            async def process_candidate(cand: RetrievedChunk):
+                prompt = self._build_prompt(
+                    feature_name,
+                    present_value,
+                    target_value,
+                    unit,
+                    cand["chunk_text"],
+                )
+                llm_out = await self._call_llm(prompt)
+                
+                parsed: MappingParsed = llm_out.get("parsed", {})
+                required_value = llm_out.get("required_value")
+                current_value = llm_out.get("current_value")
+                if (
+                    llm_out.get("applies")
+                    and required_value is None
+                    and target_value is not None
+                ):
+                    required_value = target_value
+                if current_value is None and present_value is not None:
+                    current_value = present_value
+                
+                regulation_meta = dict(cand.get("metadata") or {})
+                regulation_meta["semantic_score"] = cand.get("semantic_score")
+                change_matches = self._match_change_results_to_candidate(
+                    change_scope, cand
+                )
+                if change_matches:
+                    regulation_meta["change_detection_matches"] = change_matches
+                if rerank_result:
+                    regulation_meta["rerank"] = rerank_result
+                
+                return MappingItem(
+                    product_id=product_id,
+                    product_name=product_name,
+                    feature_name=feature_name,
+                    applies=llm_out["applies"],
+                    required_value=required_value,
+                    current_value=current_value,
+                    gap=llm_out["gap"],
+                    regulation_chunk_id=cand["chunk_id"],
+                    regulation_summary=cand["chunk_text"][:120],
+                    regulation_meta=regulation_meta,
+                    parsed=parsed,
+                )
+            
+            candidate_results = await asyncio.gather(
+                *[process_candidate(cand) for cand in ranked_candidates],
+                return_exceptions=True,
+            )
+            items: List[MappingItem] = []
+            for r in candidate_results:
+                if isinstance(r, Exception):
+                    continue
+                items.append(r)
+            return items
+        
+        feature_results = await asyncio.gather(
+            *[process_feature(fname, fval) for fname, fval in feature_iterable],
+            return_exceptions=True,
+        )
+        
+        for result in feature_results:
+            if isinstance(result, Exception):
+                logger.error(f"❌ Feature 처리 실패: {result}")
+                continue
+            if isinstance(result, list):
+                mapping_results.extend(result)
+                for item in result:
+                    if item["applies"]:
+                        feature_name = item["feature_name"]
+                        existing = mapping_targets.get(feature_name)
+                        has_req = item.get("required_value") is not None
+                        replace = False
+                        if existing is None:
+                            replace = True
+                        elif existing.get("required_value") is None and has_req:
+                            replace = True
+                        if replace:
+                            mapping_targets[feature_name] = {
+                                "required_value": item.get("required_value"),
+                                "chunk_id": item.get("regulation_chunk_id"),
+                                "doc_id": item.get("regulation_meta", {}).get(
+                                    "meta_doc_id"
+                                ),
+                            }
+        
+        return MappingResults(
+            product_id=product_id,
+            items=mapping_results,
+            targets=mapping_targets,
+            actionable_changes=change_scope.get("actionable_results", []),
+            pending_changes=change_scope.get("pending_results", []),
+            unknown_requirements=unknown_requirements,
+        )
+    
+    def _merge_multi_product_results(
+        self, results: List[MappingResults]
+    ) -> MappingResults:
+        """여러 제품의 매핑 결과 병합."""
+        all_items = []
+        all_targets = {}
+        all_actionable = []
+        all_pending = []
+        all_unknown = []
+        
+        for result in results:
+            all_items.extend(result["items"])
+            all_targets.update(result["targets"])
+            all_actionable.extend(result["actionable_changes"])
+            all_pending.extend(result["pending_changes"])
+            all_unknown.extend(result["unknown_requirements"])
+        
+        return MappingResults(
+            product_id="multi",
+            items=all_items,
+            targets=all_targets,
+            actionable_changes=all_actionable,
+            pending_changes=all_pending,
+            unknown_requirements=all_unknown,
+        )
 
     def _extract_country_from_state(self, state: Dict) -> Optional[str]:
         """
