@@ -166,7 +166,7 @@ class ChangeDetectionNode:
         model_name: Optional[str] = None,
     ):
         from app.ai_pipeline.preprocess.config import PreprocessConfig
-        
+
         if llm_client:
             self.llm = llm_client
         else:
@@ -245,10 +245,14 @@ class ChangeDetectionNode:
                             new_regul_data, session, new_regulation_id
                         )
                         if not legacy_regulation_id:
-                            logger.info("✅ 완전히 새로운 규제 (Legacy 없음) - 신규 분석 실행")
+                            logger.info(
+                                "✅ 완전히 새로운 규제 (Legacy 없음) - 신규 분석 실행"
+                            )
 
                             # 신규 규제 분석 (LLM)
-                            analysis_hints = await self._analyze_new_regulation(new_regul_data)
+                            analysis_hints = await self._analyze_new_regulation(
+                                new_regul_data
+                            )
                             state["regulation_analysis_hints"] = analysis_hints
                             logger.info(
                                 f"✅ 신규 규제 분석 완료: {len(analysis_hints.get('key_requirements', []))}개 요구사항"
@@ -391,7 +395,7 @@ class ChangeDetectionNode:
             "legacy_regulation_id": legacy_regulation_id,
             "new_regulation_id": new_regulation_id,
         }
-        
+
         # 🔑 Section 기반 빠른 조회를 위한 인덱스 생성
         change_index = {}
         for result in detection_results:
@@ -591,8 +595,9 @@ class ChangeDetectionNode:
     def _normalize_section_ref(self, section_ref: str) -> str:
         """조항 번호 정규화 (§1160.5, 1160.5, § 1160.5 → 1160.5)."""
         import re
-        normalized = re.sub(r'[§\s]', '', section_ref)
-        match = re.search(r'(\d+\.\d+)', normalized)
+
+        normalized = re.sub(r"[§\s]", "", section_ref)
+        match = re.search(r"(\d+\.\d+)", normalized)
         return match.group(1) if match else normalized
 
     async def _match_reference_blocks(
@@ -654,7 +659,11 @@ class ChangeDetectionNode:
                     break
 
         # 매칭 실패한 섹션 로그
-        unmatched_new = [b.get("section_ref") for b in new_blocks_unique if not any(p["new_block"] == b for p in matched_pairs)]
+        unmatched_new = [
+            b.get("section_ref")
+            for b in new_blocks_unique
+            if not any(p["new_block"] == b for p in matched_pairs)
+        ]
         if unmatched_new:
             logger.warning(f"⚠️ 매칭 실패한 신규 섹션: {unmatched_new[:5]}...")
 
@@ -716,11 +725,11 @@ class ChangeDetectionNode:
                 ],
                 "response_format": {"type": "json_object"},
             }
-            
+
             # gpt-5-nano가 아닌 경우에만 temperature 추가
             if "gpt-5-nano" not in self.model_name.lower():
                 call_params["temperature"] = 0.1
-            
+
             response = await self.llm.chat.completions.create(**call_params)
 
             result = json.loads(response.choices[0].message.content)
@@ -790,11 +799,11 @@ class ChangeDetectionNode:
                 ],
                 "response_format": {"type": "json_object"},
             }
-            
+
             # gpt-5-nano가 아닌 경우에만 temperature 추가
             if "gpt-5-nano" not in self.model_name.lower():
                 call_params["temperature"] = 0.1
-            
+
             response = await self.llm.chat.completions.create(**call_params)
 
             result = json.loads(response.choices[0].message.content)
