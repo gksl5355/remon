@@ -102,11 +102,17 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
         if key in seen_rows:
             continue
         seen_rows.add(key)
+        
+        # reasoning 요약 (최대 150자)
+        reasoning = item.get("reasoning", "")
+        reasoning_summary = reasoning[:150] + "..." if len(reasoning) > 150 else reasoning
+        
         product_rows.append(
             [
                 item.get("feature_name", ""),
                 item.get("product_name", ""),
                 f"현재: {item.get('current_value', '-')}, 필요: {item.get('required_value','-')}",
+                reasoning_summary,
             ]
         )
 
@@ -138,7 +144,7 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
             "id": "products",
             "title": "2. 영향받는 제품 목록",
             "type": "table",
-            "headers": ["규제항목", "제품명", "조치"],
+            "headers": ["제품 속성", "제품명", "현재 vs 필요", "판단 근거"],
             "rows": product_rows
         },
         {

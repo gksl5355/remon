@@ -75,6 +75,7 @@ class MappingItem(TypedDict):
     required_value: Any
     current_value: Any
     gap: Any
+    reasoning: str  # 매핑 판단 근거
 
     regulation_chunk_id: str
     regulation_summary: str

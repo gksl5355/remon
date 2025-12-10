@@ -698,6 +698,7 @@ class MappingNode:
         target_value,
         feature_unit,
         chunk_text,
+        change_evidence: Optional[Dict[str, Any]] = None,
     ):
         feature = {
             "name": feature_name,
@@ -706,8 +707,22 @@ class MappingNode:
             "unit": feature_unit,
         }
         feature_json = json.dumps(feature, ensure_ascii=False)
-        return MAPPING_PROMPT.replace("{feature}", feature_json).replace(
-            "{chunk}", chunk_text
+
+        # 변경 감지 증거 포맷팅
+        if change_evidence:
+            evidence_text = f"""\n[CHANGE EVIDENCE]
+Change Type: {change_evidence.get('change_type', 'N/A')}
+Confidence: {change_evidence.get('confidence_score', 0)}
+Keywords: {', '.join(change_evidence.get('keywords', []))}
+Reasoning: {change_evidence.get('reasoning', {}).get('step4_final_judgment', 'N/A')}
+"""
+        else:
+            evidence_text = ""
+
+        return (
+            MAPPING_PROMPT.replace("{feature}", feature_json)
+            .replace("{chunk}", chunk_text)
+            .replace("{change_evidence}", evidence_text)
         )
 
     def _build_search_query(self, feature_name, feature_value, feature_unit):
@@ -746,7 +761,13 @@ class MappingNode:
         try:
             res = await self.llm.chat.completions.create(
                 model="gpt-5-nano",
-                messages=[{"role": "user", "content": prompt}],
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a compliance mapping agent. Given one product feature and one regulation chunk (already narrowed by regulation metadata and change evidence), decide if the chunk applies and extract the requirement without guessing. Return JSON only.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
             )
             return json.loads(res.choices[0].message.content)
 
@@ -756,6 +777,7 @@ class MappingNode:
                 "required_value": None,
                 "current_value": None,
                 "gap": None,
+                "reasoning": "LLM call failed",
                 "parsed": {
                     "category": None,
                     "requirement_type": "other",
@@ -770,11 +792,11 @@ class MappingNode:
         change_results: List[Dict[str, Any]] = (
             state.get("change_detection_results") or []
         )
-        
+
         # ⭐ 동적 필터링: product_info 없으면 국가별 제품 조회
         if not product:
             product_id = mapping_filters.get("product_id")
-            
+
             # 옵션 1: product_id 지정됨 (기존 로직)
             if product_id:
                 async with AsyncSessionLocal() as session:
@@ -782,11 +804,11 @@ class MappingNode:
                         session, int(product_id)
                     )
                 state["product_info"] = product
-            
+
             # 옵션 2: 국가 기반 동적 필터링 (자동 실행)
             else:
                 country = self._extract_country_from_state(state)
-                
+
                 if not country:
                     logger.error("❌ 국가 정보 없음, 매핑 불가")
                     state["mapping"] = MappingResults(
@@ -795,12 +817,12 @@ class MappingNode:
                         targets={},
                         actionable_changes=[],
                         pending_changes=[],
-                        unknown_requirements=[]
+                        unknown_requirements=[],
                     )
                     return state
-                
+
                 logger.info(f"🌍 동적 필터링: {country} 국가 제품 조회")
-                
+
                 # DB 조회 후 즉시 세션 닫기
                 products = []
                 async with AsyncSessionLocal() as session:
@@ -808,7 +830,7 @@ class MappingNode:
                         session, country
                     )
                 # ← 세션 닫힘 (여기서 끝)
-                
+
                 if not products:
                     logger.warning(f"⚠️ {country} 국가 제품 없음")
                     state["mapping"] = MappingResults(
@@ -817,21 +839,25 @@ class MappingNode:
                         targets={},
                         actionable_changes=[],
                         pending_changes=[],
-                        unknown_requirements=[]
+                        unknown_requirements=[],
                     )
                     return state
-                
-                logger.info(f"✅ {len(products)}개 제품 발견: {[p['product_name'] for p in products[:3]]}...")
-                
+
+                logger.info(
+                    f"✅ {len(products)}개 제품 발견: {[p['product_name'] for p in products[:3]]}..."
+                )
+
                 # 각 제품별로 매핑 실행 (세션 없이)
                 all_mapping_results = []
                 for product in products:
                     state["product_info"] = product
                     result = await self._run_mapping_for_single_product(state)
                     all_mapping_results.append(result)
-                
+
                 # 결과 병합
-                state["mapping"] = self._merge_multi_product_results(all_mapping_results)
+                state["mapping"] = self._merge_multi_product_results(
+                    all_mapping_results
+                )
                 return state
 
         product_id = product["product_id"]
@@ -925,7 +951,9 @@ class MappingNode:
                 ]
             )
 
-        # 🔥 feature별로 검색 TOOL → 매핑 (병렬 처리)
+        # 🔥 feature별로 검색 TOOL → 매핑
+        llm_semaphore = asyncio.Semaphore(10)
+
         async def process_feature(feature_name: str, present_value: Any):
             unit = units.get(feature_name)
             target_value = target_state.get(feature_name)
@@ -979,16 +1007,26 @@ class MappingNode:
             if ranked_candidates:
                 ranked_candidates = ranked_candidates[:1]
 
-            # b) LLM 매핑 수행 (후보별 병렬)
+            # b) LLM 매핑 수행 (후보별 병렬 + Semaphore 제한)
             async def process_candidate(cand: RetrievedChunk):
+                # 변경 감지 증거 추출
+                change_matches = self._match_change_results_to_candidate(
+                    change_scope, cand
+                )
+                change_evidence = change_matches[0] if change_matches else None
+
                 prompt = self._build_prompt(
                     feature_name,
                     present_value,
                     target_value,
                     unit,
                     cand["chunk_text"],
+                    change_evidence=change_evidence,
                 )
-                llm_out = await self._call_llm(prompt)
+
+                # Semaphore로 LLM 호출 제한
+                async with llm_semaphore:
+                    llm_out = await self._call_llm(prompt)
 
                 parsed: MappingParsed = llm_out.get("parsed", {})
                 required_value = llm_out.get("required_value")
@@ -1004,9 +1042,6 @@ class MappingNode:
 
                 regulation_meta = dict(cand.get("metadata") or {})
                 regulation_meta["semantic_score"] = cand.get("semantic_score")
-                change_matches = self._match_change_results_to_candidate(
-                    change_scope, cand
-                )
                 if change_matches:
                     regulation_meta["change_detection_matches"] = change_matches
                 if rerank_result:
@@ -1020,6 +1055,7 @@ class MappingNode:
                     required_value=required_value,
                     current_value=current_value,
                     gap=llm_out["gap"],
+                    reasoning=llm_out.get("reasoning", ""),
                     regulation_chunk_id=cand["chunk_id"],
                     regulation_summary=cand["chunk_text"][:120],
                     regulation_meta=regulation_meta,
@@ -1027,8 +1063,6 @@ class MappingNode:
                 )
 
             # 후보별 병렬 처리
-            import asyncio
-
             candidate_results = await asyncio.gather(
                 *[process_candidate(cand) for cand in ranked_candidates],
                 return_exceptions=True,
@@ -1050,14 +1084,11 @@ class MappingNode:
             return items
 
         # feature별 병렬 처리
-        import asyncio
-
         feature_results = await asyncio.gather(
             *[process_feature(fname, fval) for fname, fval in feature_iterable],
             return_exceptions=True,
         )
 
-        # 결과 병합
         for result in feature_results:
             if isinstance(result, Exception):
                 logger.error(f"❌ Feature 처리 실패: {result}")
@@ -1134,15 +1165,15 @@ class MappingNode:
                 }
 
         return state
-    
+
     def _extract_country_from_state(self, state: Dict) -> Optional[str]:
         """
-State에서 국가 정보 추출 (우선순위 적용).
-        
-        우선순위:
-        1. regulation 메타데이터
-        2. preprocess_results (Vision 추출)
-        3. change_detection_results
+        State에서 국가 정보 추출 (우선순위 적용).
+
+                우선순위:
+                1. regulation 메타데이터
+                2. preprocess_results (Vision 추출)
+                3. change_detection_results
         """
         # 우선순위 1: regulation 메타데이터
         regulation = state.get("regulation") or {}
@@ -1150,7 +1181,7 @@ State에서 국가 정보 추출 (우선순위 적용).
         if country:
             logger.debug(f"국가 추출 (regulation): {country}")
             return country
-        
+
         # 우선순위 2: preprocess_results (Vision 추출)
         preprocess_results = state.get("preprocess_results") or []
         if preprocess_results:
@@ -1163,7 +1194,7 @@ State에서 국가 정보 추출 (우선순위 적용).
                 if country:
                     logger.debug(f"국가 추출 (vision): {country}")
                     return country
-        
+
         # 우선순위 3: change_detection_results
         change_results = state.get("change_detection_results") or []
         if change_results:
@@ -1173,10 +1204,10 @@ State에서 국가 정보 추출 (우선순위 적용).
                 if country:
                     logger.debug(f"국가 추출 (change_detection): {country}")
                     return country
-        
+
         logger.warning("국가 정보 추출 실패")
         return None
-    
+
     async def _run_mapping_for_single_product(self, state: Dict) -> MappingResults:
         """단일 제품에 대한 매핑 실행 (기존 로직 재사용)."""
         product: ProductInfo = state["product_info"]
@@ -1189,16 +1220,18 @@ State에서 국가 정보 추출 (우선순위 적용).
             present_state or target_state or product.get("features", {}) or {}
         )
         units = product.get("feature_units", {})
-        
-        change_results: List[Dict[str, Any]] = state.get("change_detection_results") or []
+
+        change_results: List[Dict[str, Any]] = (
+            state.get("change_detection_results") or []
+        )
         regulation_meta: Dict[str, Any] = state.get("regulation") or {}
         mapping_filters: Dict[str, Any] = state.get("mapping_filters") or {}
-        
+
         change_scope = self._extract_change_scope(change_results, present_features)
         change_hint = self._choose_change_hint(change_scope)
         change_query = self._build_change_query(change_hint)
         recovered_hints: Set[str] = set()
-        
+
         regulation_hints = state.get("regulation_analysis_hints") or {}
         if regulation_hints and not change_scope.get("feature_hints"):
             affected_areas = regulation_hints.get("affected_areas", [])
@@ -1210,15 +1243,15 @@ State에서 국가 정보 추출 (우선순위 적용).
                 }.items():
                     if normalized == norm_name or normalized in norm_name:
                         recovered_hints.add(raw_name)
-        
+
         feature_iterable, unknown_hints = self._select_features_for_mapping(
             present_features, change_scope, recovered_hints
         )
-        
+
         mapping_results: List[MappingItem] = []
         mapping_targets: Dict[str, Dict[str, Any]] = {}
         unknown_requirements: List[Dict[str, Any]] = []
-        
+
         if unknown_hints:
             unknown_requirements.extend(
                 [
@@ -1229,7 +1262,7 @@ State에서 국가 정보 추출 (우선순위 적용).
                     for hint in unknown_hints
                 ]
             )
-        
+
         extra_search_filters = {
             key: value
             for key, value in mapping_filters.items()
@@ -1240,11 +1273,11 @@ State에서 국가 정보 추출 (우선순위 적용).
         merged_search_filters = self._merge_filters(
             extra_search_filters, change_search_filters, regulation_filters
         )
-        
+
         async def process_feature(feature_name: str, present_value: Any):
             unit = units.get(feature_name)
             target_value = target_state.get(feature_name)
-            
+
             retrieval: RetrievalResult = await self._run_search(
                 product,
                 feature_name,
@@ -1256,7 +1289,7 @@ State에서 국가 정보 추출 (우선순위 적용).
             original_count = len(retrieval["candidates"])
             retrieval["candidates"] = self._prune_candidates(retrieval["candidates"])
             pruned_count = len(retrieval["candidates"])
-            
+
             ranked_candidates = retrieval["candidates"]
             rerank_result: Optional[Dict[str, Any]] = None
             if change_hint and ranked_candidates:
@@ -1273,10 +1306,10 @@ State에서 국가 정보 추출 (우선순위 적용).
                         for cand in ranked_candidates
                         if cand.get("chunk_id") == selected_id
                     ] or ranked_candidates
-            
+
             if ranked_candidates:
                 ranked_candidates = ranked_candidates[:1]
-            
+
             async def process_candidate(cand: RetrievedChunk):
                 prompt = self._build_prompt(
                     feature_name,
@@ -1286,7 +1319,7 @@ State에서 국가 정보 추출 (우선순위 적용).
                     cand["chunk_text"],
                 )
                 llm_out = await self._call_llm(prompt)
-                
+
                 parsed: MappingParsed = llm_out.get("parsed", {})
                 required_value = llm_out.get("required_value")
                 current_value = llm_out.get("current_value")
@@ -1298,7 +1331,7 @@ State에서 국가 정보 추출 (우선순위 적용).
                     required_value = target_value
                 if current_value is None and present_value is not None:
                     current_value = present_value
-                
+
                 regulation_meta = dict(cand.get("metadata") or {})
                 regulation_meta["semantic_score"] = cand.get("semantic_score")
                 change_matches = self._match_change_results_to_candidate(
@@ -1308,7 +1341,7 @@ State에서 국가 정보 추출 (우선순위 적용).
                     regulation_meta["change_detection_matches"] = change_matches
                 if rerank_result:
                     regulation_meta["rerank"] = rerank_result
-                
+
                 return MappingItem(
                     product_id=product_id,
                     product_name=product_name,
@@ -1322,7 +1355,7 @@ State에서 국가 정보 추출 (우선순위 적용).
                     regulation_meta=regulation_meta,
                     parsed=parsed,
                 )
-            
+
             candidate_results = await asyncio.gather(
                 *[process_candidate(cand) for cand in ranked_candidates],
                 return_exceptions=True,
@@ -1333,12 +1366,12 @@ State에서 국가 정보 추출 (우선순위 적용).
                     continue
                 items.append(r)
             return items
-        
+
         feature_results = await asyncio.gather(
             *[process_feature(fname, fval) for fname, fval in feature_iterable],
             return_exceptions=True,
         )
-        
+
         for result in feature_results:
             if isinstance(result, Exception):
                 logger.error(f"❌ Feature 처리 실패: {result}")
@@ -1363,7 +1396,7 @@ State에서 국가 정보 추출 (우선순위 적용).
                                     "meta_doc_id"
                                 ),
                             }
-        
+
         return MappingResults(
             product_id=product_id,
             items=mapping_results,
@@ -1372,7 +1405,7 @@ State에서 국가 정보 추출 (우선순위 적용).
             pending_changes=change_scope.get("pending_results", []),
             unknown_requirements=unknown_requirements,
         )
-    
+
     def _merge_multi_product_results(
         self, results: List[MappingResults]
     ) -> MappingResults:
@@ -1382,14 +1415,14 @@ State에서 국가 정보 추출 (우선순위 적용).
         all_actionable = []
         all_pending = []
         all_unknown = []
-        
+
         for result in results:
             all_items.extend(result["items"])
             all_targets.update(result["targets"])
             all_actionable.extend(result["actionable_changes"])
             all_pending.extend(result["pending_changes"])
             all_unknown.extend(result["unknown_requirements"])
-        
+
         return MappingResults(
             product_id="multi",
             items=all_items,
