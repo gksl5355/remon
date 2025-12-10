@@ -460,21 +460,25 @@ class MappingNode:
         self,
         mapping_results: List[MappingItem],
         regulation_meta: Dict[str, Any],
+        regulation_cache: Dict[str, Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
         now_ts = datetime.utcnow().isoformat() + "Z"
         entries: List[Dict[str, Any]] = []
         for item in mapping_results:
             if not item.get("applies"):
                 continue
-            rerank_meta = item.get("regulation_meta", {}).get("rerank", {}) or {}
-            change_status = "pending" if rerank_meta.get("pending") else "applied"
+            
+            chunk_id = item.get("regulation_chunk_id")
+            cache_data = regulation_cache.get(chunk_id, {})
+            confidence = cache_data.get("confidence_score")
+            change_status = "pending" if (confidence is not None and confidence < 0.7) else "applied"
+            
             entries.append(
                 {
                     "feature": item.get("feature_name"),
                     "applied_value": item.get("required_value"),
-                    "regulation_record_id": item.get("regulation_chunk_id"),
-                    "mapping_score": rerank_meta.get("final_confidence")
-                    or item.get("regulation_meta", {}).get("semantic_score"),
+                    "regulation_record_id": chunk_id,
+                    "mapping_score": cache_data.get("confidence_score"),
                     "change_status": change_status,
                     "evidence": {
                         "legacy_snippet": None,
@@ -691,6 +695,76 @@ class MappingNode:
             candidates=candidates,
         )
 
+    def _extract_section_number(
+        self,
+        chunk_metadata: Dict[str, Any],
+        change_evidence: Optional[Dict[str, Any]],
+        chunk_text: str
+    ) -> str:
+        """우선순위 기반 조항 번호 추출."""
+        # 1순위: Change Detection의 section_ref
+        if change_evidence and change_evidence.get("section_ref"):
+            return change_evidence["section_ref"]
+        
+        # 2순위: Qdrant metadata
+        section = (
+            chunk_metadata.get("section_label") or
+            chunk_metadata.get("section_ref") or
+            (chunk_metadata.get("hierarchy", [])[-1] if chunk_metadata.get("hierarchy") else None)
+        )
+        if section:
+            return section
+        
+        # 3순위: chunk_text에서 regex 추출
+        import re
+        patterns = [
+            r'§\s*(\d+(?:\.\d+)?(?:\([a-z]\))?)',
+            r'Section\s+(\d+(?:\.\d+)?)',
+            r'Article\s+(\d+)',
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, chunk_text, re.IGNORECASE)
+            if match:
+                return f"§{match.group(1)}"
+        
+        # 4순위: citation_code 활용
+        citation = chunk_metadata.get("citation_code")
+        if citation:
+            return f"{citation}"
+        
+        return "§Unknown"
+
+    def _extract_section_from_chunk(
+        self, chunk_metadata: Dict[str, Any], chunk_text: str
+    ) -> Optional[str]:
+        """청크에서 조항 번호 추출 및 정규화."""
+        import re
+        
+        # 1순위: metadata에서 추출
+        section = (
+            chunk_metadata.get("section_label") or
+            chunk_metadata.get("section_ref") or
+            (chunk_metadata.get("hierarchy", [])[-1] if chunk_metadata.get("hierarchy") else None)
+        )
+        
+        if section:
+            # 정규화 (§1160.5 → 1160.5)
+            normalized = re.sub(r'[§\s]', '', section)
+            match = re.search(r'(\d+\.\d+)', normalized)
+            return match.group(1) if match else None
+        
+        # 2순위: chunk_text에서 regex 추출
+        patterns = [
+            r'§\s*(\d+\.\d+)',
+            r'Section\s+(\d+\.\d+)',
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, chunk_text, re.IGNORECASE)
+            if match:
+                return match.group(1)
+        
+        return None
+
     def _build_prompt(
         self,
         feature_name,
@@ -698,7 +772,9 @@ class MappingNode:
         target_value,
         feature_unit,
         chunk_text,
+        chunk_metadata: Optional[Dict[str, Any]] = None,
         change_evidence: Optional[Dict[str, Any]] = None,
+        change_context: Optional[Dict[str, Any]] = None,
     ):
         feature = {
             "name": feature_name,
@@ -707,6 +783,21 @@ class MappingNode:
             "unit": feature_unit,
         }
         feature_json = json.dumps(feature, ensure_ascii=False)
+
+        # 조항 번호 추출
+        section_info = ""
+        if chunk_metadata:
+            section = self._extract_section_number(
+                chunk_metadata, change_evidence, chunk_text
+            )
+            citation = chunk_metadata.get("citation_code")
+            
+            if section or citation:
+                section_info = "\n[REGULATION METADATA]\n"
+                if citation:
+                    section_info += f"Citation: {citation}\n"
+                if section:
+                    section_info += f"Section: {section}\n"
 
         # 변경 감지 증거 포맷팅
         if change_evidence:
@@ -718,10 +809,20 @@ Reasoning: {change_evidence.get('reasoning', {}).get('step4_final_judgment', 'N/
 """
         else:
             evidence_text = ""
+        
+        # 🎯 Change Context 주입 (검색 실패 시 보정)
+        if change_context:
+            evidence_text += f"""\n[KNOWN CHANGE - Direct from Change Detection]
+Section: {change_context.get('section_ref', 'N/A')}
+Legacy Text: {change_context.get('legacy_snippet', '')[:200]}
+New Text: {change_context.get('new_snippet', '')[:200]}
+Numerical Changes: {change_context.get('numerical_changes', [])}
+"""
 
         return (
             MAPPING_PROMPT.replace("{feature}", feature_json)
             .replace("{chunk}", chunk_text)
+            .replace("{metadata}", section_info)
             .replace("{change_evidence}", evidence_text)
         )
 
@@ -764,7 +865,7 @@ Reasoning: {change_evidence.get('reasoning', {}).get('step4_final_judgment', 'N/
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a compliance mapping agent. Given one product feature and one regulation chunk (already narrowed by regulation metadata and change evidence), decide if the chunk applies and extract the requirement without guessing. Return JSON only.",
+                        "content": "You are a compliance mapping agent. Provide concise, citation-based reasoning (MAX 250 chars) starting with section/article number (e.g., '§1234.56'). Use Section from REGULATION METADATA if provided. If required_value is null, explain why: 'N/A (not regulated)' or 'N/A (already compliant)' or 'N/A (unrelated)'. Format: '[§XXX] [Core regulation] [Application status]'. Return JSON only.",
                     },
                     {"role": "user", "content": prompt},
                 ],
@@ -1014,6 +1115,17 @@ Reasoning: {change_evidence.get('reasoning', {}).get('step4_final_judgment', 'N/
                     change_scope, cand
                 )
                 change_evidence = change_matches[0] if change_matches else None
+                
+                # 🔑 Change Detection Index에서 직접 조회
+                change_context = None
+                change_index = state.get("change_detection_index", {})
+                if change_index:
+                    section = self._extract_section_from_chunk(
+                        cand.get("metadata", {}), cand["chunk_text"]
+                    )
+                    if section and section in change_index:
+                        change_context = change_index[section]
+                        logger.debug(f"🎯 Change Context 발견: {section}")
 
                 prompt = self._build_prompt(
                     feature_name,
@@ -1021,7 +1133,9 @@ Reasoning: {change_evidence.get('reasoning', {}).get('step4_final_judgment', 'N/
                     target_value,
                     unit,
                     cand["chunk_text"],
+                    chunk_metadata=cand.get("metadata", {}),
                     change_evidence=change_evidence,
+                    change_context=change_context,
                 )
 
                 # Semaphore로 LLM 호출 제한
@@ -1040,25 +1154,15 @@ Reasoning: {change_evidence.get('reasoning', {}).get('step4_final_judgment', 'N/
                 if current_value is None and present_value is not None:
                     current_value = present_value
 
-                regulation_meta = dict(cand.get("metadata") or {})
-                regulation_meta["semantic_score"] = cand.get("semantic_score")
-                if change_matches:
-                    regulation_meta["change_detection_matches"] = change_matches
-                if rerank_result:
-                    regulation_meta["rerank"] = rerank_result
-
                 return MappingItem(
-                    product_id=product_id,
-                    product_name=product_name,
                     feature_name=feature_name,
                     applies=llm_out["applies"],
                     required_value=required_value,
                     current_value=current_value,
                     gap=llm_out["gap"],
-                    reasoning=llm_out.get("reasoning", ""),
+                    reasoning=llm_out.get("reasoning", "")[:250],  # 최대 250자
                     regulation_chunk_id=cand["chunk_id"],
                     regulation_summary=cand["chunk_text"][:120],
-                    regulation_meta=regulation_meta,
                     parsed=parsed,
                 )
 
@@ -1128,18 +1232,36 @@ Reasoning: {change_evidence.get('reasoning', {}).get('step4_final_judgment', 'N/
         product["mapping"] = product_mapping
         state["product_info"] = product
 
+        # regulation_cache 생성 (중복 제거)
+        regulation_cache = {}
+        for item in mapping_results:
+            chunk_id = item["regulation_chunk_id"]
+            if chunk_id not in regulation_cache:
+                # 필요한 메타데이터만 캐시
+                meta = change_scope.get("raw_results", [])
+                matched_change = next(
+                    (r for r in meta if r.get("chunk_id") == chunk_id or 
+                     r.get("new_ref_id") == chunk_id),
+                    None
+                )
+                regulation_cache[chunk_id] = {
+                    "change_detected": bool(matched_change),
+                    "confidence_score": matched_change.get("confidence_score") if matched_change else None,
+                    "change_type": matched_change.get("change_type") if matched_change else None,
+                }
+        
         mapping_payload = MappingResults(
             product_id=product_id,
+            product_name=product_name,
             items=mapping_results,
             targets=mapping_targets,
-            actionable_changes=change_scope.get("actionable_results", []),
-            pending_changes=change_scope.get("pending_results", []),
             unknown_requirements=unknown_requirements,
+            regulation_cache=regulation_cache,
         )
         # NOTE: mapping과 mapping_results는 동일한 데이터 (하위 호환성 유지)
         state["mapping"] = mapping_payload
         # regulation_trace 업데이트 (in-memory)
-        trace_entries = self._build_trace_entries(mapping_results, regulation_meta)
+        trace_entries = self._build_trace_entries(mapping_results, regulation_meta, regulation_cache)
         if trace_entries:
             existing_trace = product.get("regulation_trace") or {}
             existing_list = existing_trace.get("trace") or []
@@ -1332,27 +1454,15 @@ Reasoning: {change_evidence.get('reasoning', {}).get('step4_final_judgment', 'N/
                 if current_value is None and present_value is not None:
                     current_value = present_value
 
-                regulation_meta = dict(cand.get("metadata") or {})
-                regulation_meta["semantic_score"] = cand.get("semantic_score")
-                change_matches = self._match_change_results_to_candidate(
-                    change_scope, cand
-                )
-                if change_matches:
-                    regulation_meta["change_detection_matches"] = change_matches
-                if rerank_result:
-                    regulation_meta["rerank"] = rerank_result
-
                 return MappingItem(
-                    product_id=product_id,
-                    product_name=product_name,
                     feature_name=feature_name,
                     applies=llm_out["applies"],
                     required_value=required_value,
                     current_value=current_value,
                     gap=llm_out["gap"],
+                    reasoning=llm_out.get("reasoning", "")[:250],  # 최대 250자
                     regulation_chunk_id=cand["chunk_id"],
                     regulation_summary=cand["chunk_text"][:120],
-                    regulation_meta=regulation_meta,
                     parsed=parsed,
                 )
 
@@ -1397,13 +1507,30 @@ Reasoning: {change_evidence.get('reasoning', {}).get('step4_final_judgment', 'N/
                                 ),
                             }
 
+        # regulation_cache 생성
+        regulation_cache = {}
+        for item in mapping_results:
+            chunk_id = item["regulation_chunk_id"]
+            if chunk_id not in regulation_cache:
+                meta = change_scope.get("raw_results", [])
+                matched_change = next(
+                    (r for r in meta if r.get("chunk_id") == chunk_id or 
+                     r.get("new_ref_id") == chunk_id),
+                    None
+                )
+                regulation_cache[chunk_id] = {
+                    "change_detected": bool(matched_change),
+                    "confidence_score": matched_change.get("confidence_score") if matched_change else None,
+                    "change_type": matched_change.get("change_type") if matched_change else None,
+                }
+        
         return MappingResults(
             product_id=product_id,
+            product_name=product_name,
             items=mapping_results,
             targets=mapping_targets,
-            actionable_changes=change_scope.get("actionable_results", []),
-            pending_changes=change_scope.get("pending_results", []),
             unknown_requirements=unknown_requirements,
+            regulation_cache=regulation_cache,
         )
 
     def _merge_multi_product_results(
@@ -1412,24 +1539,25 @@ Reasoning: {change_evidence.get('reasoning', {}).get('step4_final_judgment', 'N/
         """여러 제품의 매핑 결과 병합."""
         all_items = []
         all_targets = {}
-        all_actionable = []
-        all_pending = []
         all_unknown = []
 
         for result in results:
             all_items.extend(result["items"])
             all_targets.update(result["targets"])
-            all_actionable.extend(result["actionable_changes"])
-            all_pending.extend(result["pending_changes"])
             all_unknown.extend(result["unknown_requirements"])
 
+        # regulation_cache 병합
+        merged_cache = {}
+        for result in results:
+            merged_cache.update(result.get("regulation_cache", {}))
+        
         return MappingResults(
             product_id="multi",
+            product_name="Multiple Products",
             items=all_items,
             targets=all_targets,
-            actionable_changes=all_actionable,
-            pending_changes=all_pending,
             unknown_requirements=all_unknown,
+            regulation_cache=merged_cache,
         )
 
 

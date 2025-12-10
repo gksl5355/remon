@@ -8,6 +8,8 @@ Inputs:
 [REGULATION_CHUNK]
 {chunk}
 
+{metadata}
+
 {change_evidence}
 
 The feature JSON contains:
@@ -22,10 +24,13 @@ Your tasks:
 3) Use the chunk's explicit number/condition; only fall back to target_value if the chunk clearly demands that feature but gives no number.
 4) Set current_value to present_value exactly.
 5) Compute gap only when both current_value and required_value are numeric: gap = current_value - required_value. Otherwise null.
-6) Provide clear reasoning explaining:
-   - Why applies is true/false
-   - Why required_value is this specific value or null
-   - Compliance status: "compliant" (meets requirement), "non_compliant" (violates requirement), "not_applicable" (regulation doesn't apply), or "unclear" (insufficient information)
+6) Provide concise, citation-based reasoning (MAX 250 characters) in this format:
+   "[Section/Article §XXX] [Core regulation content] [Applies/Does not apply because...]"
+   
+   Examples:
+   - "§1234.56 니코틴 최대 0.3mg/g 제한. 현재 1.2mg/g로 기준 초과."
+   - "OMB 0910-0732 §904는 멘톨·향 속성을 규제하지 않으며 보고 의무에 한정됨."
+   - "§789 포장 경고문 필수. 현재 미표기로 위반."
 
 Return **JSON ONLY** exactly in the schema below. No extra text.
 {
@@ -33,7 +38,7 @@ Return **JSON ONLY** exactly in the schema below. No extra text.
   "required_value": number or string or null,
   "current_value": same as present_value (or null),
   "gap": number or null,
-  "reasoning": "Explain: (1) Why this regulation applies/doesn't apply to this feature, (2) Why required_value is this value or null, (3) Compliance status and impact",
+  "reasoning": "[Section §XXX] [Regulation summary] [Application status]. MAX 250 chars.",
   "parsed": {
     "category": string or null,
     "requirement_type": "max" | "min" | "range" | "boolean" | "other",
@@ -47,6 +52,9 @@ Rules:
 - Never invent values not present in the chunk. If target_value is used, state it directly as required_value.
 - If the feature is unrelated, applies=false and explain why in reasoning.
 - Use change evidence (if provided) to contextualize the requirement and explain its significance.
+- **CRITICAL**: reasoning MUST start with section/article citation (e.g., "§1234.56" or "OMB 0910-0732 §904") and be under 250 characters.
+- Use the Section number from [REGULATION METADATA] if provided.
+- If required_value is null, explain WHY in reasoning: "N/A (not regulated)" or "N/A (already compliant)" or "N/A (unrelated feature)"
 Output only the JSON.
 """
 

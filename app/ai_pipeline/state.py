@@ -68,30 +68,30 @@ class MappingParsed(TypedDict):
 
 
 class MappingItem(TypedDict):
-    product_id: str
     feature_name: str
 
     applies: bool
     required_value: Any
     current_value: Any
     gap: Any
-    reasoning: str  # 매핑 판단 근거
+    reasoning: str  # 매핑 판단 근거 (최대 250자)
 
     regulation_chunk_id: str
-    regulation_summary: str
-    regulation_meta: Dict[str, Any]
-
+    regulation_summary: str  # 최대 120자
+    
     parsed: MappingParsed
 
 
 class MappingResults(TypedDict, total=False):
     product_id: str
+    product_name: str
     items: List[MappingItem]
     targets: Dict[str, MappingTarget]
-    actionable_changes: List[Dict[str, Any]]
-    pending_changes: List[Dict[str, Any]]
     unknown_requirements: List[Dict[str, Any]]
     recovered_feature_hints: List[str]
+    
+    # 규제 메타데이터 캐시 (중복 제거용)
+    regulation_cache: Dict[str, Dict[str, Any]]
 
 
 class MappingDebugInfo(TypedDict, total=False):
@@ -192,7 +192,7 @@ class AppState(TypedDict, total=False):
     preprocess_results: List[Dict[str, Any]]
     preprocess_summary: PreprocessSummary
     product_info: ProductInfo
-    retrieval: RetrievalResult
+    retrieval: RetrievalResult  # 향후 사용 예정
     mapping: MappingResults
     mapping_debug: MappingDebugInfo
     mapping_filters: Dict[str, Any]  # 매핑 필터 (국가, 규제 ID 등)
@@ -201,8 +201,8 @@ class AppState(TypedDict, total=False):
     mapping_context: MappingContext
     impact_scores: List[ImpactScoreItem]
     report: ReportDraft
-    translation_id: Optional[int]
-    change_id: Optional[int]
+    translation_id: Optional[int]  # 향후 사용 예정
+    change_id: Optional[int]  # 향후 사용 예정
 
     # Vision-Centric Preprocessing Pipeline 필드
     vision_extraction_result: List[Dict[str, Any]]  # 페이지별 Vision LLM 추출 결과
