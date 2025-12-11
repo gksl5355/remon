@@ -202,7 +202,16 @@ class ProductRepository(BaseRepository[Product]):
             if isinstance(value, Decimal):
                 value = float(value)
             
-            features[field] = value
+            # ✅ LLM 환각 방지: 단위 포함 값으로 변환
+            if field == "nicotine" and value is not None:
+                features[field] = f"{value} mg/g"
+            elif field == "tar" and value is not None:
+                features[field] = f"{value} mg/g"
+            elif field == "revenue" and value is not None:
+                features[field] = f"${value:,.0f}"
+            else:
+                features[field] = value
+            
             feature_units[field] = unit
         
         # 2. Boolean 특성 처리

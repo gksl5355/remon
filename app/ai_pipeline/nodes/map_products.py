@@ -80,6 +80,13 @@ class MappingNode:
     # ----------------------------------------------------------------------
     def _normalize_token(self, value: str) -> str:
         return value.lower().replace(" ", "_").replace("-", "_").replace(".", "_")
+    
+    def _normalize_section_ref(self, section_ref: str) -> str:
+        """조항 번호 정규화 (§1160.5, 1160.5, § 1160.5 → 1160.5)."""
+        import re
+        normalized = re.sub(r"[§\s]", "", section_ref)
+        match = re.search(r"(\d+\.\d+)", normalized)
+        return match.group(1) if match else normalized
 
     def _extract_change_scope(
         self,
@@ -141,10 +148,9 @@ class MappingNode:
                 # 너무 낮은 신뢰도는 스킵
                 continue
 
-            # 문서/청크 식별자 수집 (검색 필터)
+            # 문서/청크 식별자 수집 (검색 필터) - regulation_id 제외
             for key in (
                 "doc_id",
-                "regulation_id",
                 "new_regulation_id",
                 "legacy_regulation_id",
                 "meta_doc_id",
@@ -208,13 +214,24 @@ class MappingNode:
     def _build_change_filters(
         self, change_scope: Dict[str, Any]
     ) -> Optional[Dict[str, Any]]:
+        """Change Detection 결과를 Qdrant 필터로 변환 (Section 기반)."""
         filters: Dict[str, Any] = {}
-        doc_filters = change_scope.get("doc_filters") or set()
-        chunk_filters = change_scope.get("chunk_filters") or set()
-        if doc_filters:
-            filters["meta_doc_id"] = list(doc_filters)
-        if chunk_filters:
-            filters["chunk_id"] = list(chunk_filters)
+        
+        # 🔑 Section 기반 필터링 (가장 중요)
+        section_refs = set()
+        for result in (change_scope.get("actionable_results") or []) + (change_scope.get("pending_results") or []):
+            section = result.get("section_ref")
+            if section:
+                # Section 정규화 (§1160.5 → 1160.5)
+                import re
+                normalized = re.sub(r"[§\s]", "", section)
+                match = re.search(r"(\d+\.\d+)", normalized)
+                section_refs.add(match.group(1) if match else normalized)
+        
+        if section_refs:
+            filters["section_ref"] = list(section_refs)
+            logger.debug(f"🎯 Section 필터: {list(section_refs)[:3]}...")
+        
         return filters or None
 
     def _select_features_for_mapping(
@@ -329,7 +346,6 @@ class MappingNode:
             str(v)
             for v in (
                 change_result.get("doc_id"),
-                change_result.get("regulation_id"),
                 change_result.get("new_regulation_id"),
                 change_result.get("legacy_regulation_id"),
                 change_result.get("meta_doc_id"),
@@ -380,20 +396,14 @@ class MappingNode:
     def _build_regulation_filters(
         self, regulation: Optional[Dict[str, Any]]
     ) -> Dict[str, Any]:
-        """state.regulation 메타데이터 기반 검색 필터."""
+        """state.regulation 메타데이터 기반 검색 필터 (국가만 사용)."""
         if not regulation:
             return {}
         filters: Dict[str, Any] = {}
-        for key in (
-            "country",
-            "citation_code",
-            "effective_date",
-            "title",
-            "regulation_id",
-        ):
-            val = regulation.get(key)
-            if val:
-                filters[key] = val
+        # 국가 정보만 필터링에 사용
+        country = regulation.get("country") or regulation.get("jurisdiction_code")
+        if country:
+            filters["country"] = country
         return filters
 
     def _merge_filters(
@@ -630,9 +640,15 @@ class MappingNode:
         else:
             combined_query = base_query
 
-        filters = build_product_filters(product)
+        # 국가 필터만 사용
+        filters = {}
+        country = product.get("country")
+        if country:
+            filters["country"] = country
         if extra_filters:
-            filters.update(extra_filters)
+            # extra_filters에서도 국가만 추출
+            if "country" in extra_filters:
+                filters["country"] = extra_filters["country"]
 
         async def _search_once(q: str) -> RetrievalOutput:
             return await self.search_tool.search(
@@ -1071,7 +1087,7 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
             unit = units.get(feature_name)
             target_value = target_state.get(feature_name)
 
-            # a) 검색 TOOL 호출
+            # a) 검색 TOOL 호출 (🔑 Change Detection 기반 Section 필터링)
             if self.debug_enabled:
                 logger.info(
                     "🔍 Searching feature=%s value=%s unit=%s",
@@ -1079,12 +1095,26 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
                     present_value,
                     unit or "-",
                 )
+            
+            # 🔑 Change Hint에서 Section 추출
+            section_filter = None
+            if change_hint:
+                section_ref = change_hint.get("section_ref")
+                if section_ref:
+                    section_filter = {"section_ref": self._normalize_section_ref(section_ref)}
+                    logger.debug(f"🎯 Section 필터 적용: {section_ref}")
+            
+            # Section 필터 병합
+            final_filters = dict(merged_search_filters or {})
+            if section_filter:
+                final_filters.update(section_filter)
+            
             retrieval: RetrievalResult = await self._run_search(
                 product,
                 feature_name,
                 present_value,
                 unit,
-                merged_search_filters,
+                final_filters,
                 change_query=change_query,
             )
             original_count = len(retrieval["candidates"])
@@ -1122,33 +1152,52 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
 
             # b) LLM 매핑 수행 (후보별 병렬 + Semaphore 제한)
             async def process_candidate(cand: RetrievedChunk):
-                # 변경 감지 증거 추출
+                # 🔑 1순위: Chunk 메타데이터의 section_ref 사용
+                chunk_meta = cand.get("metadata", {})
+                section_ref = chunk_meta.get("section_ref")
+                
+                # 🔑 2순위: Change Detection Index에서 조회
+                change_context = None
+                change_index = state.get("change_detection_index", {})
+                if section_ref:
+                    normalized_section = self._normalize_section_ref(section_ref)
+                    if normalized_section in change_index:
+                        change_context = change_index[normalized_section]
+                        logger.debug(f"✅ Change Context 직접 매칭: {section_ref}")
+                
+                # 🔑 3순위: 텍스트 기반 추출 (fallback)
+                if not change_context and change_index:
+                    section = self._extract_section_from_chunk(
+                        chunk_meta, cand["chunk_text"]
+                    )
+                    if section and section in change_index:
+                        change_context = change_index[section]
+                        logger.debug(f"🎯 Change Context fallback: {section}")
+                
+                # 변경 감지 증거 추출 (기존 로직 유지)
                 change_matches = self._match_change_results_to_candidate(
                     change_scope, cand
                 )
                 change_evidence = change_matches[0] if change_matches else None
 
-                # 🔑 Change Detection Index에서 직접 조회
-                change_context = None
-                change_index = state.get("change_detection_index", {})
-                if change_index:
-                    section = self._extract_section_from_chunk(
-                        cand.get("metadata", {}), cand["chunk_text"]
-                    )
-                    if section and section in change_index:
-                        change_context = change_index[section]
-                        logger.debug(f"🎯 Change Context 발견: {section}")
-
+                # 🔑 Section 정보를 포함한 프롬프트 생성
                 prompt = self._build_prompt(
                     feature_name,
                     present_value,
                     target_value,
                     unit,
                     cand["chunk_text"],
-                    chunk_metadata=cand.get("metadata", {}),
+                    chunk_metadata=chunk_meta,
                     change_evidence=change_evidence,
                     change_context=change_context,
                 )
+                
+                # 📊 디버그: Section 연결 상태 로깅
+                if self.debug_enabled and section_ref:
+                    logger.debug(
+                        f"  ➡️ Chunk {cand.get('chunk_id')} → Section {section_ref} "
+                        f"(Change: {bool(change_context)})"
+                    )
 
                 # Semaphore로 LLM 호출 제한
                 async with llm_semaphore:
@@ -1172,7 +1221,7 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
                     required_value=required_value,
                     current_value=current_value,
                     gap=llm_out["gap"],
-                    reasoning=llm_out.get("reasoning", "")[:250],  # 최대 250자
+                    reasoning=llm_out.get("reasoning", "")[:250],
                     regulation_chunk_id=cand["chunk_id"],
                     regulation_summary=cand["chunk_text"][:120],
                     parsed=parsed,

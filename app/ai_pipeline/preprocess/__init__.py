@@ -187,6 +187,14 @@ async def preprocess_node(state: AppState) -> AppState:
                         logger.info(
                             f"✅ DB 저장 완료: regulation_id={regulation.regulation_id}"
                         )
+                        
+                        # 🔑 change_context 자동 채우기 (변경 감지용)
+                        if request.get("enable_change_detection"):
+                            state["change_context"] = {
+                                "new_regulation_id": regulation.regulation_id,
+                                "new_regul_data": result,
+                            }
+                            logger.info("✅ change_context 자동 설정 완료")
                     except Exception as e:
                         await session.rollback()
                         logger.error(f"❌ DB 저장 실패: {e}")
@@ -259,8 +267,22 @@ async def preprocess_node(state: AppState) -> AppState:
         fail_count,
     )
 
-    # NOTE: 변경 감지는 graph.py의 detect_changes 노드에서 실행됨
-    # preprocess는 데이터 전처리만 담당
+    # 변경 감지 활성화 시 regulation 메타데이터 추가
+    if request.get("enable_change_detection") and processed_results:
+        first_result = processed_results[0]
+        if first_result.get("status") == "success" and use_vision:
+            vision_pages = first_result.get("vision_extraction_result", [])
+            if vision_pages:
+                metadata = vision_pages[0].get("structure", {}).get("metadata", {})
+                state["regulation"] = {
+                    "country": metadata.get("jurisdiction_code", "US"),
+                    "title": metadata.get("title", "Unknown Regulation"),
+                    "effective_date": metadata.get("effective_date"),
+                    "citation_code": metadata.get("citation_code"),
+                    "authority": metadata.get("authority"),
+                    "regulation_id": first_result.get("regulation_id"),
+                }
+                logger.info("✅ regulation 메타데이터 추가 완료")
 
     return state
 
