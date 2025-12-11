@@ -106,6 +106,10 @@ class PreprocessConfig:
     OPENAI_TIMEOUT: int = int(os.getenv("OPENAI_TIMEOUT", "30"))
     """OpenAI 요청 타임아웃 (초). 기본값: 30"""
     
+    # ==================== Change Detection ====================
+    CHANGE_DETECTION_MODEL: str = os.getenv("CHANGE_DETECTION_MODEL", "gpt-5-nano")
+    """변경 감지 전용 모델. 기본값: gpt-5-nano"""
+    
     # ==================== Vision Pipeline ====================
     VISION_MODEL_COMPLEX: str = os.getenv("VISION_MODEL_COMPLEX", "gpt-4o")
     """복잡한 표 처리용 Vision 모델. 기본값: gpt-4o"""

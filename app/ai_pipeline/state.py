@@ -3,7 +3,7 @@ module: state.py
 description: LangGraph 전역 State 스키마 정의 – Production Minimal Version
 author: AI Agent
 created: 2025-01-18
-updated: 2025-12-09
+updated: 2025-01-21 (누락된 State 키 추가: needs_embedding, change_detection_ran_inline)
 dependencies:
     - typing
 """
@@ -68,30 +68,30 @@ class MappingParsed(TypedDict):
 
 
 class MappingItem(TypedDict):
-    product_id: str
     feature_name: str
 
     applies: bool
     required_value: Any
     current_value: Any
     gap: Any
+    reasoning: str  # 매핑 판단 근거 (최대 250자)
 
     regulation_chunk_id: str
-    regulation_summary: str
-    regulation_meta: Dict[str, Any]
-
+    regulation_summary: str  # 최대 120자
+    
     parsed: MappingParsed
 
 
-class MappingResults(TypedDict):
+class MappingResults(TypedDict, total=False):
     product_id: str
+    product_name: str
     items: List[MappingItem]
     targets: Dict[str, MappingTarget]
-    actionable_changes: List[Dict[str, Any]]
-    pending_changes: List[Dict[str, Any]]
     unknown_requirements: List[Dict[str, Any]]
-    # change detection에 힌트가 없을 때, LLM 분류로 얻은 feature 재매핑 요청
     recovered_feature_hints: List[str]
+    
+    # 규제 메타데이터 캐시 (중복 제거용)
+    regulation_cache: Dict[str, Dict[str, Any]]
 
 
 class MappingDebugInfo(TypedDict, total=False):
@@ -192,7 +192,7 @@ class AppState(TypedDict, total=False):
     preprocess_results: List[Dict[str, Any]]
     preprocess_summary: PreprocessSummary
     product_info: ProductInfo
-    retrieval: RetrievalResult
+    retrieval: RetrievalResult  # 향후 사용 예정
     mapping: MappingResults
     mapping_debug: MappingDebugInfo
     mapping_filters: Dict[str, Any]  # 매핑 필터 (국가, 규제 ID 등)
@@ -201,8 +201,8 @@ class AppState(TypedDict, total=False):
     mapping_context: MappingContext
     impact_scores: List[ImpactScoreItem]
     report: ReportDraft
-    translation_id: Optional[int]
-    change_id: Optional[int]
+    translation_id: Optional[int]  # 향후 사용 예정
+    change_id: Optional[int]  # 향후 사용 예정
 
     # Vision-Centric Preprocessing Pipeline 필드
     vision_extraction_result: List[Dict[str, Any]]  # 페이지별 Vision LLM 추출 결과
@@ -215,11 +215,13 @@ class AppState(TypedDict, total=False):
     change_summary: Dict[str, Any]  # 변경 감지 요약
     change_detection: Dict[str, Any]
     regulation_analysis_hints: Dict[str, Any]  # 변경감지 노드가 매핑 노드에 전달하는 힌트
+    needs_embedding: bool  # 임베딩 필요 여부 (변경 감지 또는 신규 규제)
+    change_detection_ran_inline: bool  # preprocess에서 변경 감지 실행 여부 (중복 방지)
     
     # regulation info (매핑 노드 입력용)
     regulation: Dict[str, Any]  # 규제 정보 (매핑 노드가 사용)
     regulation_id: Optional[int]  # DB에 저장된 regulation_id
     
-    #validation
+    # validation
     validation_result: Optional[Dict[str, Any]]
-    validation_retry_count: int = 0
+    validation_retry_count: int

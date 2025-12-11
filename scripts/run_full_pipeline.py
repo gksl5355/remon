@@ -3,7 +3,7 @@ module: run_full_pipeline.py
 description: REMON AI Pipeline 전체 실행 스크립트 (S3 PDF → 최종 리포트)
 author: AI Agent
 created: 2025-01-19
-updated: 2025-01-20
+updated: 2025-01-21 (함수 시그니처 통합: traceable + citation_code 파라미터)
 
 실행 방법:
     # Legacy 규제 전처리 (1회만)
@@ -18,16 +18,21 @@ import asyncio
 import logging
 import sys
 import argparse
+import copy
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any
+from sqlalchemy import text
 
 # 프로젝트 루트 경로 추가
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.ai_pipeline.graph import build_graph
+from app.ai_pipeline.preprocess import preprocess_node
 from app.ai_pipeline.state import AppState
 from app.core.database import AsyncSessionLocal
+from langsmith import traceable
+from app.core.repositories.product_repository import ProductRepository
 
 # 로그 디렉토리 생성
 Path("logs").mkdir(exist_ok=True)
@@ -214,54 +219,90 @@ async def run_legacy_preprocessing():
     logger.info("=" * 80)
 
 
-async def run_full_pipeline():
-    """전체 파이프라인 실행 (LangGraph 방식)"""
-
-    # 테스트용 하드코딩 설정
-    new_s3_key = "skala2/skala-2.4.17/regulation/US/Regulation Data B (1).pdf"
-    local_new_path = "/tmp/Regulation_Data_B.pdf"
+@traceable(name="REMON_Full_Pipeline", run_type="chain")
+async def run_full_pipeline(citation_code: str):
+    """전체 파이프라인 실행 (S3 자동 로드 + LangGraph)"""
 
     logger.info("=" * 80)
     logger.info("🚀 REMON AI Pipeline 전체 실행 시작")
     logger.info("=" * 80)
 
-    # Step 1: S3에서 New 규제 PDF 다운로드
-    try:
-        logger.info("\n[Step 1] S3에서 New 규제 PDF 다운로드")
-        await download_pdf_from_s3(new_s3_key, local_new_path)
-        logger.info(f"   ✅ New: {local_new_path}")
-    except Exception as e:
-        logger.error(f"❌ 파일 다운로드 실패: {e}")
-        return
+    # Step 1: Legacy regulation_id DB 조회 (citation_code 기반)
+    logger.info("\n[Step 1] Legacy regulation_id DB 조회")
+    from app.core.repositories.regulation_repository import RegulationRepository
+    
+    legacy_regulation_id = None
+    new_regulation_id = None
+    
+    async with AsyncSessionLocal() as session:
+        repo = RegulationRepository()
+        try:
+            legacy_reg = await repo.find_by_citation_code(
+                session,
+                citation_code=citation_code,
+            )
+            if legacy_reg:
+                legacy_regulation_id = legacy_reg.regulation_id
+                logger.info(f"  ✅ Legacy 발견: regulation_id={legacy_regulation_id}")
+            else:
+                logger.info("  ℹ️ Legacy 없음 (신규 규제로 처리)")
+        except Exception as e:
+            logger.warning(f"  ⚠️ Legacy 조회 실패: {e}")
 
-    # Step 2: LangGraph 파이프라인 실행 (DB 전체 제품 자동 처리)
-    logger.info("\n[Step 2] LangGraph 파이프라인 실행 (DB 전체 제품 자동 처리)")
-    logger.info("  ℹ️ Legacy 검색은 change_detection_node에서 자동 수행됩니다")
-    logger.info("  ℹ️ 제품 매핑은 map_products_node에서 DB 전체 제품을 자동 조회합니다")
+    # Step 2: 최신/이전 규제 ID 결정 (DB 기준)
+    logger.info("\n[Step 2] 규제 ID 결정 (citation_code 기반)")
+    async with AsyncSessionLocal() as session:
+        repo = RegulationRepository()
+        try:
+            latest, previous = await repo.find_latest_and_previous_by_citation(
+                session, citation_code
+            )
+            if latest:
+                new_regulation_id = latest.regulation_id
+                logger.info(f"  ✅ 최신 규제: regulation_id={new_regulation_id}")
+            if previous:
+                legacy_regulation_id = previous.regulation_id
+                logger.info(f"  ✅ 이전(legacy): regulation_id={legacy_regulation_id}")
+            elif not legacy_regulation_id:
+                logger.info("  ℹ️ 이전 버전 없음")
+        except Exception as e:
+            logger.warning(f"  ⚠️ 규제 ID 결정 실패: {e}")
 
-    app = build_graph()
+    # Step 3: 전체 파이프라인 실행 (S3 자동 로드 + 동적 필터링)
+    logger.info("\n[Step 3] 전체 파이프라인 실행")
+    logger.info("  ℹ️ S3에서 오늘 업로드된 파일 자동 로드 (skala2/skala-2.4.17/test)")
+    logger.info("  ℹ️ 전처리에서 추출한 국가 정보로 제품 자동 필터링")
+    logger.info("  ℹ️ Legacy 검색은 change_detection_node에서 자동 수행")
 
     initial_state: AppState = {
         "preprocess_request": {
-            "pdf_paths": [local_new_path],
+            "load_from_s3": True,  # S3 자동 로드 활성화
+            "s3_date": None,  # None이면 오늘 날짜
             "use_vision_pipeline": True,
             "enable_change_detection": True,
+            # pdf_paths 없음 → S3에서 자동 로드
+            # product_info 없음 → 국가 기반 동적 필터링
         },
-        "change_context": {},  # Legacy는 change_detection_node가 자동 검색
-        "mapping_filters": {},  # 빈 딕셔너리: map_products_node가 DB에서 자동 조회
+        "change_context": {
+            "legacy_regulation_id": legacy_regulation_id,
+            "new_regulation_id": new_regulation_id,
+        },
+        "mapping_filters": {},  # 빈 딕셔너리: 국가 기반 자동 필터링
         "validation_retry_count": 0,
     }
 
+    app = build_graph()
+    
     try:
         final_state = await app.ainvoke(initial_state, config={"configurable": {}})
-        logger.info("✅ 파이프라인 실행 완료")
+        logger.info("✅ 전체 파이프라인 실행 완료")
     except Exception as e:
         logger.error(f"❌ 파이프라인 실행 실패: {e}", exc_info=True)
         return
 
-    # Step 3: 결과 출력
-    logger.info("\n[Step 3] 실행 결과 요약")
-    print_pipeline_summary(final_state)
+    if final_state:
+        logger.info("\n[Step 4] 실행 결과 요약")
+        print_pipeline_summary(final_state)
 
     return final_state
 
@@ -275,12 +316,17 @@ async def main():
         default="new",
         help="실행 모드: legacy (Legacy 전처리만), new (전체 파이프라인)",
     )
+    parser.add_argument(
+        "--citation-code",
+        default="21 CFR Part 1160",
+        help="규제 식별용 citation_code (legacy/new 매칭에 사용)"
+    )
     args = parser.parse_args()
 
     if args.mode == "legacy":
         await run_legacy_preprocessing()
     else:
-        await run_full_pipeline()
+        await run_full_pipeline(citation_code=args.citation_code)
 
 
 if __name__ == "__main__":
