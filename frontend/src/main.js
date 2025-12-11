@@ -1,4 +1,4 @@
-import { createApp, ref } from "vue";
+import { createApp, ref, watchEffect } from "vue"; // ← watchEffect 추가!
 import App from "./App.vue";
 import router from "./router";
 
@@ -10,7 +10,6 @@ import { use } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import VueECharts from "vue-echarts";
 
-// ECharts 등록
 use([CanvasRenderer, MapChart, TooltipComponent, VisualMapComponent, GeoComponent]);
 
 const app = createApp(App);
@@ -18,7 +17,16 @@ const app = createApp(App);
 // ----------------------------
 // 🌙 전역 다크모드 provide
 // ----------------------------
-const isDark = ref(false);
+const isDark = ref(true);
+
+watchEffect(() => {
+  if (isDark.value) {
+    document.documentElement.classList.add("dark");
+  } else {
+    document.documentElement.classList.remove("dark");
+  }
+});
+
 const toggleDarkMode = () => {
   isDark.value = !isDark.value;
 };

@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-#!/usr/bin/env bash
-=======
 #!/usr/bin/bash
->>>>>>> origin/main
 set -e
 
 echo "🐍 Python 3.11.13 환경 자동 세팅 시작..."
@@ -98,8 +94,6 @@ echo ""
 echo "   source $RC_FILE"
 echo ""
 
-<<<<<<< HEAD
-=======
 # ------------------------------
 # 6️⃣ uv 설치 (Python 패키지 관리자)
 # ------------------------------
@@ -134,4 +128,3 @@ echo "가상환경 활성화:"
 echo "   source .venv/bin/activate"
 echo ""
 
->>>>>>> origin/main

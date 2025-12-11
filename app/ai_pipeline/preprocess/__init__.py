@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-"""Preprocessing utilities for PDF, OCR, text cleaning, and translation."""
-
-
-=======
 """
 Preprocessing entrypoints exposed to the LangGraph pipeline.
 """
@@ -242,4 +237,3 @@ async def preprocess_node(state: AppState) -> AppState:
 
 
 __all__ = ["preprocess_node"]
->>>>>>> origin/main
