@@ -52,32 +52,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def extract_metadata(
-    vision_result: Dict[str, Any], regulation_id: int
-) -> Dict[str, Any]:
-    """Vision 결과에서 regulation 메타데이터 추출"""
-    pages = vision_result.get("vision_extraction_result", [])
-    if not pages:
-        return {
-            "country": "US",
-            "title": "Unknown Regulation",
-            "effective_date": None,
-            "regulation_id": regulation_id,
-        }
-
-    first_page = pages[0]
-    metadata = first_page.get("structure", {}).get("metadata", {})
-
-    return {
-        "country": metadata.get("jurisdiction_code", "US"),
-        "title": metadata.get("title", "Unknown Regulation"),
-        "effective_date": metadata.get("effective_date"),
-        "citation_code": metadata.get("citation_code"),
-        "authority": metadata.get("authority"),
-        "regulation_id": regulation_id,
-    }
-
-
 def print_pipeline_summary(final_state: AppState):
     """파이프라인 실행 결과 요약 출력"""
     logger.info("\n" + "=" * 80)
@@ -197,13 +171,15 @@ async def run_legacy_preprocessing():
     logger.info("\n[Step 3] PostgreSQL DB 저장")
     from app.core.repositories.regulation_repository import RegulationRepository
 
+    regulation_id = None
     async with AsyncSessionLocal() as session:
         repo = RegulationRepository()
         try:
             legacy_reg = await repo.create_from_vision_result(session, legacy_result)
             await session.commit()
+            regulation_id = legacy_reg.regulation_id
             logger.info(
-                f"  ✅ Legacy 저장 완료: regulation_id={legacy_reg.regulation_id}"
+                f"  ✅ Legacy 저장 완료: regulation_id={regulation_id}"
             )
             logger.info(f"  ✅ citation_code: {legacy_reg.citation_code}")
         except Exception as e:
@@ -214,80 +190,60 @@ async def run_legacy_preprocessing():
             traceback.print_exc()
             return
 
+    # Step 4: 임베딩 (Qdrant 저장)
+    logger.info("\n[Step 4] 임베딩 및 VectorDB 저장")
+    from app.ai_pipeline.preprocess.semantic_processing import DualIndexer
+
+    chunks = legacy_result.get("chunks", [])
+    graph_data = legacy_result.get("graph_data", {"nodes": [], "edges": []})
+    vision_results = legacy_result.get("vision_extraction_result", [])
+
+    if chunks:
+        indexer = DualIndexer()
+        index_summary = indexer.index(
+            chunks=chunks,
+            graph_data=graph_data,
+            source_file=Path(local_legacy_path).name,
+            regulation_id=regulation_id,
+            vision_results=vision_results
+        )
+        logger.info(f"  ✅ 임베딩 완료: {index_summary.get('qdrant_chunks', 0)}개 청크")
+    else:
+        logger.warning("  ⚠️ 청크 없음, 임베딩 스킵")
+
     logger.info("\n" + "=" * 80)
-    logger.info("🎉 Legacy 규제 전처리 완료!")
+    logger.info("🎉 Legacy 규제 전처리 완료 (임베딩 포함)!")
     logger.info("=" * 80)
 
 
 @traceable(name="REMON_Full_Pipeline", run_type="chain")
-async def run_full_pipeline(citation_code: str):
-    """전체 파이프라인 실행 (S3 자동 로드 + LangGraph)"""
+async def run_full_pipeline(citation_code: str = None):
+    """전체 파이프라인 실행 (S3 자동 로드 + LangGraph)
+    
+    Args:
+        citation_code: 규제 식별 코드 (None이면 전처리에서 자동 추출)
+    """
 
     logger.info("=" * 80)
     logger.info("🚀 REMON AI Pipeline 전체 실행 시작")
     logger.info("=" * 80)
 
-    # Step 1: Legacy regulation_id DB 조회 (citation_code 기반)
-    logger.info("\n[Step 1] Legacy regulation_id DB 조회")
-    from app.core.repositories.regulation_repository import RegulationRepository
-    
-    legacy_regulation_id = None
-    new_regulation_id = None
-    
-    async with AsyncSessionLocal() as session:
-        repo = RegulationRepository()
-        try:
-            legacy_reg = await repo.find_by_citation_code(
-                session,
-                citation_code=citation_code,
-            )
-            if legacy_reg:
-                legacy_regulation_id = legacy_reg.regulation_id
-                logger.info(f"  ✅ Legacy 발견: regulation_id={legacy_regulation_id}")
-            else:
-                logger.info("  ℹ️ Legacy 없음 (신규 규제로 처리)")
-        except Exception as e:
-            logger.warning(f"  ⚠️ Legacy 조회 실패: {e}")
-
-    # Step 2: 최신/이전 규제 ID 결정 (DB 기준)
-    logger.info("\n[Step 2] 규제 ID 결정 (citation_code 기반)")
-    async with AsyncSessionLocal() as session:
-        repo = RegulationRepository()
-        try:
-            latest, previous = await repo.find_latest_and_previous_by_citation(
-                session, citation_code
-            )
-            if latest:
-                new_regulation_id = latest.regulation_id
-                logger.info(f"  ✅ 최신 규제: regulation_id={new_regulation_id}")
-            if previous:
-                legacy_regulation_id = previous.regulation_id
-                logger.info(f"  ✅ 이전(legacy): regulation_id={legacy_regulation_id}")
-            elif not legacy_regulation_id:
-                logger.info("  ℹ️ 이전 버전 없음")
-        except Exception as e:
-            logger.warning(f"  ⚠️ 규제 ID 결정 실패: {e}")
-
-    # Step 3: 전체 파이프라인 실행 (S3 자동 로드 + 동적 필터링)
-    logger.info("\n[Step 3] 전체 파이프라인 실행")
-    logger.info("  ℹ️ S3에서 오늘 업로드된 파일 자동 로드 (skala2/skala-2.4.17/test)")
-    logger.info("  ℹ️ 전처리에서 추출한 국가 정보로 제품 자동 필터링")
-    logger.info("  ℹ️ Legacy 검색은 change_detection_node에서 자동 수행")
+    # Step 1: 전체 파이프라인 실행 (S3 자동 로드 + 동적 필터링)
+    logger.info("\n[Step 1] 전체 파이프라인 실행")
+    logger.info("  ℹ️ S3에서 오늘 업로드된 파일 자동 로드")
+    logger.info("  ℹ️ 전처리에서 citation_code 자동 추출")
+    logger.info("  ℹ️ change_detection_node에서 Legacy 자동 검색")
+    logger.info("  ℹ️ 국가 정보로 제품 자동 필터링")
 
     initial_state: AppState = {
         "preprocess_request": {
-            "load_from_s3": True,  # S3 자동 로드 활성화
-            "s3_date": None,  # None이면 오늘 날짜
+            "load_from_s3": True,
+            "s3_date": None,
             "use_vision_pipeline": True,
             "enable_change_detection": True,
-            # pdf_paths 없음 → S3에서 자동 로드
-            # product_info 없음 → 국가 기반 동적 필터링
         },
-        "change_context": {
-            "legacy_regulation_id": legacy_regulation_id,
-            "new_regulation_id": new_regulation_id,
-        },
-        "mapping_filters": {},  # 빈 딕셔너리: 국가 기반 자동 필터링
+        "change_context": {},  # 전처리 후 자동 채워짐
+        "mapping_filters": {},
         "validation_retry_count": 0,
     }
 
@@ -318,8 +274,8 @@ async def main():
     )
     parser.add_argument(
         "--citation-code",
-        default="21 CFR Part 1160",
-        help="규제 식별용 citation_code (legacy/new 매칭에 사용)"
+        default=None,
+        help="(선택) 규제 식별용 citation_code (미지정 시 전처리에서 자동 추출)"
     )
     args = parser.parse_args()
 
