@@ -107,19 +107,20 @@
 </template>
 
 <script setup>
-import { inject } from "vue";
+import { inject, onMounted, ref } from "vue";
 const isDark = inject("isDark");
 
-const timeline = [
-  { id: 1, date: "US · 2025-12-03", title: "오늘 변경사항 없음", type: "no-change", description: "시스템 모니터링 활성", },
-  { id: 2, date: "US · 2025-12-02", title: "전자담배 광고 규제 업데이트", type: "change", description: "디지털 마케팅 제한에 대한 새로운 연방 지침", },
-  { id: 3, date: "ID · 2025-12-01", title: "포장 요구사항 신설", type: "new", description: "건강 경고 라벨 크기가 패키지의 90%로 증가", },
-  { id: 4, date: "ID · 2025-11-30", title: "흡연 구역 규제 확대", type: "change", description: "금연 구역으로 지정된 추가 공공 장소", },
-  { id: 5, date: "RU · 2025-11-28", title: "정기 모니터링 검사 완료", type: "no-change", description: "규제 변경 사항 없음", },
-  { id: 6, date: "ID · 2025-12-01", title: "포장 요구사항 신설", type: "new", description: "건강 경고 라벨 크기가 패키지의 90%로 증가", },
-  { id: 7, date: "ID · 2025-11-30", title: "흡연 구역 규제 확대", type: "change", description: "금연 구역으로 지정된 추가 공공 장소", },
-  { id: 8, date: "RU · 2025-11-28", title: "정기 모니터링 검사 완료", type: "no-change", description: "규제 변경 사항 없음", },
-];
+const timeline = ref([]);
+
+const fetchTimeline = async () => {
+  const response = await fetch('http://localhost:8000/api/main/timeline');
+  timeline.value = await response.json();
+};
+
+onMounted(() => {
+  fetchTimeline();
+});
+
 </script>
 
 <style scoped>
