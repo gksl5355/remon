@@ -145,39 +145,46 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
 
     # ✅ 제품별로 그룹화
     from collections import defaultdict
+
     product_groups = defaultdict(list)
-    
+
     logger.info(f"📊 mapping_items 개수: {len(mapping_items)}")
-    
+
     for item in mapping_items:
         feature_name = item.get("feature_name", "")
         item_product_name = item.get("product_name") or product_name
-        
+
         logger.debug(f"  - {item_product_name} / {feature_name}")
-        
+
         # required_value 표시
         reasoning = item.get("reasoning", "")
-        required_value = item.get('required_value')
+        required_value = item.get("required_value")
         if required_value is None:
             reasoning_lower = reasoning.lower()
             if "not regulated" in reasoning_lower or "규제하지 않" in reasoning:
                 required_display = "규제 대상 아님"
             elif "already compliant" in reasoning_lower or "충족" in reasoning:
                 required_display = "기준 충족"
-            elif "unrelated" in reasoning_lower or "무관" in reasoning or "비적용" in reasoning:
+            elif (
+                "unrelated" in reasoning_lower
+                or "무관" in reasoning
+                or "비적용" in reasoning
+            ):
                 required_display = "해당 없음"
             else:
                 required_display = "규제 없음"
         else:
             required_display = str(required_value)
-        
+
         # 제품별로 그룹화
-        product_groups[item_product_name].append([
-            feature_name,
-            f"현재: {item.get('current_value', '-')}, 필요: {required_display}",
-            reasoning,
-        ])
-    
+        product_groups[item_product_name].append(
+            [
+                feature_name,
+                f"현재: {item.get('current_value', '-')}, 필요: {required_display}",
+                reasoning,
+            ]
+        )
+
     # 참고 문헌 생성: Legacy + New 규제 모두 포함
     references_map = {}  # regulation_id를 키로 중복 제거
 
@@ -298,22 +305,24 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
     # ✅ 제품별 하위 테이블 생성
     product_tables = []
     for prod_name, rows in sorted(product_groups.items()):
-        product_tables.append({
-            "product_name": prod_name,
-            "headers": ["제품 속성", "현재 vs 필요", "판단 근거"],
-            "rows": rows if rows else [["데이터 없음", "-", "-"]]
-        })
-    
+        product_tables.append(
+            {
+                "product_name": prod_name,
+                "headers": ["제품 속성", "현재 vs 필요", "판단 근거"],
+                "rows": rows if rows else [["데이터 없음", "-", "-"]],
+            }
+        )
+
     # ✅ 2. 제품 분석 (단일 섹션, 하위 테이블 포함)
     products_section = {
         "id": "products_analysis",
         "type": "nested_tables",
         "title": "2. 제품 분석",
-        "tables": product_tables
+        "tables": product_tables,
     }
-    
+
     logger.info(f"📊 제품 테이블 생성: {len(product_tables)}개 제품")
-    
+
     return [
         overall_summary,
         change_summary_section,
@@ -430,18 +439,28 @@ async def report_node(state: AppState) -> Dict[str, Any]:
             # Change Detection Keynote 저장 (우선)
             change_keynote_data = state.get("change_keynote_data")
             if change_keynote_data:
-                keynote = await keynote_repo.create_keynote(db_session, change_keynote_data)
+                keynote = await keynote_repo.create_keynote(
+                    db_session, change_keynote_data
+                )
                 logger.info(f"✅ Change Keynote 저장: {keynote.keynote_id}")
             else:
                 # Fallback: 기존 방식 (Mapping 기반)
                 keynote = await keynote_repo.create_keynote(
                     db_session,
                     {
-                        "country": meta.get('country', ''),
-                        "category": mapping_items[0].get('parsed',{}).get('category','') if mapping_items else '',
-                        "summary": mapping_items[0].get('regulation_summary','') if mapping_items else '',
-                        "impact": impact_score.get('impact_level','N/A')
-                    }
+                        "country": meta.get("country", ""),
+                        "category": (
+                            mapping_items[0].get("parsed", {}).get("category", "")
+                            if mapping_items
+                            else ""
+                        ),
+                        "summary": (
+                            mapping_items[0].get("regulation_summary", "")
+                            if mapping_items
+                            else ""
+                        ),
+                        "impact": impact_score.get("impact_level", "N/A"),
+                    },
                 )
                 logger.info(f"Keynote 저장 완료: {keynote.keynote_id}")
 

@@ -475,6 +475,7 @@ class MappingNode:
         mapping_results: List[MappingItem],
         regulation_meta: Dict[str, Any],
         regulation_cache: Dict[str, Dict[str, Any]],
+        regulation_cache: Dict[str, Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
         now_ts = datetime.utcnow().isoformat() + "Z"
         entries: List[Dict[str, Any]] = []
@@ -495,6 +496,8 @@ class MappingNode:
                 {
                     "feature": item.get("feature_name"),
                     "applied_value": item.get("required_value"),
+                    "regulation_record_id": chunk_id,
+                    "mapping_score": cache_data.get("confidence_score"),
                     "regulation_record_id": chunk_id,
                     "mapping_score": cache_data.get("confidence_score"),
                     "change_status": change_status,
@@ -808,6 +811,9 @@ class MappingNode:
         chunk_metadata: Optional[Dict[str, Any]] = None,
         change_evidence: Optional[Dict[str, Any]] = None,
         change_context: Optional[Dict[str, Any]] = None,
+        chunk_metadata: Optional[Dict[str, Any]] = None,
+        change_evidence: Optional[Dict[str, Any]] = None,
+        change_context: Optional[Dict[str, Any]] = None,
     ):
         feature = {
             "name": feature_name,
@@ -902,6 +908,13 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
                     },
                     {"role": "user", "content": prompt},
                 ],
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a compliance mapping agent. Provide concise, citation-based reasoning (MAX 250 chars) starting with section/article number (e.g., '§1234.56'). Use Section from REGULATION METADATA if provided. If required_value is null, explain why: 'N/A (not regulated)' or 'N/A (already compliant)' or 'N/A (unrelated)'. Format: '[§XXX] [Core regulation] [Application status]'. Return JSON only.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
             )
             return json.loads(res.choices[0].message.content)
 
@@ -911,6 +924,7 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
                 "required_value": None,
                 "current_value": None,
                 "gap": None,
+                "reasoning": "LLM call failed",
                 "reasoning": "LLM call failed",
                 "parsed": {
                     "category": None,
@@ -964,6 +978,7 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
                         session, country
                     )
                 # ← 세션 닫힘 (여기서 끝)
+
                 if not products:
                     logger.warning(f"⚠️ {country} 국가 제품 없음")
                     state["mapping"] = MappingResults(
@@ -973,8 +988,13 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
                         actionable_changes=[],
                         pending_changes=[],
                         unknown_requirements=[],
+                        unknown_requirements=[],
                     )
                     return state
+
+                logger.info(
+                    f"✅ {len(products)}개 제품 발견: {[p['product_name'] for p in products[:3]]}..."
+                )
 
                 logger.info(
                     f"✅ {len(products)}개 제품 발견: {[p['product_name'] for p in products[:3]]}..."
@@ -988,6 +1008,9 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
                     all_mapping_results.append(result)
 
                 # 결과 병합
+                state["mapping"] = self._merge_multi_product_results(
+                    all_mapping_results
+                )
                 state["mapping"] = self._merge_multi_product_results(
                     all_mapping_results
                 )
@@ -1087,6 +1110,9 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
         # 🔥 feature별로 검색 TOOL → 매핑
         llm_semaphore = asyncio.Semaphore(10)
 
+        # 🔥 feature별로 검색 TOOL → 매핑
+        llm_semaphore = asyncio.Semaphore(10)
+
         async def process_feature(feature_name: str, present_value: Any):
             unit = units.get(feature_name)
             target_value = target_state.get(feature_name)
@@ -1156,6 +1182,7 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
             if ranked_candidates:
                 ranked_candidates = ranked_candidates[:1]
 
+            # b) LLM 매핑 수행 (후보별 병렬 + Semaphore 제한)
             # b) LLM 매핑 수행 (후보별 병렬 + Semaphore 제한)
             async def process_candidate(cand: RetrievedChunk):
                 # 🔑 1순위: Chunk 메타데이터의 section_ref 사용
@@ -1330,9 +1357,11 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
         mapping_payload = MappingResults(
             product_id=product_id,
             product_name=product_name,
+            product_name=product_name,
             items=mapping_results,
             targets=mapping_targets,
             unknown_requirements=unknown_requirements,
+            regulation_cache=regulation_cache,
             regulation_cache=regulation_cache,
         )
         # NOTE: mapping과 mapping_results는 동일한 데이터 (하위 호환성 유지)
