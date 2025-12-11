@@ -1,3 +1,4 @@
+#scripts/run_full_pipeline.py
 """
 module: run_full_pipeline.py
 description: REMON AI Pipeline 전체 실행 스크립트 (S3 PDF → 최종 리포트)
@@ -215,96 +216,79 @@ async def run_legacy_preprocessing():
     logger.info("🎉 Legacy 규제 전처리 완료 (임베딩 포함)!")
     logger.info("=" * 80)
 
-
+##sa-mj 통합 (219 - 364)
 @traceable(name="REMON_Full_Pipeline", run_type="chain")
-#sa
-async def run_full_pipeline(citation_code: str):
+async def run_full_pipeline(citation_code: str | None = None):
     """
     전체 파이프라인 실행 (S3 자동 로드 + LangGraph + HITL 루프)
 
-    1) 그래프 한 번 풀로 실행 (preprocess → ... → report → hitl 까지)
-    2) 결과 요약 출력
-    3) 콘솔에서 HITL 피드백을 반복 입력
-       - 입력값 → state["external_hitl_feedback"] 에 넣고 그래프 재실행
-       - 내부에서는 hitl_node → validator → restart_node 로 파이프라인 fallback
-#mj
-async def run_full_pipeline(citation_code: str = None):
-    """전체 파이프라인 실행 (S3 자동 로드 + LangGraph)
-    
     Args:
-        citation_code: 규제 식별 코드 (None이면 전처리에서 자동 추출)
+        citation_code: 규제 식별 코드.
+            - None이면 전처리/변경감지 단계에서 자동 추출 및 매핑을 시도함.
     """
 
     logger.info("=" * 80)
     logger.info("🚀 REMON AI Pipeline 전체 실행 시작")
     logger.info("=" * 80)
 
-#sa
     # ------- 그래프 컴파일 (HITL 통합 버전) -------
     app = build_graph()  # entry_point = preprocess
 
     # Step 1: Legacy regulation_id DB 조회 (citation_code 기반)
     logger.info("\n[Step 1] Legacy regulation_id DB 조회")
     from app.core.repositories.regulation_repository import RegulationRepository
-    
+
     legacy_regulation_id = None
     new_regulation_id = None
-    
-    async with AsyncSessionLocal() as session:
-        repo = RegulationRepository()
-        try:
-            legacy_reg = await repo.find_by_citation_code(
-                session,
-                citation_code=citation_code,
-            )
-            if legacy_reg:
-                legacy_regulation_id = legacy_reg.regulation_id
-                logger.info(f"  ✅ Legacy 발견: regulation_id={legacy_regulation_id}")
-            else:
-                logger.info("  ℹ️ Legacy 없음 (신규 규제로 처리)")
-        except Exception as e:
-            logger.warning(f"  ⚠️ Legacy 조회 실패: {e}")
+
+    if citation_code:
+        async with AsyncSessionLocal() as session:
+            repo = RegulationRepository()
+            try:
+                legacy_reg = await repo.find_by_citation_code(
+                    session,
+                    citation_code=citation_code,
+                )
+                if legacy_reg:
+                    legacy_regulation_id = legacy_reg.regulation_id
+                    logger.info(f"  ✅ Legacy 발견: regulation_id={legacy_regulation_id}")
+                else:
+                    logger.info("  ℹ️ Legacy 없음 (신규 규제로 처리)")
+            except Exception as e:
+                logger.warning(f"  ⚠️ Legacy 조회 실패: {e}")
 
     # Step 2: 최신/이전 규제 ID 결정 (DB 기준)
     logger.info("\n[Step 2] 규제 ID 결정 (citation_code 기반)")
-    async with AsyncSessionLocal() as session:
-        repo = RegulationRepository()
-        try:
-            latest, previous = await repo.find_latest_and_previous_by_citation(
-                session, citation_code
-            )
-            if latest:
-                new_regulation_id = latest.regulation_id
-                logger.info(f"  ✅ 최신 규제: regulation_id={new_regulation_id}")
-            if previous:
-                legacy_regulation_id = previous.regulation_id
-                logger.info(f"  ✅ 이전(legacy): regulation_id={legacy_regulation_id}")
-            elif not legacy_regulation_id:
-                logger.info("  ℹ️ 이전 버전 없음")
-        except Exception as e:
-            logger.warning(f"  ⚠️ 규제 ID 결정 실패: {e}")
+    if citation_code:
+        async with AsyncSessionLocal() as session:
+            repo = RegulationRepository()
+            try:
+                latest, previous = await repo.find_latest_and_previous_by_citation(
+                    session, citation_code
+                )
+                if latest:
+                    new_regulation_id = latest.regulation_id
+                    logger.info(f"  ✅ 최신 규제: regulation_id={new_regulation_id}")
+                if previous:
+                    legacy_regulation_id = previous.regulation_id
+                    logger.info(f"  ✅ 이전(legacy): regulation_id={legacy_regulation_id}")
+                elif not legacy_regulation_id:
+                    logger.info("  ℹ️ 이전 버전 없음")
+            except Exception as e:
+                logger.warning(f"  ⚠️ 규제 ID 결정 실패: {e}")
+    else:
+        logger.info("  ℹ️ citation_code 미지정 → 전처리/변경감지 단계에서 자동 추출")
 
     # Step 3: 전체 파이프라인 1회 실행 (자동 모드)
     logger.info("\n[Step 3] 전체 파이프라인 1회 실행 (자동 모드)")
     logger.info("  ℹ️ S3에서 오늘 업로드된 파일 자동 로드 (skala2/skala-2.4.17/test)")
     logger.info("  ℹ️ 전처리에서 추출한 국가 정보로 제품 자동 필터링")
-    logger.info("  ℹ️ Legacy 검색은 change_detection_node에서 자동 수행")
-#mj
-    # Step 1: 전체 파이프라인 실행 (S3 자동 로드 + 동적 필터링)
-    logger.info("\n[Step 1] 전체 파이프라인 실행")
-    logger.info("  ℹ️ S3에서 오늘 업로드된 파일 자동 로드")
-    logger.info("  ℹ️ 전처리에서 citation_code 자동 추출")
-    logger.info("  ℹ️ change_detection_node에서 Legacy 자동 검색")
-    logger.info("  ℹ️ 국가 정보로 제품 자동 필터링")
+    logger.info("  ℹ️ change_detection_node에서 Legacy 자동 검색 및 비교")
 
     state: AppState = {
         "preprocess_request": {
-#sa
-            "load_from_s3": True,  # S3 자동 로드 활성화
-            "s3_date": None,       # None이면 오늘 날짜
-#mj
-            "load_from_s3": True,
-            "s3_date": None,
+            "load_from_s3": True,          # S3 자동 로드 활성화
+            "s3_date": None,               # None이면 오늘 날짜
             "use_vision_pipeline": True,
             "enable_change_detection": True,
         },
@@ -327,7 +311,7 @@ async def run_full_pipeline(citation_code: str = None):
     # ------------------------------------------------------------------
     # Step 5: HITL 인터랙티브 루프
     #   - 사람이 결과를 보고 피드백을 입력하면
-    #     → external_hitl_feedback 에 넣고 같은 그래프를 다시 태움
+    #     → external_hitl_feedback 에 넣고 그래프 재실행
     #   - 그래프 안에서는:
     #       report → hitl_node → validator (HITL 모드)
     #       → restart_node(예: map_products, generate_strategy, score_impact, change_detection)
@@ -378,7 +362,7 @@ async def run_full_pipeline(citation_code: str = None):
         logger.info("\n[HITL] 재실행 결과 요약")
         print_pipeline_summary(state)
 
-    return state
+    return state 
 
 
 async def main():

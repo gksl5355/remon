@@ -156,7 +156,7 @@ class ConfidenceScorer:
         else:
             return "UNCERTAIN"
 
-
+##sa-mj 통합 (160 - 236)
 # ==================== Change Detection Node ====================
 class ChangeDetectionNode:
     """독립 변경 감지 노드 (Reference ID 기반)."""
@@ -178,12 +178,12 @@ class ChangeDetectionNode:
         self.vector_client = vector_client or VectorClient()
         self.model_name = model_name or PreprocessConfig.CHANGE_DETECTION_MODEL
         self.confidence_scorer = ConfidenceScorer()
-#sa
+
     # 🔹 공통 실행 마킹 헬퍼: 한 번 돌면 ran_inline=True, force 플래그 해제
     def _mark_execution_state(self, state: AppState) -> None:
         state["change_detection_ran_inline"] = True
         state["force_rerun_change_detection"] = False
-#mj
+
     def _build_keynote_data(
         self,
         detection_results: List[Dict[str, Any]],
@@ -235,6 +235,7 @@ class ChangeDetectionNode:
             ),
         }
 
+
     async def run(self, state: AppState, db_session=None) -> AppState:
         """변경 감지 노드 실행 (짧은 DB 세션 사용)."""
         logger.info("=== Change Detection Node 시작 (Reference ID 기반) ===")
@@ -262,6 +263,7 @@ class ChangeDetectionNode:
         legacy_regul_data = None
         legacy_regulation_id = None  # 초기화
 
+        #sa-mj 통합(266 - 382 )
         # citation_code 기반으로 Legacy 검색 (DB 세션 사용)
         if not legacy_regul_data:
             from app.core.repositories.regulation_repository import RegulationRepository
@@ -302,69 +304,52 @@ class ChangeDetectionNode:
                         logger.info(
                             f"   new_regul_data keys: {list(new_regul_data.keys())}"
                         )
-#sa
-                            # 신규 규제 분석 (LLM)
-                            analysis_hints = await self._analyze_new_regulation(
-                                new_regul_data
-                            )
-                            state["regulation_analysis_hints"] = analysis_hints
-                            logger.info(
-                                f"✅ 신규 규제 분석 완료: {len(analysis_hints.get('key_requirements', []))}개 요구사항"
-                            )
-                            logger.info(
-                                f"   affected_areas: {analysis_hints.get('affected_areas', [])}"
-                            )
 
-                            state["change_detection_results"] = []
-                            state["change_summary"] = {
-                                "status": "new_regulation",
-                                "total_changes": 0,
-                            }
-                            state["needs_embedding"] = True
-                            state["change_detection_index"] = {}
-                            self._mark_execution_state(state)
-                            return state
-
-                    legacy_regul_data = await repo.get_regul_data(
-                        session, legacy_regulation_id
-#mj
-                    vision_pages = (
-                        new_regul_data.get("vision_extraction_result", [])
-                        if new_regul_data
-                        else []
-                    )
-                    logger.info(f"   vision_pages 개수: {len(vision_pages)}")
-
-                    if vision_pages:
-                        new_metadata = (
-                            vision_pages[0].get("structure", {}).get("metadata", {})
+                        vision_pages = (
+                            new_regul_data.get("vision_extraction_result", [])
+                            if new_regul_data
+                            else []
                         )
-                        new_citation = new_metadata.get("citation_code")
-                        new_country = new_metadata.get("jurisdiction_code")
+                        logger.info(f"   vision_pages 개수: {len(vision_pages)}")
 
-                        if new_citation and new_country:
-                            logger.info(
-                                f"🔍 citation_code로 Legacy 검색: {new_citation} ({new_country})"
+                        if vision_pages:
+                            new_metadata = (
+                                vision_pages[0]
+                                .get("structure", {})
+                                .get("metadata", {})
                             )
+                            new_citation = new_metadata.get("citation_code")
+                            new_country = new_metadata.get("jurisdiction_code")
 
-                            # citation_code + country로 Legacy 직접 조회
-                            result = await session.execute(
-                                text(
+                            if new_citation and new_country:
+                                logger.info(
+                                    f"🔍 citation_code로 Legacy 검색: {new_citation} ({new_country})"
+                                )
+
+                                # citation_code + country로 Legacy 직접 조회
+                                result = await session.execute(
+                                    text(
+                                        """
+                                        SELECT regul_data FROM regulations
+                                        WHERE citation_code = :citation
+                                        AND country_code = :country
+                                        AND DATE(created_at) < CURRENT_DATE
+                                        ORDER BY created_at DESC LIMIT 1
                                     """
-                                    SELECT regul_data FROM regulations
-                                    WHERE citation_code = :citation
-                                    AND country_code = :country
-                                    AND DATE(created_at) < CURRENT_DATE
-                                    ORDER BY created_at DESC LIMIT 1
-                                """
-                                ),
-                                {"citation": new_citation, "country": new_country},
-                            )
-                            row = result.fetchone()
-                            if row:
-                                legacy_regul_data = row[0]
-                                logger.info(f"✅ Legacy 발견: citation={new_citation}")
+                                    ),
+                                    {
+                                        "citation": new_citation,
+                                        "country": new_country,
+                                    },
+                                )
+                                row = result.fetchone()
+                                if row:
+                                    legacy_regul_data = row[0]
+                                    logger.info(
+                                        f"✅ Legacy 발견: citation={new_citation}"
+                                    )
 
+                    # 여전히 legacy_regul_data 없으면 → 완전 신규 규제 처리
                     if not legacy_regul_data:
                         logger.warning("⚠️ Legacy 검색 실패 - 신규 규제로 처리")
                         logger.info(
@@ -388,12 +373,15 @@ class ChangeDetectionNode:
                             "status": "new_regulation",
                             "total_changes": 0,
                         }
-#sa
-                        self._mark_execution_state(state)
-#mj
+                        # 신규 규제는 변경감지 인덱스 없음
+                        state["change_detection_index"] = {}
+                        # 이후 임베딩 파이프라인 필요
                         state["needs_embedding"] = True
+                        # 실행 상태 마킹 (추후 재실행 방지)
+                        self._mark_execution_state(state)
                         return state
                 # end session block
+
 
         # legacy_regulation_id 없지만 legacy_regul_data 주입된 경우 기본값 세팅
         if legacy_regul_data and not legacy_regulation_id:
