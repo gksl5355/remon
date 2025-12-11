@@ -183,6 +183,16 @@ class DualIndexer:
                     hierarchy = md_chunk.get("hierarchy", [])
                     section_label = " > ".join(hierarchy) if hierarchy else f"Page {page_num}"
                     
+                    # 🔑 Section 연결: reference_blocks에서 section_ref 추출
+                    section_ref = None
+                    parent_section_id = None
+                    for ref_block in structure.get("reference_blocks", []):
+                        ref_section = ref_block.get("section_ref", "")
+                        if ref_section and ref_section in md_chunk["text"]:
+                            section_ref = ref_section
+                            parent_section_id = f"{regulation_id}-{ref_section}"
+                            break
+                    
                     all_chunks.append({
                         "text": md_chunk["text"],
                         "metadata": {
@@ -192,6 +202,9 @@ class DualIndexer:
                             "page_num": page_num,
                             "hierarchy": hierarchy,
                             "token_count": md_chunk.get("token_count", 0),
+                            # 🔑 Section 연결 메타데이터
+                            "section_ref": section_ref,
+                            "parent_section_id": parent_section_id,
                             # 확장 메타데이터
                             "document_id": doc_metadata.get("document_id"),
                             "jurisdiction_code": doc_metadata.get("jurisdiction_code"),
@@ -223,6 +236,16 @@ class DualIndexer:
                 # 표를 검색 가능한 텍스트로 변환
                 table_text = self._table_to_text(table)
                 
+                # 🔑 표의 Section 연결 (주변 reference_blocks 기반)
+                section_ref = None
+                parent_section_id = None
+                for ref_block in structure.get("reference_blocks", []):
+                    ref_section = ref_block.get("section_ref", "")
+                    if ref_section:
+                        section_ref = ref_section
+                        parent_section_id = f"{regulation_id}-{ref_section}"
+                        break
+                
                 all_chunks.append({
                     "text": table_text,
                     "metadata": {
@@ -233,6 +256,9 @@ class DualIndexer:
                         "table_caption": table.get("caption", f"Table {table_idx + 1}"),
                         "table_headers": table.get("headers", []),
                         "table_row_count": len(table.get("rows", [])),
+                        # 🔑 Section 연결 메타데이터
+                        "section_ref": section_ref,
+                        "parent_section_id": parent_section_id,
                         # 확장 메타데이터 (텍스트 청크와 동일하게)
                         "document_id": doc_metadata.get("document_id"),
                         "jurisdiction_code": doc_metadata.get("jurisdiction_code"),

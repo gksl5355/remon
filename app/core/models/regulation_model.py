@@ -8,14 +8,10 @@ class Regulation(Base):
     __tablename__ = "regulations"
 
     regulation_id = Column(Integer, primary_key=True, index=True)
-    # source_id = Column(Integer, ForeignKey("data_sources.source_id"), nullable=False)
-    # country_code = Column(String(2), ForeignKey("countries.country_code"), nullable=False)
-    # external_id = Column(String(200))
-    # title = Column(String(200))
-    # proclaimed_date = Column(Date)
-    # effective_date = Column(Date)
-    # language = Column(String(10))
-    # status = Column(String(20))
+    source_id = Column(Integer, nullable=True)  # FK 제거, 선택 사항
+    country_code = Column(String(2), index=True, nullable=True)  # 빠른 검색용
+    title = Column(String(500), nullable=True)  # 검색용
+    status = Column(String(20), default="active")  # active/inactive
     regul_data = Column(JSONB)  # Vision Pipeline 전체 결과 저장
     citation_code = Column(String(200), index=True, nullable=True)  # 변경 감지 대상 검색용
     created_at = Column(DateTime, server_default=func.now())
