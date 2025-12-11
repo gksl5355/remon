@@ -183,11 +183,11 @@ class ChangeDetectionNode:
         detection_results: List[Dict[str, Any]],
         change_summary: Dict[str, Any],
         regulation_meta: Dict[str, Any],
-        legacy_regulation_id: Optional[str] = None
+        legacy_regulation_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Change Detection 결과를 Keynote JSON으로 변환"""
         from datetime import datetime
-        
+
         return {
             "regulation_id": regulation_meta.get("regulation_id"),
             "country": regulation_meta.get("country"),
@@ -196,9 +196,13 @@ class ChangeDetectionNode:
             "effective_date": regulation_meta.get("effective_date"),
             "analysis_date": datetime.utcnow().isoformat() + "Z",
             "change_summary": {
-                "total_sections_analyzed": change_summary.get("total_reference_blocks", 0),
+                "total_sections_analyzed": change_summary.get(
+                    "total_reference_blocks", 0
+                ),
                 "total_changes_detected": change_summary.get("total_changes", 0),
-                "high_confidence_changes": change_summary.get("high_confidence_changes", 0)
+                "high_confidence_changes": change_summary.get(
+                    "high_confidence_changes", 0
+                ),
             },
             "section_changes": [
                 {
@@ -209,19 +213,22 @@ class ChangeDetectionNode:
                     "change_type": r.get("change_type"),
                     "comparison": {
                         "legacy_snippet": r.get("legacy_snippet", "")[:200],
-                        "new_snippet": r.get("new_snippet", "")[:200]
+                        "new_snippet": r.get("new_snippet", "")[:200],
                     },
                     "reasoning": r.get("reasoning", {}),
                     "numerical_changes": r.get("numerical_changes", []),
-                    "keywords": r.get("keywords", [])
+                    "keywords": r.get("keywords", []),
                 }
-                for r in detection_results if r.get("change_detected")
+                for r in detection_results
+                if r.get("change_detected")
             ],
-            "legacy_regulation": {
-                "regulation_id": legacy_regulation_id
-            } if legacy_regulation_id else None
+            "legacy_regulation": (
+                {"regulation_id": legacy_regulation_id}
+                if legacy_regulation_id
+                else None
+            ),
         }
-    
+
     async def run(self, state: AppState, db_session=None) -> AppState:
         """변경 감지 노드 실행 (짧은 DB 세션 사용)."""
         logger.info("=== Change Detection Node 시작 (Reference ID 기반) ===")
@@ -230,16 +237,19 @@ class ChangeDetectionNode:
         if not pre_results:
             logger.info("preprocess_results 없음, 변경 감지 스킵")
             state["change_detection_results"] = []
-            state["change_summary"] = {"status": "skipped", "reason": "no_preprocess_results"}
+            state["change_summary"] = {
+                "status": "skipped",
+                "reason": "no_preprocess_results",
+            }
             return state
-        
+
         new_regul_data = pre_results[0]
         if new_regul_data.get("status") != "success":
             logger.error("❌ 전처리 실패, 변경 감지 스킵")
             state["change_detection_results"] = []
             state["change_summary"] = {"status": "error", "reason": "preprocess_failed"}
             return state
-        
+
         new_regulation_id = new_regul_data.get("regulation_id", "NEW")
         legacy_regul_data = None
         legacy_regulation_id = None  # 초기화
@@ -279,47 +289,65 @@ class ChangeDetectionNode:
                     # citation_code 기반으로 Legacy 검색 (regulation_id 무시)
                     logger.info(f"🔍 new_regul_data 확인: {bool(new_regul_data)}")
                     if new_regul_data:
-                        logger.info(f"   new_regul_data keys: {list(new_regul_data.keys())}")
-                    
-                    vision_pages = new_regul_data.get("vision_extraction_result", []) if new_regul_data else []
+                        logger.info(
+                            f"   new_regul_data keys: {list(new_regul_data.keys())}"
+                        )
+
+                    vision_pages = (
+                        new_regul_data.get("vision_extraction_result", [])
+                        if new_regul_data
+                        else []
+                    )
                     logger.info(f"   vision_pages 개수: {len(vision_pages)}")
-                    
+
                     if vision_pages:
-                        new_metadata = vision_pages[0].get("structure", {}).get("metadata", {})
+                        new_metadata = (
+                            vision_pages[0].get("structure", {}).get("metadata", {})
+                        )
                         new_citation = new_metadata.get("citation_code")
                         new_country = new_metadata.get("jurisdiction_code")
-                        
+
                         if new_citation and new_country:
-                            logger.info(f"🔍 citation_code로 Legacy 검색: {new_citation} ({new_country})")
-                            
+                            logger.info(
+                                f"🔍 citation_code로 Legacy 검색: {new_citation} ({new_country})"
+                            )
+
                             # citation_code + country로 Legacy 직접 조회
                             result = await session.execute(
-                                text("""
+                                text(
+                                    """
                                     SELECT regul_data FROM regulations
                                     WHERE citation_code = :citation
                                     AND country_code = :country
                                     AND DATE(created_at) < CURRENT_DATE
                                     ORDER BY created_at DESC LIMIT 1
-                                """),
-                                {"citation": new_citation, "country": new_country}
+                                """
+                                ),
+                                {"citation": new_citation, "country": new_country},
                             )
                             row = result.fetchone()
                             if row:
                                 legacy_regul_data = row[0]
                                 logger.info(f"✅ Legacy 발견: citation={new_citation}")
-                    
+
                     if not legacy_regul_data:
                         logger.warning("⚠️ Legacy 검색 실패 - 신규 규제로 처리")
-                        logger.info("✅ 완전히 새로운 규제 (Legacy 없음) - 신규 분석 실행")
-                        
+                        logger.info(
+                            "✅ 완전히 새로운 규제 (Legacy 없음) - 신규 분석 실행"
+                        )
+
                         # 신규 규제 분석 (LLM)
-                        analysis_hints = await self._analyze_new_regulation(new_regul_data)
+                        analysis_hints = await self._analyze_new_regulation(
+                            new_regul_data
+                        )
                         state["regulation_analysis_hints"] = analysis_hints
                         logger.info(
                             f"✅ 신규 규제 분석 완료: {len(analysis_hints.get('key_requirements', []))}개 요구사항"
                         )
-                        logger.info(f"   affected_areas: {analysis_hints.get('affected_areas', [])}")
-                        
+                        logger.info(
+                            f"   affected_areas: {analysis_hints.get('affected_areas', [])}"
+                        )
+
                         state["change_detection_results"] = []
                         state["change_summary"] = {
                             "status": "new_regulation",
@@ -347,7 +375,9 @@ class ChangeDetectionNode:
         # ========== 최종 검증: legacy_regul_data 확인 ==========
         if not legacy_regul_data:
             logger.error("❌ legacy_regul_data가 None입니다")
-            logger.error("💡 해결: python scripts/run_full_pipeline.py --mode legacy 실행 필요")
+            logger.error(
+                "💡 해결: python scripts/run_full_pipeline.py --mode legacy 실행 필요"
+            )
             state["change_detection_results"] = []
             state["change_summary"] = {
                 "status": "error",
@@ -452,7 +482,6 @@ class ChangeDetectionNode:
             "legacy_regulation_id": legacy_regulation_id,
             "new_regulation_id": new_regulation_id,
         }
-
         # 🔑 Section 기반 빠른 조회를 위한 인덱스 생성
         change_index = {}
         for result in detection_results:
@@ -472,7 +501,7 @@ class ChangeDetectionNode:
             detection_results=detection_results,
             change_summary=state["change_summary"],
             regulation_meta=regulation_meta,
-            legacy_regulation_id=legacy_regulation_id
+            legacy_regulation_id=legacy_regulation_id,
         )
         state["change_keynote_data"] = keynote_data
         logger.info("📝 Change Keynote 데이터 생성 완료")
@@ -606,8 +635,10 @@ class ChangeDetectionNode:
             exclude_date = None
             if exclude_regulation_id:
                 result = await db_session.execute(
-                    text("SELECT DATE(created_at) FROM regulations WHERE regulation_id = :rid"),
-                    {"rid": exclude_regulation_id}
+                    text(
+                        "SELECT DATE(created_at) FROM regulations WHERE regulation_id = :rid"
+                    ),
+                    {"rid": exclude_regulation_id},
                 )
                 row = result.fetchone()
                 if row:
@@ -618,16 +649,22 @@ class ChangeDetectionNode:
                 # 원본 citation_code로 검색 (같은 날짜 제외)
                 if exclude_date:
                     result = await db_session.execute(
-                        text("""
+                        text(
+                            """
                             SELECT regulation_id FROM regulations
                             WHERE citation_code = :citation
                             AND country_code = :country
                             AND DATE(created_at) < :exclude_date
                             AND (:exclude_id IS NULL OR regulation_id != :exclude_id)
                             ORDER BY created_at DESC LIMIT 1
-                        """),
-                        {"citation": citation_code, "country": country, 
-                         "exclude_date": exclude_date, "exclude_id": exclude_regulation_id}
+                        """
+                        ),
+                        {
+                            "citation": citation_code,
+                            "country": country,
+                            "exclude_date": exclude_date,
+                            "exclude_id": exclude_regulation_id,
+                        },
                     )
                     row = result.fetchone()
                     regulation = await repo.get(db_session, row[0]) if row else None
@@ -635,7 +672,7 @@ class ChangeDetectionNode:
                     regulation = await repo.find_by_citation_and_country(
                         db_session, citation_code, country, exclude_regulation_id
                     )
-                
+
                 if regulation:
                     logger.info(
                         f"DB Legacy 발견 (citation 원본): regulation_id={regulation.regulation_id}"
@@ -707,12 +744,12 @@ class ChangeDetectionNode:
         # 중복 제거 + 텍스트 병합: 같은 section_ref의 모든 텍스트를 병합
         def deduplicate_blocks(blocks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             section_map = {}  # {section_ref: merged_block}
-            
+
             for block in blocks:
                 section = self._normalize_section_ref(block.get("section_ref", ""))
                 if not section:
                     continue
-                
+
                 if section not in section_map:
                     # 첫 발견: 초기화
                     section_map[section] = block.copy()
@@ -725,7 +762,7 @@ class ChangeDetectionNode:
                     section_map[section]["text"] = existing_text + "\n\n" + new_text
                     section_map[section]["end_page"] = block.get("page_num")
                     section_map[section]["page_range"].append(block.get("page_num"))
-            
+
             return list(section_map.values())
 
         new_blocks_unique = deduplicate_blocks(new_blocks)

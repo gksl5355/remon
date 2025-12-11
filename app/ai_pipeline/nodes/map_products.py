@@ -80,10 +80,11 @@ class MappingNode:
     # ----------------------------------------------------------------------
     def _normalize_token(self, value: str) -> str:
         return value.lower().replace(" ", "_").replace("-", "_").replace(".", "_")
-    
+
     def _normalize_section_ref(self, section_ref: str) -> str:
         """조항 번호 정규화 (§1160.5, 1160.5, § 1160.5 → 1160.5)."""
         import re
+
         normalized = re.sub(r"[§\s]", "", section_ref)
         match = re.search(r"(\d+\.\d+)", normalized)
         return match.group(1) if match else normalized
@@ -216,22 +217,25 @@ class MappingNode:
     ) -> Optional[Dict[str, Any]]:
         """Change Detection 결과를 Qdrant 필터로 변환 (Section 기반)."""
         filters: Dict[str, Any] = {}
-        
+
         # 🔑 Section 기반 필터링 (가장 중요)
         section_refs = set()
-        for result in (change_scope.get("actionable_results") or []) + (change_scope.get("pending_results") or []):
+        for result in (change_scope.get("actionable_results") or []) + (
+            change_scope.get("pending_results") or []
+        ):
             section = result.get("section_ref")
             if section:
                 # Section 정규화 (§1160.5 → 1160.5)
                 import re
+
                 normalized = re.sub(r"[§\s]", "", section)
                 match = re.search(r"(\d+\.\d+)", normalized)
                 section_refs.add(match.group(1) if match else normalized)
-        
+
         if section_refs:
             filters["section_ref"] = list(section_refs)
             logger.debug(f"🎯 Section 필터: {list(section_refs)[:3]}...")
-        
+
         return filters or None
 
     def _select_features_for_mapping(
@@ -1095,20 +1099,22 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
                     present_value,
                     unit or "-",
                 )
-            
+
             # 🔑 Change Hint에서 Section 추출
             section_filter = None
             if change_hint:
                 section_ref = change_hint.get("section_ref")
                 if section_ref:
-                    section_filter = {"section_ref": self._normalize_section_ref(section_ref)}
+                    section_filter = {
+                        "section_ref": self._normalize_section_ref(section_ref)
+                    }
                     logger.debug(f"🎯 Section 필터 적용: {section_ref}")
-            
+
             # Section 필터 병합
             final_filters = dict(merged_search_filters or {})
             if section_filter:
                 final_filters.update(section_filter)
-            
+
             retrieval: RetrievalResult = await self._run_search(
                 product,
                 feature_name,
@@ -1155,7 +1161,7 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
                 # 🔑 1순위: Chunk 메타데이터의 section_ref 사용
                 chunk_meta = cand.get("metadata", {})
                 section_ref = chunk_meta.get("section_ref")
-                
+
                 # 🔑 2순위: Change Detection Index에서 조회
                 change_context = None
                 change_index = state.get("change_detection_index", {})
@@ -1164,7 +1170,7 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
                     if normalized_section in change_index:
                         change_context = change_index[normalized_section]
                         logger.debug(f"✅ Change Context 직접 매칭: {section_ref}")
-                
+
                 # 🔑 3순위: 텍스트 기반 추출 (fallback)
                 if not change_context and change_index:
                     section = self._extract_section_from_chunk(
@@ -1173,7 +1179,7 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
                     if section and section in change_index:
                         change_context = change_index[section]
                         logger.debug(f"🎯 Change Context fallback: {section}")
-                
+
                 # 변경 감지 증거 추출 (기존 로직 유지)
                 change_matches = self._match_change_results_to_candidate(
                     change_scope, cand
@@ -1191,7 +1197,7 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
                     change_evidence=change_evidence,
                     change_context=change_context,
                 )
-                
+
                 # 📊 디버그: Section 연결 상태 로깅
                 if self.debug_enabled and section_ref:
                     logger.debug(
