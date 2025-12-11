@@ -27,7 +27,7 @@ CHANGE_DETECTION_SYSTEM_PROMPT = """You are a regulatory change detection expert
 **CRITICAL INSTRUCTIONS:**
 
 1. **Complete Recall**: 
-   - 사소해 보이는 수치 변경(예: 18mg → 20mg)도 반드시 감지하십시오.
+   - 사소해 보이는 수치 변경(예: 값 A → 값 B)도 반드시 감지하십시오. 단, 반드시 제공된 텍스트 내에 존재하는 수치만 추출해야 합니다.
    - 단어 하나의 차이(예: '권고' → '의무', 'may' → 'shall')도 놓치지 마십시오.
 
 2. **Context Preservation with Reference IDs**:
@@ -163,18 +163,18 @@ class ChangeDetectionNode:
         self,
         llm_client: Optional[AsyncOpenAI] = None,
         vector_client: Optional[VectorClient] = None,
-        model_name: str = "gpt-4o-mini",
+        model_name: Optional[str] = None,
     ):
+        from app.ai_pipeline.preprocess.config import PreprocessConfig
+        
         if llm_client:
             self.llm = llm_client
         else:
-            from app.ai_pipeline.preprocess.config import PreprocessConfig
-
             client = AsyncOpenAI()
             self.llm = PreprocessConfig.wrap_openai_client(client)
 
         self.vector_client = vector_client or VectorClient()
-        self.model_name = model_name
+        self.model_name = model_name or PreprocessConfig.CHANGE_DETECTION_MODEL
         self.confidence_scorer = ConfidenceScorer()
 
     async def run(self, state: AppState, db_session=None) -> AppState:
@@ -391,6 +391,15 @@ class ChangeDetectionNode:
             "legacy_regulation_id": legacy_regulation_id,
             "new_regulation_id": new_regulation_id,
         }
+        
+        # 🔑 Section 기반 빠른 조회를 위한 인덱스 생성
+        change_index = {}
+        for result in detection_results:
+            section = self._normalize_section_ref(result.get("section_ref", ""))
+            if section and result.get("change_detected"):
+                change_index[section] = result
+        state["change_detection_index"] = change_index
+        logger.info(f"📚 Change Index 생성: {len(change_index)}개 섹션")
 
         logger.info(
             f"✅ 변경 감지 완료: {total_changes}개 변경 감지 (HIGH: {high_confidence})"
@@ -579,122 +588,79 @@ class ChangeDetectionNode:
             logger.error(f"DB Legacy 검색 실패: {e}")
             return None
 
+    def _normalize_section_ref(self, section_ref: str) -> str:
+        """조항 번호 정규화 (§1160.5, 1160.5, § 1160.5 → 1160.5)."""
+        import re
+        normalized = re.sub(r'[§\s]', '', section_ref)
+        match = re.search(r'(\d+\.\d+)', normalized)
+        return match.group(1) if match else normalized
+
     async def _match_reference_blocks(
         self, new_blocks: List[Dict[str, Any]], legacy_blocks: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         """
-        CoT Step 1: 계층 구조 기반 정확 매칭 (밀림 현상 방지).
-
-        전략:
-        1. 계층 구조 완전 일치 (hierarchy 배열 비교)
-        2. section_ref 일치 (fallback)
-        3. 키워드 유사도 (fuzzy matching)
+        Strict Section Matching: 조항 번호 기반 정확한 1:1 매칭 (중복 제거).
         """
-        logger.info("계층 구조 기반 매칭 시작 (규칙 기반)")
+        logger.info("🔍 Strict Section Matching 시작 (중복 제거)")
+
+        # 중복 제거: 같은 section_ref는 처음 하나만 사용
+        def deduplicate_blocks(blocks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+            seen_sections = set()
+            unique_blocks = []
+            for block in blocks:
+                section = self._normalize_section_ref(block.get("section_ref", ""))
+                if section and section not in seen_sections:
+                    seen_sections.add(section)
+                    unique_blocks.append(block)
+            return unique_blocks
+
+        new_blocks_unique = deduplicate_blocks(new_blocks)
+        legacy_blocks_unique = deduplicate_blocks(legacy_blocks)
+
+        logger.info(
+            f"🧹 중복 제거: New {len(new_blocks)} → {len(new_blocks_unique)}, "
+            f"Legacy {len(legacy_blocks)} → {len(legacy_blocks_unique)}"
+        )
 
         matched_pairs = []
-        matched_legacy_indices = set()
+        matched_legacy_sections = set()
 
-        # 전략 1: 계층 구조 완전 일치
-        for new_block in new_blocks:
-            new_hierarchy = new_block.get("hierarchy", [])
+        # 정규화된 조항 번호 기반 1:1 매칭
+        for new_block in new_blocks_unique:
+            new_section = new_block.get("section_ref", "")
+            new_normalized = self._normalize_section_ref(new_section)
 
-            if not new_hierarchy:
+            if not new_normalized:
                 continue
 
-            for idx, legacy_block in enumerate(legacy_blocks):
-                if idx in matched_legacy_indices:
+            for legacy_block in legacy_blocks_unique:
+                legacy_section = legacy_block.get("section_ref", "")
+                legacy_normalized = self._normalize_section_ref(legacy_section)
+
+                if legacy_normalized in matched_legacy_sections:
                     continue
 
-                legacy_hierarchy = legacy_block.get("hierarchy", [])
-
-                # 계층 구조 완전 일치
-                if new_hierarchy == legacy_hierarchy:
+                if new_normalized == legacy_normalized:
                     matched_pairs.append(
                         {
                             "new_block": new_block,
                             "legacy_block": legacy_block,
                             "match_confidence": 1.0,
-                            "match_reason": f"Exact hierarchy match: {' > '.join(new_hierarchy)}",
+                            "match_reason": f"Exact section: {new_normalized}",
                         }
                     )
-                    matched_legacy_indices.add(idx)
+                    matched_legacy_sections.add(legacy_normalized)
+                    logger.debug(f"✅ Matched: {new_section} ↔ {legacy_section}")
                     break
 
-        # 전략 2: section_ref 일치 (fallback)
-        for new_block in new_blocks:
-            # 이미 매칭된 경우 스킵
-            if any(p["new_block"] == new_block for p in matched_pairs):
-                continue
-
-            new_section = new_block["section_ref"]
-
-            for idx, legacy_block in enumerate(legacy_blocks):
-                if idx in matched_legacy_indices:
-                    continue
-
-                legacy_section = legacy_block["section_ref"]
-
-                if new_section == legacy_section:
-                    matched_pairs.append(
-                        {
-                            "new_block": new_block,
-                            "legacy_block": legacy_block,
-                            "match_confidence": 0.9,
-                            "match_reason": f"Section ref match: {new_section}",
-                        }
-                    )
-                    matched_legacy_indices.add(idx)
-                    break
-
-        # 전략 3: 키워드 유사도 (fuzzy matching)
-        for new_block in new_blocks:
-            if any(p["new_block"] == new_block for p in matched_pairs):
-                continue
-
-            new_keywords = set(new_block.get("keywords", []))
-
-            if not new_keywords:
-                continue
-
-            best_match = None
-            best_score = 0.0
-
-            for idx, legacy_block in enumerate(legacy_blocks):
-                if idx in matched_legacy_indices:
-                    continue
-
-                legacy_keywords = set(legacy_block.get("keywords", []))
-
-                if not legacy_keywords:
-                    continue
-
-                # Jaccard 유사도
-                intersection = len(new_keywords & legacy_keywords)
-                union = len(new_keywords | legacy_keywords)
-                score = intersection / union if union > 0 else 0.0
-
-                if score > best_score and score >= 0.5:  # 임계값
-                    best_score = score
-                    best_match = (idx, legacy_block)
-
-            if best_match:
-                idx, legacy_block = best_match
-                matched_pairs.append(
-                    {
-                        "new_block": new_block,
-                        "legacy_block": legacy_block,
-                        "match_confidence": best_score,
-                        "match_reason": f"Keyword similarity: {best_score:.2f}",
-                    }
-                )
-                matched_legacy_indices.add(idx)
+        # 매칭 실패한 섹션 로그
+        unmatched_new = [b.get("section_ref") for b in new_blocks_unique if not any(p["new_block"] == b for p in matched_pairs)]
+        if unmatched_new:
+            logger.warning(f"⚠️ 매칭 실패한 신규 섹션: {unmatched_new[:5]}...")
 
         logger.info(
-            f"매칭 완료: {len(matched_pairs)}개 쌍 "
-            f"(정확: {sum(1 for p in matched_pairs if p['match_confidence'] == 1.0)}, "
-            f"section: {sum(1 for p in matched_pairs if p['match_confidence'] == 0.9)}, "
-            f"fuzzy: {sum(1 for p in matched_pairs if p['match_confidence'] < 0.9)})"
+            f"✅ 매칭 완료: {len(matched_pairs)}개 쌍 "
+            f"(Exact: {sum(1 for p in matched_pairs if p['match_confidence'] == 1.0)})"
         )
         return matched_pairs
 
@@ -741,15 +707,21 @@ class ChangeDetectionNode:
 5. Extract numerical changes with full context
 """
 
-            response = await self.llm.chat.completions.create(
-                model=self.model_name,
-                messages=[
+            # GPT-5 nano는 temperature 파라미터 미지원
+            call_params = {
+                "model": self.model_name,
+                "messages": [
                     {"role": "system", "content": CHANGE_DETECTION_SYSTEM_PROMPT},
                     {"role": "user", "content": prompt},
                 ],
-                response_format={"type": "json_object"},
-                temperature=0.1,
-            )
+                "response_format": {"type": "json_object"},
+            }
+            
+            # gpt-5-nano가 아닌 경우에만 temperature 추가
+            if "gpt-5-nano" not in self.model_name.lower():
+                call_params["temperature"] = 0.1
+            
+            response = await self.llm.chat.completions.create(**call_params)
 
             result = json.loads(response.choices[0].message.content)
             result["section_ref"] = section_ref
@@ -809,15 +781,21 @@ class ChangeDetectionNode:
 """
 
         try:
-            response = await self.llm.chat.completions.create(
-                model=self.model_name,
-                messages=[
+            # GPT-5 nano는 temperature 파라미터 미지원
+            call_params = {
+                "model": self.model_name,
+                "messages": [
                     {"role": "system", "content": NEW_REGULATION_ANALYSIS_PROMPT},
                     {"role": "user", "content": user_prompt},
                 ],
-                response_format={"type": "json_object"},
-                temperature=0.1,
-            )
+                "response_format": {"type": "json_object"},
+            }
+            
+            # gpt-5-nano가 아닌 경우에만 temperature 추가
+            if "gpt-5-nano" not in self.model_name.lower():
+                call_params["temperature"] = 0.1
+            
+            response = await self.llm.chat.completions.create(**call_params)
 
             result = json.loads(response.choices[0].message.content)
             return result
