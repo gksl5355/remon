@@ -475,6 +475,7 @@ class MappingNode:
         mapping_results: List[MappingItem],
         regulation_meta: Dict[str, Any],
         regulation_cache: Dict[str, Dict[str, Any]],
+        regulation_cache: Dict[str, Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
         now_ts = datetime.utcnow().isoformat() + "Z"
         entries: List[Dict[str, Any]] = []
@@ -810,6 +811,9 @@ class MappingNode:
         chunk_metadata: Optional[Dict[str, Any]] = None,
         change_evidence: Optional[Dict[str, Any]] = None,
         change_context: Optional[Dict[str, Any]] = None,
+        chunk_metadata: Optional[Dict[str, Any]] = None,
+        change_evidence: Optional[Dict[str, Any]] = None,
+        change_context: Optional[Dict[str, Any]] = None,
     ):
         feature = {
             "name": feature_name,
@@ -904,6 +908,13 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
                     },
                     {"role": "user", "content": prompt},
                 ],
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a compliance mapping agent. Provide concise, citation-based reasoning (MAX 250 chars) starting with section/article number (e.g., '§1234.56'). Use Section from REGULATION METADATA if provided. If required_value is null, explain why: 'N/A (not regulated)' or 'N/A (already compliant)' or 'N/A (unrelated)'. Format: '[§XXX] [Core regulation] [Application status]'. Return JSON only.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
             )
             return json.loads(res.choices[0].message.content)
 
@@ -977,8 +988,13 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
                         actionable_changes=[],
                         pending_changes=[],
                         unknown_requirements=[],
+                        unknown_requirements=[],
                     )
                     return state
+
+                logger.info(
+                    f"✅ {len(products)}개 제품 발견: {[p['product_name'] for p in products[:3]]}..."
+                )
 
                 logger.info(
                     f"✅ {len(products)}개 제품 발견: {[p['product_name'] for p in products[:3]]}..."
@@ -1341,9 +1357,11 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
         mapping_payload = MappingResults(
             product_id=product_id,
             product_name=product_name,
+            product_name=product_name,
             items=mapping_results,
             targets=mapping_targets,
             unknown_requirements=unknown_requirements,
+            regulation_cache=regulation_cache,
             regulation_cache=regulation_cache,
         )
         # NOTE: mapping과 mapping_results는 동일한 데이터 (하위 호환성 유지)
