@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.black-formatter",
+    "esbenp.prettier-vscode",
+    "ms-toolsai.jupyter",
+    "Vue.volar",
+    "Vue.vscode-typescript-vue-plugin"
+  ]
+}
