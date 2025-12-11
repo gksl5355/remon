@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from sqlalchemy.dialects.postgresql import JSONB
 from . import Base
 
 class DataSource(Base):
@@ -13,7 +14,6 @@ class DataSource(Base):
     
     # Relationships
     # regulations = relationship("Regulation", back_populates="data_source")
-    crawl_logs = relationship("CrawlLog", back_populates="data_source")
 
 class CrawlJob(Base):
     __tablename__ = "crawl_jobs"
@@ -24,17 +24,12 @@ class CrawlJob(Base):
     is_active = Column(Boolean, default=True)
     
     # Relationships
-    crawl_logs = relationship("CrawlLog", back_populates="crawl_job")
 
 class CrawlLog(Base):
     __tablename__ = "crawl_logs"
     
     log_id = Column(Integer, primary_key=True, autoincrement=True)
-    job_id = Column(Integer, ForeignKey("crawl_jobs.job_id"), nullable=False)
-    source_id = Column(Integer, ForeignKey("data_sources.source_id"), nullable=False)
-    status = Column(String(50), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    timeline = Column(JSONB) # 12-11 DB서버는 변경 안됨
     
     # Relationships
-    crawl_job = relationship("CrawlJob", back_populates="crawl_logs")
-    data_source = relationship("DataSource", back_populates="crawl_logs")
+
