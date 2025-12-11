@@ -182,6 +182,16 @@ class RegulationRepository(BaseRepository[Regulation]):
         )
         row = result.fetchone()
         return row[0] if row else None
+
+    async def get_latest_regulation(
+        self, db: AsyncSession, exclude_id: Optional[int] = None
+    ) -> Optional[Regulation]:
+        """가장 최근 regulation 1개 반환 (exclude_id 제외 가능)."""
+        stmt = select(Regulation).order_by(Regulation.created_at.desc())
+        if exclude_id:
+            stmt = stmt.where(Regulation.regulation_id != exclude_id)
+        result = await db.execute(stmt)
+        return result.scalars().first()
     
     async def create_from_vision_result(
         self,
@@ -189,6 +199,9 @@ class RegulationRepository(BaseRepository[Regulation]):
         vision_result: Dict
     ) -> Regulation:
         """Vision Pipeline 결과를 DB에 저장"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
         # 첫 페이지 메타데이터 추출
         vision_pages = vision_result.get("vision_extraction_result", [])
         if not vision_pages:
@@ -197,18 +210,37 @@ class RegulationRepository(BaseRepository[Regulation]):
         first_page = vision_pages[0]
         metadata = first_page.get("structure", {}).get("metadata", {})
         
-        # citation_code 추출 (변경 감지용)
+        # 메타데이터 추출
         citation_code = metadata.get("citation_code")
+        country_code = metadata.get("jurisdiction_code")  # US, KR 등
+        title = metadata.get("title")
         
-        # Regulation 생성
+        # title fallback 처리
+        if not title:
+            title = "Unknown Regulation"
+            metadata["title"] = title
+            logger.warning(f"   title이 없어 fallback 적용: 'Unknown Regulation'")
+        
+        logger.info(f"   추출된 citation_code: {citation_code}")
+        logger.info(f"   추출된 title: {title}")
+        logger.info(f"   추출된 country_code: {country_code}")
+        logger.info(f"   vision_result 크기: {len(str(vision_result))} bytes")
+        logger.info(f"   페이지 수: {len(vision_pages)}")
+        
+        # Regulation 생성 (메타데이터 컴럼 + JSONB)
         regulation = Regulation(
             citation_code=citation_code,
+            country_code=country_code,
+            title=title,
+            status="active",
             regul_data=vision_result  # 전체 Vision 결과 저장
         )
         
         db.add(regulation)
         await db.flush()
         await db.refresh(regulation)
+        
+        logger.info(f"   생성된 regulation_id: {regulation.regulation_id}")
         
         return regulation
     
@@ -228,6 +260,218 @@ class RegulationRepository(BaseRepository[Regulation]):
         
         result = await db.execute(query)
         return result.scalar_one_or_none()
+
+    async def find_latest_and_previous_by_citation(
+        self,
+        db: AsyncSession,
+        citation_code: str,
+    ) -> tuple[Optional[Regulation], Optional[Regulation]]:
+        """
+        주어진 citation_code로 최신/이전 규제를 한 번에 조회한다.
+        반환: (latest, previous) — previous가 없을 수 있음.
+        """
+        query = (
+            select(Regulation)
+            .where(Regulation.citation_code == citation_code)
+            .order_by(Regulation.created_at.desc())
+            .limit(2)
+        )
+        result = await db.execute(query)
+        regs = result.scalars().all()
+        latest = regs[0] if len(regs) > 0 else None
+        previous = regs[1] if len(regs) > 1 else None
+        return latest, previous
+    
+    async def find_by_citation_and_country(
+        self,
+        db: AsyncSession,
+        citation_code: str,
+        country_code: str,
+        exclude_regulation_id: Optional[int] = None
+    ) -> Optional[Regulation]:
+        """citation_code + country로 Legacy 규제 검색 (컬럼 기반 빠른 검색)"""
+        query = select(Regulation).where(
+            Regulation.citation_code == citation_code,
+            Regulation.country_code == country_code
+        )
+        
+        if exclude_regulation_id:
+            query = query.where(Regulation.regulation_id != exclude_regulation_id)
+        
+        query = query.order_by(Regulation.created_at.desc()).limit(1)
+        
+        result = await db.execute(query)
+        return result.scalar_one_or_none()
+    
+    async def find_by_citation_normalized(
+        self,
+        db: AsyncSession,
+        normalized_citation: str,
+        country_code: str,
+        exclude_regulation_id: Optional[int] = None
+    ) -> Optional[Regulation]:
+        """정규화된 citation_code로 Legacy 검색 (하이픈/공백 제거 후 비교)."""
+        from sqlalchemy import text
+        
+        if exclude_regulation_id:
+            sql = """
+                SELECT regulation_id, regul_data, citation_code
+                FROM regulations 
+                WHERE UPPER(REPLACE(REPLACE(citation_code, '-', ''), ' ', '')) = :normalized
+                AND country_code = :country
+                AND regulation_id != :exclude_id
+                ORDER BY created_at DESC
+                LIMIT 1
+            """
+            params = {"normalized": normalized_citation, "country": country_code, "exclude_id": exclude_regulation_id}
+        else:
+            sql = """
+                SELECT regulation_id, regul_data, citation_code
+                FROM regulations 
+                WHERE UPPER(REPLACE(REPLACE(citation_code, '-', ''), ' ', '')) = :normalized
+                AND country_code = :country
+                ORDER BY created_at DESC
+                LIMIT 1
+            """
+            params = {"normalized": normalized_citation, "country": country_code}
+        
+        result = await db.execute(text(sql), params)
+        row = result.fetchone()
+        if row:
+            reg = Regulation()
+            reg.regulation_id = row[0]
+            reg.regul_data = row[1]
+            return reg
+        return None
+    
+    async def find_by_title_country_version(
+        self,
+        db: AsyncSession,
+        title: str,
+        country_code: str,
+        version: str,
+        exclude_regulation_id: Optional[int] = None
+    ) -> Optional[Regulation]:
+        """title + country + version으로 Legacy 규제 검색 (JSONB)"""
+        from sqlalchemy import text
+        
+        if exclude_regulation_id:
+            sql = """
+                SELECT regulation_id, regul_data 
+                FROM regulations 
+                WHERE title ILIKE :title
+                AND country_code = :country
+                AND regul_data->'vision_extraction_result'->0->'structure'->'metadata'->>'version' = :version
+                AND regulation_id != :exclude_id
+                ORDER BY created_at DESC
+                LIMIT 1
+            """
+            params = {"title": f"%{title}%", "country": country_code, "version": version, "exclude_id": exclude_regulation_id}
+        else:
+            sql = """
+                SELECT regulation_id, regul_data 
+                FROM regulations 
+                WHERE title ILIKE :title
+                AND country_code = :country
+                AND regul_data->'vision_extraction_result'->0->'structure'->'metadata'->>'version' = :version
+                ORDER BY created_at DESC
+                LIMIT 1
+            """
+            params = {"title": f"%{title}%", "country": country_code, "version": version}
+        
+        result = await db.execute(text(sql), params)
+        row = result.fetchone()
+        if row:
+            reg = Regulation()
+            reg.regulation_id = row[0]
+            reg.regul_data = row[1]
+            return reg
+        return None
+    
+    async def find_by_citation_normalized(
+        self,
+        db: AsyncSession,
+        normalized_citation: str,
+        country_code: str,
+        exclude_regulation_id: Optional[int] = None
+    ) -> Optional[Regulation]:
+        """정규화된 citation_code로 Legacy 검색 (하이픈/공백 제거 후 비교)."""
+        from sqlalchemy import text
+        
+        if exclude_regulation_id:
+            sql = """
+                SELECT regulation_id, regul_data, citation_code
+                FROM regulations 
+                WHERE UPPER(REPLACE(REPLACE(citation_code, '-', ''), ' ', '')) = :normalized
+                AND regul_data->'vision_extraction_result'->0->'structure'->'metadata'->>'jurisdiction_code' = :country
+                AND regulation_id != :exclude_id
+                ORDER BY created_at DESC
+                LIMIT 1
+            """
+            params = {"normalized": normalized_citation, "country": country_code, "exclude_id": exclude_regulation_id}
+        else:
+            sql = """
+                SELECT regulation_id, regul_data, citation_code
+                FROM regulations 
+                WHERE UPPER(REPLACE(REPLACE(citation_code, '-', ''), ' ', '')) = :normalized
+                AND regul_data->'vision_extraction_result'->0->'structure'->'metadata'->>'jurisdiction_code' = :country
+                ORDER BY created_at DESC
+                LIMIT 1
+            """
+            params = {"normalized": normalized_citation, "country": country_code}
+        
+        result = await db.execute(text(sql), params)
+        row = result.fetchone()
+        if row:
+            reg = Regulation()
+            reg.regulation_id = row[0]
+            reg.regul_data = row[1]
+            return reg
+        return None
+    
+    async def find_by_title_country_version(
+        self,
+        db: AsyncSession,
+        title: str,
+        country_code: str,
+        version: str,
+        exclude_regulation_id: Optional[int] = None
+    ) -> Optional[Regulation]:
+        """title + country + version으로 Legacy 규제 검색 (JSONB)"""
+        from sqlalchemy import text
+        
+        if exclude_regulation_id:
+            sql = """
+                SELECT regulation_id, regul_data 
+                FROM regulations 
+                WHERE regul_data->'vision_extraction_result'->0->'structure'->'metadata'->>'title' ILIKE :title
+                AND regul_data->'vision_extraction_result'->0->'structure'->'metadata'->>'jurisdiction_code' = :country
+                AND regul_data->'vision_extraction_result'->0->'structure'->'metadata'->>'version' = :version
+                AND regulation_id != :exclude_id
+                ORDER BY created_at DESC
+                LIMIT 1
+            """
+            params = {"title": f"%{title}%", "country": country_code, "version": version, "exclude_id": exclude_regulation_id}
+        else:
+            sql = """
+                SELECT regulation_id, regul_data 
+                FROM regulations 
+                WHERE regul_data->'vision_extraction_result'->0->'structure'->'metadata'->>'title' ILIKE :title
+                AND regul_data->'vision_extraction_result'->0->'structure'->'metadata'->>'jurisdiction_code' = :country
+                AND regul_data->'vision_extraction_result'->0->'structure'->'metadata'->>'version' = :version
+                ORDER BY created_at DESC
+                LIMIT 1
+            """
+            params = {"title": f"%{title}%", "country": country_code, "version": version}
+        
+        result = await db.execute(text(sql), params)
+        row = result.fetchone()
+        if row:
+            reg = Regulation()
+            reg.regulation_id = row[0]
+            reg.regul_data = row[1]
+            return reg
+        return None
     
 
     # 추가

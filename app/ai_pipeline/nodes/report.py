@@ -11,7 +11,7 @@ import json
 import re
 import os
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from dotenv import load_dotenv
 
 from openai import OpenAI
@@ -19,6 +19,7 @@ from app.ai_pipeline.state import AppState
 
 # DB 연동
 from app.core.database import AsyncSessionLocal
+from sqlalchemy import text
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -72,7 +73,7 @@ JSON 최상위 키는 다음 두 개여야 합니다:
 
     except Exception as e:
         logger.error(f"[ReportNode] JSON 파싱 실패: {e}")
-        return {}   # fallback
+        return {}  # fallback
 
 
 # -----------------------------
@@ -93,71 +94,304 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
         "(빈값 대응) 전략 수립 데이터 부족"
     ]
 
-    product_rows = [
-        [
-            item.get("feature_name", ""),
-            item.get("product_name", ""),
-            f"현재: {item.get('current_value', '-')}, 필요: {item.get('required_value','-')}"
-        ]
-        for item in mapping_items
-    ]
+    # product_name은 mapping에서 가져오기
+    product_name = mapping.get("product_name", "Unknown")
 
-    references = []
+    # ✅ 수정: 제품별 × feature별 조합으로 중복 제거
+    seen_rows = set()
+    product_rows = []
     for item in mapping_items:
-        url = item.get("regulation_meta", {}).get("source_url")
-        if url:
-            references.append({
-                "title": item.get("regulation_chunk_id", ""),
-                "url": url
-            })
+        feature_name = item.get("feature_name", "")
+        # item에서 product_name 가져오기 (멀티 제품 지원)
+        item_product_name = item.get("product_name") or product_name
+
+        # 제품명 + feature로 유니크 키 생성
+        row_key = (item_product_name, feature_name)
+        if row_key in seen_rows:
+            continue
+        seen_rows.add(row_key)
+
+        # reasoning은 이미 LLM에서 250자 이내로 생성됨
+        reasoning = item.get("reasoning", "")
+
+        # required_value 표시 개선
+        required_value = item.get("required_value")
+        if required_value is None:
+            # reasoning에서 이유 추출
+            reasoning_lower = reasoning.lower()
+            if "not regulated" in reasoning_lower or "규제하지 않" in reasoning:
+                required_display = "규제 대상 아님"
+            elif "already compliant" in reasoning_lower or "충족" in reasoning:
+                required_display = "기준 충족"
+            elif (
+                "unrelated" in reasoning_lower
+                or "무관" in reasoning
+                or "비적용" in reasoning
+            ):
+                required_display = "해당 없음"
+            else:
+                required_display = "규제 없음"
+        else:
+            required_display = str(required_value)
+
+        product_rows.append(
+            [
+                feature_name,
+                item_product_name,  # ✅ 각 행마다 올바른 제품명
+                f"현재: {item.get('current_value', '-')}, 필요: {required_display}",
+                reasoning,
+            ]
+        )
+
+    # ✅ 제품별로 그룹화
+    from collections import defaultdict
+
+    product_groups = defaultdict(list)
+
+    logger.info(f"📊 mapping_items 개수: {len(mapping_items)}")
+
+    for item in mapping_items:
+        feature_name = item.get("feature_name", "")
+        item_product_name = item.get("product_name") or product_name
+
+        logger.debug(f"  - {item_product_name} / {feature_name}")
+
+        # required_value 표시
+        reasoning = item.get("reasoning", "")
+        required_value = item.get("required_value")
+        if required_value is None:
+            reasoning_lower = reasoning.lower()
+            if "not regulated" in reasoning_lower or "규제하지 않" in reasoning:
+                required_display = "규제 대상 아님"
+            elif "already compliant" in reasoning_lower or "충족" in reasoning:
+                required_display = "기준 충족"
+            elif (
+                "unrelated" in reasoning_lower
+                or "무관" in reasoning
+                or "비적용" in reasoning
+            ):
+                required_display = "해당 없음"
+            else:
+                required_display = "규제 없음"
+        else:
+            required_display = str(required_value)
+
+        # 제품별로 그룹화
+        product_groups[item_product_name].append(
+            [
+                feature_name,
+                f"현재: {item.get('current_value', '-')}, 필요: {required_display}",
+                reasoning,
+            ]
+        )
+
+    # 참고 문헌 생성: Legacy + New 규제 모두 포함
+    references_map = {}  # regulation_id를 키로 중복 제거
+
+    def add_regulation_reference(reg_meta: Dict[str, Any], label: str = ""):
+        """규제 메타데이터를 references_map에 추가."""
+        if not reg_meta:
+            return
+
+        reg_id = reg_meta.get("regulation_id")
+        if not reg_id or reg_id in references_map:
+            return
+
+        title = reg_meta.get("title") or "규제 문서"
+        citation = reg_meta.get("citation_code")
+        source_url = reg_meta.get("source_url")
+        file_path = reg_meta.get("file_path")
+        s3_key = reg_meta.get("s3_key")
+        effective_date = reg_meta.get("effective_date")
+        jurisdiction = reg_meta.get("jurisdiction_code") or reg_meta.get("country")
+
+        # URL 우선순위: 1) source_url 2) S3 경로 3) 로컬 파일명
+        if source_url:
+            link = source_url
+        elif s3_key:
+            link = f"s3://remon-regulations/{s3_key}"
+        elif file_path:
+            from pathlib import Path
+
+            filename = Path(file_path).name
+            link = f"파일: {filename}"
+        else:
+            link = "원문 링크 없음"
+
+        display_title = f"{citation} - {title}" if citation else title
+        if label:
+            display_title = f"[{label}] {display_title}"
+
+        references_map[reg_id] = {
+            "title": display_title,
+            "url": link,
+            "file_path": file_path or s3_key,  # 있으면 표시, 없으더라도 None
+            "citation": citation,
+            "effective_date": effective_date,
+            "jurisdiction": jurisdiction,
+            "regulation_type": label,
+        }
+
+    # 1) 새로운 규제 추가
+    new_reg_meta = state.get("regulation", {})
+    add_regulation_reference(new_reg_meta, "New")
+
+    # 2) Legacy 규제 추가 (change_context에서)
+    change_summary = state.get("change_summary", {})
+    legacy_regulation_id = change_summary.get("legacy_regulation_id")
+
+    if legacy_regulation_id:
+        change_context = state.get("change_context", {})
+        legacy_regul_data = change_context.get("legacy_regul_data")
+
+        if legacy_regul_data:
+            # legacy_regul_data에서 regulation 메타 추출
+            legacy_reg_meta = legacy_regul_data.get("regulation", {})
+            add_regulation_reference(legacy_reg_meta, "Legacy")
+
+    # 리스트로 변환 (Legacy → New 순서)
+    references = (
+        sorted(
+            references_map.values(),
+            key=lambda x: 0 if x.get("regulation_type") == "Legacy" else 1,
+        )
+        if references_map
+        else []
+    )
 
     summary_content = [
         f"국가 / 지역: {meta.get('country', '')} ({meta.get('region', '')})",
         f"카테고리: {mapping_items[0].get('parsed',{}).get('category','') if mapping_items else ''}",
         f"규제 요약: {mapping_items[0].get('regulation_summary','') if mapping_items else ''}",
         f"영향도: {impact_score.get('impact_level','N/A')} (점수 {impact_score.get('weighted_score',0.0)})",
-        f"전략 권고: {strategies[0] if strategies else ''}"
+        f"전략 권고: {strategies[0] if strategies else ''}",
     ]
 
+    # 0. 종합 요약 (기존 summary)
+    overall_summary = {
+        "id": "overall_summary",
+        "type": "paragraph",
+        "title": "0. 종합 요약",
+        "content": summary_content,
+    }
+
+    # 1. 규제 변경 요약 (change_detection_results 활용)
+    change_items = []
+    change_results = state.get("change_detection_results", [])
+    for result in change_results:
+        if not result.get("change_detected"):
+            continue
+
+        section = result.get("section_ref", "Unknown")
+        numerical_changes = result.get("numerical_changes", [])
+
+        if numerical_changes:
+            for num_change in numerical_changes:
+                field = num_change.get("field", "항목")
+                legacy_val = num_change.get("legacy_value", "없음")
+                new_val = num_change.get("new_value", "없음")
+                change_items.append(f"- {section}: {field} {legacy_val} → {new_val}")
+        else:
+            change_type = result.get("change_type", "변경")
+            change_items.append(f"- {section}: {change_type}")
+
+    change_summary_section = {
+        "id": "change_summary",
+        "type": "list",
+        "title": "1. 규제 변경 요약",
+        "content": change_items if change_items else ["변경 사항 없음"],
+    }
+
+    # ✅ 제품별 하위 테이블 생성
+    product_tables = []
+    for prod_name, rows in sorted(product_groups.items()):
+        product_tables.append(
+            {
+                "product_name": prod_name,
+                "headers": ["제품 속성", "현재 vs 필요", "판단 근거"],
+                "rows": rows if rows else [["데이터 없음", "-", "-"]],
+            }
+        )
+
+    # ✅ 2. 제품 분석 (단일 섹션, 하위 테이블 포함)
+    products_section = {
+        "id": "products_analysis",
+        "type": "nested_tables",
+        "title": "2. 제품 분석",
+        "tables": product_tables,
+    }
+
+    logger.info(f"📊 제품 테이블 생성: {len(product_tables)}개 제품")
+
     return [
-        {
-            "id": "summary",
-            "title": "1. 규제 변경 요약",
-            "type": "paragraph",
-            "content": summary_content
-        },
-        {
-            "id": "products",
-            "title": "2. 영향받는 제품 목록",
-            "type": "table",
-            "headers": ["규제항목", "제품명", "조치"],
-            "rows": product_rows
-        },
+        overall_summary,
+        change_summary_section,
+        products_section,
         {
             "id": "changes",
-            "title": "3. 주요 변경 사항 해석",
             "type": "list",
-            "content": major_analysis
+            "title": "3. 주요 변경 사항 해석",
+            "content": major_analysis,
         },
         {
             "id": "strategy",
-            "title": "4. 대응 전략 제안",
             "type": "list",
-            "content": strategy_steps
+            "title": "4. 대응 전략 제안",
+            "content": strategy_steps,
         },
         {
             "id": "reasoning",
-            "title": "5. 영향 평가 근거",
             "type": "paragraph",
-            "content": [impact_score.get("reasoning", "")]
+            "title": "5. 영향 평가 근거",
+            "content": [impact_score.get("reasoning", "")],
         },
         {
             "id": "references",
-            "title": "6. 참고 및 원문 링크",
             "type": "links",
-            "content": references
-        }
+            "title": "6. 참고 및 원문 링크",
+            "content": references,
+        },
     ]
+
+
+# -----------------------------
+# 알림 메시지/슬랙 전송 헬퍼
+# -----------------------------
+def build_report_notification(mapping: Dict[str, Any], product_name: str = "") -> str:
+    """변경 건수와 보고서 생성 완료 메시지를 단순 문자열로 생성."""
+    unknown = len(mapping.get("unknown_requirements", []) or [])
+    total_items = len(mapping.get("items", []))
+    prod = product_name or mapping.get("product_name", "") or "unknown"
+    return (
+        f"[Report] product={prod} items={total_items} "
+        f"unknown={unknown} report generated.| global 17팀 대장 고서아"
+    )
+
+
+def send_slack_notification(message: str, webhook_url: Optional[str] = None) -> bool:
+    """
+    간단한 Slack Webhook 전송 헬퍼.
+    테스트 시 SLACK_WEBHOOK_URL 환경변수나 인자를 지정해야 하며,
+    실패해도 예외를 던지지 않고 False 반환.
+    """
+    import os
+    import requests
+
+    url = webhook_url or os.getenv("SLACK_WEBHOOK_URL")
+    if not url:
+        logger.warning("SLACK_WEBHOOK_URL 미설정 - 슬랙 전송 스킵")
+        return False
+    try:
+        resp = requests.post(url, json={"text": message}, timeout=5)
+        if resp.status_code >= 300:
+            logger.warning(
+                "Slack 전송 실패: status=%s body=%s", resp.status_code, resp.text
+            )
+            return False
+        return True
+    except Exception as exc:
+        logger.warning("Slack 전송 예외: %s", exc)
+        return False
 
 
 # -----------------------------
@@ -168,13 +402,14 @@ async def report_node(state: AppState) -> Dict[str, Any]:
     mapping_items = state.get("mapping", {}).get("items", [])
     strategies = state.get("strategies", [])
     impact_score = (state.get("impact_scores") or [{}])[0]
+    regulation_trace = meta.get("regulation_trace")
 
     context_parts = [
         f"국가: {meta.get('country','')}, 지역: {meta.get('region','')}",
         f"요약: {mapping_items[0].get('regulation_summary','') if mapping_items else ''}",
         f"영향도: {impact_score.get('impact_level','N/A')}",
         f"전략: {strategies[0] if strategies else ''}",
-        f"근거: {impact_score.get('reasoning','')}"
+        f"근거: {impact_score.get('reasoning','')}",
     ]
     llm_context = "\n".join(context_parts)
 
@@ -188,31 +423,63 @@ async def report_node(state: AppState) -> Dict[str, Any]:
     report_json = {
         "report_id": None,
         "generated_at": datetime.utcnow().isoformat(),
-        "sections": sections
+        "sections": sections,
     }
 
     async with AsyncSessionLocal() as db_session:
-        from app.core.repositories.regulation_keynote_repository import RegulationKeynoteRepository
+        from app.core.repositories.regulation_keynote_repository import (
+            RegulationKeynoteRepository,
+        )
         from app.core.repositories.report_repository import ReportSummaryRepository
 
         keynote_repo = RegulationKeynoteRepository()
         summary_repo = ReportSummaryRepository()
 
         try:
-            keynote = await keynote_repo.create_keynote(
-                db_session,
-                [
-                    f"country: {meta.get('country', '')}",
-                    f"category: {mapping_items[0].get('parsed',{}).get('category','') if mapping_items else ''}",
-                    f"summary: {mapping_items[0].get('regulation_summary','') if mapping_items else ''}",
-                    f"impact: {impact_score.get('impact_level','N/A')}"
-                ]
-            )
-            logger.info(f"Keynote 저장 완료: {keynote.keynote_id}")
+            # Change Detection Keynote 저장 (우선)
+            change_keynote_data = state.get("change_keynote_data")
+            if change_keynote_data:
+                keynote = await keynote_repo.create_keynote(
+                    db_session, change_keynote_data
+                )
+                logger.info(f"✅ Change Keynote 저장: {keynote.keynote_id}")
+            else:
+                # Fallback: 기존 방식 (Mapping 기반)
+                keynote = await keynote_repo.create_keynote(
+                    db_session,
+                    {
+                        "country": meta.get("country", ""),
+                        "category": (
+                            mapping_items[0].get("parsed", {}).get("category", "")
+                            if mapping_items
+                            else ""
+                        ),
+                        "summary": (
+                            mapping_items[0].get("regulation_summary", "")
+                            if mapping_items
+                            else ""
+                        ),
+                        "impact": impact_score.get("impact_level", "N/A"),
+                    },
+                )
+                logger.info(f"Keynote 저장 완료: {keynote.keynote_id}")
 
             summary = await summary_repo.create_report_summary(db_session, sections)
+            # 규제 trace 저장
+            if regulation_trace:
+                pid = meta.get("product_id")
+                try:
+                    pid_int = int(pid)
+                except (TypeError, ValueError):
+                    logger.error("Invalid product_id for trace update: %s", pid)
+                else:
+                    await db_session.execute(
+                        text(
+                            "UPDATE products SET regulation_trace = :trace WHERE product_id = :pid"
+                        ),
+                        {"trace": json.dumps(regulation_trace), "pid": pid_int},
+                    )
             await db_session.commit()
-
             report_json["report_id"] = summary.summary_id
             logger.info(f"ReportSummary 저장 완료: {summary.summary_id}")
 

@@ -106,6 +106,10 @@ class PreprocessConfig:
     OPENAI_TIMEOUT: int = int(os.getenv("OPENAI_TIMEOUT", "30"))
     """OpenAI 요청 타임아웃 (초). 기본값: 30"""
     
+    # ==================== Change Detection ====================
+    CHANGE_DETECTION_MODEL: str = os.getenv("CHANGE_DETECTION_MODEL", "gpt-5-nano")
+    """변경 감지 전용 모델. 기본값: gpt-5-nano"""
+    
     # ==================== Vision Pipeline ====================
     VISION_MODEL_COMPLEX: str = os.getenv("VISION_MODEL_COMPLEX", "gpt-4o")
     """복잡한 표 처리용 Vision 모델. 기본값: gpt-4o"""
@@ -122,8 +126,8 @@ class PreprocessConfig:
     VISION_MAX_TOKENS: int = int(os.getenv("VISION_MAX_TOKENS", "16384"))
     """Vision LLM 최대 출력 토큰. 기본값: 16384 (Prompt Caching 효율화)"""
     
-    VISION_TEMPERATURE: float = float(os.getenv("VISION_TEMPERATURE", "0.1"))
-    """Vision LLM 온도 (구조 추출용 낮게). 기본값: 0.1"""
+    VISION_TEMPERATURE: float = float(os.getenv("VISION_TEMPERATURE", "0.2"))
+    """Vision LLM 온도 (구조 추출용). 기본값: 0.2"""
     
     ENABLE_GRAPH_EXTRACTION: bool = os.getenv("ENABLE_GRAPH_EXTRACTION", "true").lower() == "true"
     """지식 그래프 추출 활성화. 기본값: True"""

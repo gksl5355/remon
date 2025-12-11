@@ -24,8 +24,10 @@ class Settings(BaseSettings):
     QDRANT_API_KEY: str | None = None
     QDRANT_PATH: str = "./data/qdrant"
     QDRANT_COLLECTION: str = "remon_regulations"
+    QDRANT_VECTOR_NAME: str = "dense"
     QDRANT_PREFER_GRPC: bool = False
     QDRANT_TIMEOUT: float = 10.0
+    QDRANT_TLS_VERIFY: bool = False
     MAPPING_TOP_K: int = 10
     MAPPING_THRESHOLD: float = 0.45
     MAPPING_ALPHA: float = 0.7

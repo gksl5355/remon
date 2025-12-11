@@ -1,7 +1,10 @@
-# """
-# module: database.py
-# description: SQLAlchemy 비동기 세션 관리
-# """
+"""
+module: database.py
+description: SQLAlchemy 비동기 세션 관리
+author: AI Agent
+created: 2025-01-19
+updated: 2025-12-08
+"""
 
 
 import logging
@@ -24,7 +27,10 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_async_engine(
     DATABASE_URL,
     echo=True,  # 개발 시 SQL 로그 출력
-    poolclass=NullPool,
+    pool_pre_ping=True,  # 쿼리 전 연결 상태 확인
+    pool_recycle=3600,  # 1시간마다 연결 재생성
+    pool_size=5,  # 기본 연결 풀 크기
+    max_overflow=10,  # 최대 추가 연결 수
     future=True
 )
 

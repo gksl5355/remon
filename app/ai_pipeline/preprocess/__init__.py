@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Dict, List, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from app.ai_pipeline.state import AppState, PreprocessRequest, PreprocessSummary
 
@@ -39,12 +39,11 @@ async def _run_orchestrator(pdf_path: str) -> Dict[str, Any]:
 
 
 async def _run_vision_orchestrator(
-    pdf_path: str,
-    vision_config: Optional[Dict[str, Any]] = None
+    pdf_path: str, vision_config: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Vision Pipeline 실행.
-    
+
     Args:
         pdf_path: PDF 파일 경로
         vision_config: Vision 설정 딕셔너리 (None이면 기본값 사용)
@@ -68,6 +67,36 @@ async def _run_vision_orchestrator(
     else:
         orchestrator = VisionOrchestrator()
     return await asyncio.to_thread(orchestrator.process_pdf, pdf_path)
+
+
+def _resolve_pdf_paths(state: AppState) -> List[str]:
+    """
+    PDF 경로 결정 우선순위:
+    1. state["preprocess_request"]["pdf_paths"] (직접 지정)
+    2. state["preprocess_request"]["load_from_s3"] = True (S3 자동 로드)
+    3. 빈 리스트 (스킵)
+    """
+    request: PreprocessRequest | None = state.get("preprocess_request")
+
+    if not request:
+        return []
+
+    # 1. 직접 지정된 경로
+    pdf_paths = request.get("pdf_paths", [])
+    if pdf_paths:
+        return pdf_paths
+
+    # 2. S3 자동 로드
+    if request.get("load_from_s3"):
+        from app.ai_pipeline.preprocess.s3_loader import load_today_regulations
+
+        target_date = request.get("s3_date")  # YYYYMMDD or None
+        logger.info("📥 S3에서 오늘 날짜 규제 파일 자동 로드")
+
+        s3_paths = load_today_regulations(target_date)
+        return s3_paths
+
+    return []
 
 
 async def preprocess_node(state: AppState) -> AppState:
@@ -97,21 +126,10 @@ async def preprocess_node(state: AppState) -> AppState:
         state["dual_index_summary"]  # Vision Pipeline 사용 시
     """
 
-    request: PreprocessRequest | None = state.get("preprocess_request")
+    # PDF 경로 결정 (직접 지정 또는 S3 자동 로드)
+    pdf_paths: List[str] = _resolve_pdf_paths(state)
 
-    if not request:
-        logger.info("preprocess_node skipped – preprocess_request 없음")
-        summary: PreprocessSummary = {
-            "status": "skipped",
-            "processed_count": 0,
-            "succeeded": 0,
-            "failed": 0,
-            "reason": "preprocess_request missing",
-        }
-        state["preprocess_summary"] = summary
-        return state
-
-    pdf_paths: List[str] = request.get("pdf_paths", [])
+    request: PreprocessRequest | None = state.get("preprocess_request") or {}
     if not pdf_paths:
         logger.info("preprocess_node skipped – pdf_paths 비어있음")
         summary = {
@@ -140,33 +158,65 @@ async def preprocess_node(state: AppState) -> AppState:
     # Vision Pipeline 설정 (preprocess_request에서 가져오기)
     vision_config = request.get("vision_config") if use_vision else None
 
-    # Vision Pipeline 설정 (preprocess_request에서 가져오기)
-    vision_config = request.get("vision_config") if use_vision else None
-    
     for pdf_path in pdf_paths:
         try:
             if use_vision:
-                result = await _run_vision_orchestrator(pdf_path, vision_config=vision_config)
+                result = await _run_vision_orchestrator(
+                    pdf_path, vision_config=vision_config
+                )
             else:
                 result = await _run_orchestrator(pdf_path)
-            
+
             result.setdefault("pdf_path", pdf_path)
+
+            # 🔥 DB에 저장하고 regulation_id 추가
+            if result.get("status") == "success" and use_vision:
+                from app.core.repositories.regulation_repository import (
+                    RegulationRepository,
+                )
+                from app.core.database import AsyncSessionLocal
+
+                async with AsyncSessionLocal() as session:
+                    repo = RegulationRepository()
+                    try:
+                        regulation = await repo.create_from_vision_result(
+                            session, result
+                        )
+                        await session.commit()
+                        result["regulation_id"] = regulation.regulation_id
+                        logger.info(
+                            f"✅ DB 저장 완료: regulation_id={regulation.regulation_id}"
+                        )
+                        
+                        # 🔑 change_context 자동 채우기 (변경 감지용)
+                        if request.get("enable_change_detection"):
+                            state["change_context"] = {
+                                "new_regulation_id": regulation.regulation_id,
+                                "new_regul_data": result,
+                            }
+                            logger.info("✅ change_context 자동 설정 완료")
+                    except Exception as e:
+                        await session.rollback()
+                        logger.error(f"❌ DB 저장 실패: {e}")
+
             processed_results.append(result)
-            
+
             if result.get("status") == "success":
                 success_count += 1
-                
+
                 # Vision Pipeline 결과 수집
                 if use_vision:
-                    all_vision_results.extend(result.get("vision_extraction_result", []))
-                    
+                    all_vision_results.extend(
+                        result.get("vision_extraction_result", [])
+                    )
+
                     graph_data = result.get("graph_data", {})
                     all_graph_data["nodes"].extend(graph_data.get("nodes", []))
                     all_graph_data["edges"].extend(graph_data.get("edges", []))
-                    
+
                     if result.get("dual_index_summary"):
                         all_index_summaries.append(result["dual_index_summary"])
-                        
+
         except Exception as exc:  # pragma: no cover - defensive guard
             logger.exception("PDF 전처리 실패: %s", pdf_path)
             processed_results.append(
@@ -204,7 +254,7 @@ async def preprocess_node(state: AppState) -> AppState:
             "total_chunks": sum(s.get("qdrant_chunks", 0) for s in all_index_summaries),
             "total_nodes": len(all_graph_data["nodes"]),
             "total_edges": len(all_graph_data["edges"]),
-            "summaries": all_index_summaries
+            "summaries": all_index_summaries,
         }
 
     # product_info가 Preprocess 단계에서 전달되는 경우 상태에 반영
@@ -217,21 +267,22 @@ async def preprocess_node(state: AppState) -> AppState:
         fail_count,
     )
 
-    # 변경 감지 분기 (전처리 완료 후, 임베딩 전)
-    if (
-        use_vision
-        and all_vision_results
-        and request.get("enable_change_detection", False)
-    ):
-        logger.info("변경 감지 노드 실행 준비")
-        from app.ai_pipeline.nodes.change_detection import change_detection_node
-
-        # change_context가 제공되었는지 확인
-        if state.get("change_context"):
-            logger.info("변경 감지 노드 실행")
-            state = await change_detection_node(state)
-        else:
-            logger.info("change_context 없음, 변경 감지 스킵")
+    # 변경 감지 활성화 시 regulation 메타데이터 추가
+    if request.get("enable_change_detection") and processed_results:
+        first_result = processed_results[0]
+        if first_result.get("status") == "success" and use_vision:
+            vision_pages = first_result.get("vision_extraction_result", [])
+            if vision_pages:
+                metadata = vision_pages[0].get("structure", {}).get("metadata", {})
+                state["regulation"] = {
+                    "country": metadata.get("jurisdiction_code", "US"),
+                    "title": metadata.get("title", "Unknown Regulation"),
+                    "effective_date": metadata.get("effective_date"),
+                    "citation_code": metadata.get("citation_code"),
+                    "authority": metadata.get("authority"),
+                    "regulation_id": first_result.get("regulation_id"),
+                }
+                logger.info("✅ regulation 메타데이터 추가 완료")
 
     return state
 
