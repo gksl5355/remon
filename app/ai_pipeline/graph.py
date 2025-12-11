@@ -1,25 +1,33 @@
-"""LangGraph 파이프라인 구성
+# app/ai_pipeline/graph.py
+"""
+LangGraph 파이프라인 구성 (HITL 통합 버전)
 
 흐름:
     preprocess → detect_changes → [embedding] → map_products 
-    → generate_strategy → score_impact → validator → report
+    → generate_strategy → score_impact → validator → report → hitl → validator → ...
 
-분기 처리:
-    - detect_changes: 변경 감지 시 embedding 실행, 아니면 스킵
-    - validator: 실패 시 최대 1회 재시도 (map_products/generate_strategy/score_impact)
+HITL 구조:
+    - report 이후 hitl 노드를 호출
+    - hitl_node에서 사용자 피드백을 분석하여 state를 수정
+    - validator 재실행하여 어떤 노드가 다시 실행될지 결정
 """
 
 from langgraph.graph import StateGraph, END
 from app.ai_pipeline.state import AppState
 
+# 기존 노드들
 from app.ai_pipeline.preprocess import preprocess_node
-from app.ai_pipeline.nodes.map_products import map_products_node
 from app.ai_pipeline.nodes.change_detection import change_detection_node
 from app.ai_pipeline.nodes.embedding import embedding_node
+from app.ai_pipeline.nodes.map_products import map_products_node
 from app.ai_pipeline.nodes.generate_strategy import generate_strategy_node
-from app.ai_pipeline.nodes.validator import validator_node
 from app.ai_pipeline.nodes.score_impact import score_impact_node
+from app.ai_pipeline.nodes.validator import validator_node
 from app.ai_pipeline.nodes.report import report_node
+
+# 신규 HITL 통합 노드
+from app.ai_pipeline.nodes.hitl import hitl_node
+
 
 # --------------------------------------------------------------
 # Validator → 다음 노드 결정
@@ -27,28 +35,33 @@ from app.ai_pipeline.nodes.report import report_node
 def _route_validation(state: AppState) -> str:
     """
     Validator 결과에 따라 다음 노드 결정.
-    
-    재시도 정책: 최대 2번 실행 (초기 1번 + 재시도 1번)
-    2번 실패 시 강제 통과하여 HITL로 전달
+
+    - restart_node가 있으면 해당 노드를 재실행
+    - 재시도 2번 초과 시 강제 OK 처리하여 보고서 생성
     """
-    decision = state.get("validation_result", {})
+    decision = state.get("validation_result", {}) or {}
     restart = decision.get("restart_node")
     is_valid = decision.get("is_valid", True)
-    retry_count = state.get("validation_retry_count", 0)
+    retry_count = state.get("validation_retry_count", 0) or 0
 
-    # 최대 2번 실행 (초기 1번 + 재시도 1번)
+    # 2번 넘게 실패하면 그냥 OK 처리 → report로 이동
     if retry_count >= 2:
         return "ok"
 
-    # 정상일 때
-    if is_valid:
+    # 정상 통과 또는 재시작 노드 없음
+    if is_valid or not restart:
         return "ok"
 
-    # 오류 + retry_count < 2 이면 → 재생성 노드로 이동
+    # change_detection 은 실제 그래프 노드 ID인 detect_changes 로 매핑
+    if restart == "change_detection":
+        return "detect_changes"
+
+    # 나머지 노드 이름은 그래프 노드 ID와 동일
     if restart in ["map_products", "generate_strategy", "score_impact"]:
         return restart
 
     return "ok"
+
 
 # --------------------------------------------------------------
 # Build Graph
@@ -56,63 +69,77 @@ def _route_validation(state: AppState) -> str:
 def build_graph(start_node: str = "preprocess"):
     graph = StateGraph(AppState)
 
-    graph.add_node("preprocess",        preprocess_node)
-    graph.add_node("detect_changes",    change_detection_node)
-    graph.add_node("embedding",         embedding_node)  # 임베딩 노드 추가
-    graph.add_node("map_products",      map_products_node)
+    # -------------------------
+    # 노드 등록
+    # -------------------------
+    graph.add_node("preprocess", preprocess_node)
+    graph.add_node("detect_changes", change_detection_node)
+    graph.add_node("embedding", embedding_node)
+    graph.add_node("map_products", map_products_node)
     graph.add_node("generate_strategy", generate_strategy_node)
-    graph.add_node("score_impact",      score_impact_node)
-    graph.add_node("validator",         validator_node)
-    graph.add_node("report_node",       report_node)
+    graph.add_node("score_impact", score_impact_node)
+    graph.add_node("validator", validator_node)
+    graph.add_node("report", report_node)
+    graph.add_node("hitl", hitl_node)
 
-    # entry point can be overridden for reuse (e.g., start at map_products when
-    # preprocess/change_detection 결과를 재사용)
+    # -------------------------
+    # Entry point 설정
+    # -------------------------
     if start_node not in {
-        "preprocess",
-        "detect_changes",
-        "embedding",
-        "map_products",
-        "generate_strategy",
-        "score_impact",
-        "validator",
-        "report_node",
+        "preprocess", "detect_changes", "embedding", "map_products",
+        "generate_strategy", "score_impact", "validator",
+        "report", "hitl"
     }:
         raise ValueError(f"Invalid start_node: {start_node}")
     graph.set_entry_point(start_node)
 
-    # main flow
+    # -------------------------
+    # 메인 파이프라인
+    # -------------------------
     graph.add_edge("preprocess", "detect_changes")
-    graph.add_edge("map_products",      "generate_strategy")
-    graph.add_edge("generate_strategy", "score_impact")
-    graph.add_edge("score_impact",      "validator")
 
-    # detect_changes → embedding (변경 감지 또는 신규) | map_products (변경 없음)
+    # detect_changes → embedding or map_products
     graph.add_conditional_edges(
         "detect_changes",
-        lambda state: "embedding" if state.get("needs_embedding", False) else "skip_embedding",
+        lambda state: "embedding" if state.get("needs_embedding", False) else "skip",
         {
             "embedding": "embedding",
-            "skip_embedding": "map_products",
-        }
+            "skip": "map_products",
+        },
     )
-    
-    # embedding → map_products
-    graph.add_edge("embedding", "map_products")
 
-    # validator → validation only for 3 nodes
+    graph.add_edge("embedding", "map_products")
+    graph.add_edge("map_products", "generate_strategy")
+    graph.add_edge("generate_strategy", "score_impact")
+    graph.add_edge("score_impact", "validator")
+
+    # -------------------------
+    # 검증 결과에 따른 분기
+    # -------------------------
     graph.add_conditional_edges(
         "validator",
         _route_validation,
         {
-            "ok": "report_node",              # 마지막 노드
-            "map_products": "map_products",   # 실패 시 재시도 노드들
+            "ok": "report",
+            "map_products": "map_products",
             "generate_strategy": "generate_strategy",
             "score_impact": "score_impact",
+            "detect_changes": "detect_changes",
         },
     )
 
-    # report → END
-    graph.add_edge("report_node", END)
+    # -------------------------
+    # 보고서 후 HITL 노드 연결
+    # -------------------------
+    graph.add_edge("report", "hitl")
+
+    # HITL → validator (state 패치 → 검증 → 재실행)
+    graph.add_edge("hitl", "validator")
+
+    # -------------------------
+    # 파이프라인 종료
+    # -------------------------
+    # 기본 실행에서는 report 이후 바로 종료되는 경로도 허용
+    graph.add_edge("report", END)   # 사용자가 피드백 입력 안 하면 바로 END
 
     return graph.compile()
-

@@ -1,4 +1,4 @@
-#app/ai_pipeline/nodes/change_detection.py
+# app/ai_pipeline/nodes/change_detection.py
 """
 module: change_detection.py
 description: 규제 변경 감지 노드 (Reference ID 기반, 전처리 후 임베딩 전)
@@ -167,7 +167,7 @@ class ChangeDetectionNode:
         model_name: Optional[str] = None,
     ):
         from app.ai_pipeline.preprocess.config import PreprocessConfig
-        
+
         if llm_client:
             self.llm = llm_client
         else:
@@ -177,6 +177,11 @@ class ChangeDetectionNode:
         self.vector_client = vector_client or VectorClient()
         self.model_name = model_name or PreprocessConfig.CHANGE_DETECTION_MODEL
         self.confidence_scorer = ConfidenceScorer()
+
+    # 🔹 공통 실행 마킹 헬퍼: 한 번 돌면 ran_inline=True, force 플래그 해제
+    def _mark_execution_state(self, state: AppState) -> None:
+        state["change_detection_ran_inline"] = True
+        state["force_rerun_change_detection"] = False
 
     async def run(self, state: AppState, db_session=None) -> AppState:
         """변경 감지 노드 실행 (짧은 DB 세션 사용)."""
@@ -189,6 +194,8 @@ class ChangeDetectionNode:
                 "status": "skipped",
                 "reason": "no_change_context",
             }
+            # 실행 상태 마킹
+            self._mark_execution_state(state)
             return state
 
         new_regulation_id = change_context.get("new_regulation_id")
@@ -224,6 +231,7 @@ class ChangeDetectionNode:
                             "status": "error",
                             "reason": "no_new_regulation_id",
                         }
+                        self._mark_execution_state(state)
                         return state
 
                     new_regul_data = await repo.get_regul_data(
@@ -238,6 +246,7 @@ class ChangeDetectionNode:
                             "status": "error",
                             "reason": "no_new_regul_data",
                         }
+                        self._mark_execution_state(state)
                         return state
 
                 if not legacy_regul_data:
@@ -249,7 +258,9 @@ class ChangeDetectionNode:
                             logger.info("✅ 완전히 새로운 규제 (Legacy 없음) - 신규 분석 실행")
 
                             # 신규 규제 분석 (LLM)
-                            analysis_hints = await self._analyze_new_regulation(new_regul_data)
+                            analysis_hints = await self._analyze_new_regulation(
+                                new_regul_data
+                            )
                             state["regulation_analysis_hints"] = analysis_hints
                             logger.info(
                                 f"✅ 신규 규제 분석 완료: {len(analysis_hints.get('key_requirements', []))}개 요구사항"
@@ -264,6 +275,8 @@ class ChangeDetectionNode:
                                 "total_changes": 0,
                             }
                             state["needs_embedding"] = True
+                            state["change_detection_index"] = {}
+                            self._mark_execution_state(state)
                             return state
 
                     legacy_regul_data = await repo.get_regul_data(
@@ -278,6 +291,7 @@ class ChangeDetectionNode:
                             "status": "error",
                             "reason": "legacy_not_found",
                         }
+                        self._mark_execution_state(state)
                         return state
                 # end session block
 
@@ -392,7 +406,7 @@ class ChangeDetectionNode:
             "legacy_regulation_id": legacy_regulation_id,
             "new_regulation_id": new_regulation_id,
         }
-        
+
         # 🔑 Section 기반 빠른 조회를 위한 인덱스 생성
         change_index = {}
         for result in detection_results:
@@ -411,6 +425,8 @@ class ChangeDetectionNode:
         state["needs_embedding"] = needs_embedding
         logger.info(f"📦 임베딩 필요: {needs_embedding}")
 
+        # 실행 상태 마킹 (정상 완료)
+        self._mark_execution_state(state)
         return state
 
     def _extract_reference_blocks(
@@ -592,8 +608,9 @@ class ChangeDetectionNode:
     def _normalize_section_ref(self, section_ref: str) -> str:
         """조항 번호 정규화 (§1160.5, 1160.5, § 1160.5 → 1160.5)."""
         import re
-        normalized = re.sub(r'[§\s]', '', section_ref)
-        match = re.search(r'(\d+\.\d+)', normalized)
+
+        normalized = re.sub(r"[§\s]", "", section_ref)
+        match = re.search(r"(\d+\.\d+)", normalized)
         return match.group(1) if match else normalized
 
     async def _match_reference_blocks(
@@ -655,7 +672,11 @@ class ChangeDetectionNode:
                     break
 
         # 매칭 실패한 섹션 로그
-        unmatched_new = [b.get("section_ref") for b in new_blocks_unique if not any(p["new_block"] == b for p in matched_pairs)]
+        unmatched_new = [
+            b.get("section_ref")
+            for b in new_blocks_unique
+            if not any(p["new_block"] == b for p in matched_pairs)
+        ]
         if unmatched_new:
             logger.warning(f"⚠️ 매칭 실패한 신규 섹션: {unmatched_new[:5]}...")
 
@@ -717,11 +738,11 @@ class ChangeDetectionNode:
                 ],
                 "response_format": {"type": "json_object"},
             }
-            
+
             # gpt-5-nano가 아닌 경우에만 temperature 추가
             if "gpt-5-nano" not in self.model_name.lower():
                 call_params["temperature"] = 0.1
-            
+
             response = await self.llm.chat.completions.create(**call_params)
 
             result = json.loads(response.choices[0].message.content)
@@ -791,11 +812,11 @@ class ChangeDetectionNode:
                 ],
                 "response_format": {"type": "json_object"},
             }
-            
+
             # gpt-5-nano가 아닌 경우에만 temperature 추가
             if "gpt-5-nano" not in self.model_name.lower():
                 call_params["temperature"] = 0.1
-            
+
             response = await self.llm.chat.completions.create(**call_params)
 
             result = json.loads(response.choices[0].message.content)

@@ -1,4 +1,4 @@
-#app/ai_pipeline/state.py
+# app/ai_pipeline/state.py
 """
 module: state.py
 description: LangGraph 전역 State 스키마 정의 – Production Minimal Version
@@ -64,7 +64,7 @@ class RetrievalResult(TypedDict):
 # ---------------------------------------------------------------------------
 class MappingParsed(TypedDict):
     category: Optional[str]
-    requirement_type: Optional[str]  # "max" | "min" | "range" | "boolean" | "other" 
+    requirement_type: Optional[str]  # "max" | "min" | "range" | "boolean" | "other"
     condition: Optional[str]
 
 
@@ -79,7 +79,7 @@ class MappingItem(TypedDict):
 
     regulation_chunk_id: str
     regulation_summary: str  # 최대 120자
-    
+
     parsed: MappingParsed
 
 
@@ -90,7 +90,7 @@ class MappingResults(TypedDict, total=False):
     targets: Dict[str, MappingTarget]
     unknown_requirements: List[Dict[str, Any]]
     recovered_feature_hints: List[str]
-    
+
     # 규제 메타데이터 캐시 (중복 제거용)
     regulation_cache: Dict[str, Dict[str, Any]]
 
@@ -218,16 +218,22 @@ class AppState(TypedDict, total=False):
     regulation_analysis_hints: Dict[str, Any]  # 변경감지 노드가 매핑 노드에 전달하는 힌트
     needs_embedding: bool  # 임베딩 필요 여부 (변경 감지 또는 신규 규제)
     change_detection_ran_inline: bool  # preprocess에서 변경 감지 실행 여부 (중복 방지)
-    
+    change_detection_index: Dict[str, Dict[str, Any]]  # 섹션별 변경 결과 인덱스
+    force_rerun_change_detection: bool  # HITL에서 변경 감지 강제 재실행 여부
+
     # regulation info (매핑 노드 입력용)
     regulation: Dict[str, Any]  # 규제 정보 (매핑 노드가 사용)
     regulation_id: Optional[int]  # DB에 저장된 regulation_id
-    
+
     # validation
     validation_result: Optional[Dict[str, Any]]
-    validation_retry_count: int 
+    validation_retry_count: int
 
     # HITL (Human-in-the-Loop) feedback
-    hitl_target_node: Optional[Literal["change_detection","map_products", "generate_strategy", "score_impact"]]
-    hitl_feedback_text: Optional[str]
-    manual_change_flag: Optional[bool] #변경 감지용 hitl
+    external_hitl_feedback: Optional[str]  # report 이후 외부에서 들어오는 원본 피드백
+    hitl_target_node: Optional[
+        Literal["change_detection", "map_products", "generate_strategy", "score_impact"]
+    ]
+    hitl_feedback_text: Optional[Any]  # 과거 버전 호환용 (문자열/불리언 모두 수용)
+    hitl_feedback: Optional[Any]       # hitl 노드 → validator로 넘기는 정제된 피드백
+    manual_change_flag: Optional[bool]  # 변경 감지용 HITL 플래그

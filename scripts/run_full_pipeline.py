@@ -9,7 +9,7 @@ updated: 2025-01-21 (함수 시그니처 통합: traceable + citation_code 파�
     # Legacy 규제 전처리 (1회만)
     python scripts/run_full_pipeline.py --mode legacy
 
-    # New 규제 처리 (전체 파이프라인)
+    # New 규제 처리 (전체 파이프라인 + HITL 대화)
     python scripts/run_full_pipeline.py --mode new
     python scripts/run_full_pipeline.py  # 기본값 = new
 """
@@ -221,11 +221,22 @@ async def run_legacy_preprocessing():
 
 @traceable(name="REMON_Full_Pipeline", run_type="chain")
 async def run_full_pipeline(citation_code: str):
-    """전체 파이프라인 실행 (S3 자동 로드 + LangGraph)"""
+    """
+    전체 파이프라인 실행 (S3 자동 로드 + LangGraph + HITL 루프)
+
+    1) 그래프 한 번 풀로 실행 (preprocess → ... → report → hitl 까지)
+    2) 결과 요약 출력
+    3) 콘솔에서 HITL 피드백을 반복 입력
+       - 입력값 → state["external_hitl_feedback"] 에 넣고 그래프 재실행
+       - 내부에서는 hitl_node → validator → restart_node 로 파이프라인 fallback
+    """
 
     logger.info("=" * 80)
     logger.info("🚀 REMON AI Pipeline 전체 실행 시작")
     logger.info("=" * 80)
+
+    # ------- 그래프 컴파일 (HITL 통합 버전) -------
+    app = build_graph()  # entry_point = preprocess
 
     # Step 1: Legacy regulation_id DB 조회 (citation_code 기반)
     logger.info("\n[Step 1] Legacy regulation_id DB 조회")
@@ -268,20 +279,18 @@ async def run_full_pipeline(citation_code: str):
         except Exception as e:
             logger.warning(f"  ⚠️ 규제 ID 결정 실패: {e}")
 
-    # Step 3: 전체 파이프라인 실행 (S3 자동 로드 + 동적 필터링)
-    logger.info("\n[Step 3] 전체 파이프라인 실행")
+    # Step 3: 전체 파이프라인 1회 실행 (자동 모드)
+    logger.info("\n[Step 3] 전체 파이프라인 1회 실행 (자동 모드)")
     logger.info("  ℹ️ S3에서 오늘 업로드된 파일 자동 로드 (skala2/skala-2.4.17/test)")
     logger.info("  ℹ️ 전처리에서 추출한 국가 정보로 제품 자동 필터링")
     logger.info("  ℹ️ Legacy 검색은 change_detection_node에서 자동 수행")
 
-    initial_state: AppState = {
+    state: AppState = {
         "preprocess_request": {
             "load_from_s3": True,  # S3 자동 로드 활성화
-            "s3_date": None,  # None이면 오늘 날짜
+            "s3_date": None,       # None이면 오늘 날짜
             "use_vision_pipeline": True,
             "enable_change_detection": True,
-            # pdf_paths 없음 → S3에서 자동 로드
-            # product_info 없음 → 국가 기반 동적 필터링
         },
         "change_context": {
             "legacy_regulation_id": legacy_regulation_id,
@@ -291,20 +300,72 @@ async def run_full_pipeline(citation_code: str):
         "validation_retry_count": 0,
     }
 
-    app = build_graph()
-    
     try:
-        final_state = await app.ainvoke(initial_state, config={"configurable": {}})
-        logger.info("✅ 전체 파이프라인 실행 완료")
+        state = await app.ainvoke(state, config={"configurable": {}})
+        logger.info("✅ 1차 파이프라인 실행 완료")
     except Exception as e:
         logger.error(f"❌ 파이프라인 실행 실패: {e}", exc_info=True)
         return
 
-    if final_state:
-        logger.info("\n[Step 4] 실행 결과 요약")
-        print_pipeline_summary(final_state)
+    if state:
+        logger.info("\n[Step 4] 1차 실행 결과 요약")
+        print_pipeline_summary(state)
 
-    return final_state
+    # ------------------------------------------------------------------
+    # Step 5: HITL 인터랙티브 루프
+    #   - 사람이 결과를 보고 피드백을 입력하면
+    #     → external_hitl_feedback 에 넣고 같은 그래프를 다시 태움
+    #   - 그래프 안에서는:
+    #       report → hitl_node → validator (HITL 모드)
+    #       → restart_node(예: map_products, generate_strategy, score_impact, change_detection)
+    #       → ... → report → (다시 hitl 진입 가능)
+    # ------------------------------------------------------------------
+    logger.info("\n[Step 5] HITL 피드백 루프 시작 (엔터만 입력하면 종료)")
+
+    while True:
+        print("\n" + "-" * 80)
+        print("💬 결과에 대한 HITL 피드백을 입력하세요.")
+        print("   - 예) '변경 없음으로 처리해줘', '매핑 다시 해줘', '전략 좀 더 보수적으로'")
+        print("   - 아무것도 입력하지 않고 엔터 → HITL 종료")
+        print("   - 'exit' / 'quit' / '완료' 입력 → HITL 종료")
+        print("-" * 80)
+
+        try:
+            feedback = input("HITL> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nHITL 입력이 중단되었습니다. 파이프라인을 종료합니다.")
+            break
+
+        if not feedback or feedback.lower() in {"exit", "quit", "완료"}:
+            logger.info("HITL 루프 종료 요청 → 파이프라인 종료.")
+            break
+
+        # 그래프에서 hitl_node가 읽을 입력값 주입
+        state["external_hitl_feedback"] = feedback
+
+        # validator 자동 retry 카운터 초기화 (HITL는 별도 사이클)
+        state["validation_retry_count"] = 0
+
+        # 안전하게 이전 HITL 메타데이터도 초기화
+        state.pop("hitl_target_node", None)
+        state.pop("hitl_feedback_text", None)
+        state.pop("hitl_feedback", None)
+
+        logger.info(f"[HITL] 새로운 피드백으로 그래프 재실행: '{feedback}'")
+
+        try:
+            # 동일 그래프에 기존 state를 다시 태움
+            state = await app.ainvoke(state, config={"configurable": {}})
+            logger.info("✅ HITL 반영 후 파이프라인 재실행 완료")
+        except Exception as e:
+            logger.error(f"❌ HITL 재실행 중 오류: {e}", exc_info=True)
+            break
+
+        # 재실행 결과 요약
+        logger.info("\n[HITL] 재실행 결과 요약")
+        print_pipeline_summary(state)
+
+    return state
 
 
 async def main():
