@@ -115,7 +115,7 @@ ai = [
   "torch>=2.6,<3.0",
   "numpy==2.1.2",
   "pandas==2.2.3",
-  "openai==1.43.0",
+  "openai==1.45.0",
   "pypdf>=4.0.0",
   "qdrant-client>=1.15.1",
   "rank-bm25>=0.2.2",
