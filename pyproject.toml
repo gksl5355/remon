@@ -16,7 +16,7 @@ dependencies = [
   "tavily-python>=0.7.13",
   "chardet>=5.2.0",
   "langchain>=1.1.0",
-  "openai>=1.43.0",
+  "openai==1.45.0",
   "boto3>=1.42.0",
   "awscli>=1.43.7",
   "weasyprint>=67.0",
@@ -42,7 +42,6 @@ api = [
   "torch>=2.6,<3.0", # 변경: 최소 2.6 이상 (CVE 대응)
   "numpy==2.1.2",
   "pandas==2.2.3",
-  "openai==1.45.0",
   "alembic>=1.17.2",
   "python-dotenv>=1.2.1",
   # --- Crawler ---
@@ -115,7 +114,6 @@ ai = [
   "torch>=2.6,<3.0",
   "numpy==2.1.2",
   "pandas==2.2.3",
-  "openai==1.43.0",
   "pypdf>=4.0.0",
   "qdrant-client>=1.15.1",
   "rank-bm25>=0.2.2",

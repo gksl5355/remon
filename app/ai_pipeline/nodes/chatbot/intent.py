@@ -1,12 +1,14 @@
 # app/chatbot/intent.py
 """
-REMON 챗봇의 인텐트 분류 모듈 (1) HITL 분기 필요 여부 판단 2) 어떤 노드(map / strategy / impact)인지 식별)
+REMON 챗봇의 인텐트 분류 모듈
+1) HITL 분기 필요 여부 판단
+2) 어떤 노드(detect_changes / map / strategy / impact)인지 식별
 
 이 파일은 사용자 메시지가 다음 중 무엇인지 판별한다:
 1) HITL (Human-In-The-Loop): 사용자가 REMON 파이프라인 결과를 수정/정정하려는 경우
 2) GENERAL: 일반적인 질문 (규제 설명, 일반 대화 등)
 
-결과는 service.py에서 다음 행동을 결정하는 데 사용된다.
+결과는 service.py에서 다음 행동을 결정하는 데 사용됨
 """
 
 import os
@@ -32,7 +34,7 @@ INTENT_PROMPT = """
 [인텐트 종류]
 
 1) hitl  
-- 사용자가 REMON 파이프라인 결과(매핑, 대응전략, 영향도 평가)에 대해
+- 사용자가 REMON 파이프라인 결과(변경 감지, 매핑, 대응전략, 영향도 평가)에 대해
   '틀렸다 / 부족하다 / 다시 해라 / 고쳐라'는 식으로 수정·재실행을 요구하는 경우
 
 예시:
@@ -41,9 +43,11 @@ INTENT_PROMPT = """
   - "impact 계산 다시해"
   - "여기 잘못됐음 → 고쳐"
   - "이거 이 기준으로 다시 해줘"
-  - "대응전략이 너무 추상적이야. 다시 짜줘."
+  - "대응전략이 너무 추상적이야. 다시 짜줘"
   - "영향도 점수 근거 부족한데 다시 평가해"
   - "이 매핑 이상한데 map 다시 해봐"
+  - "이건 변경 아니야. 변경 없음으로 처리해"
+  - "여기 실제로는 변경됐는데 왜 변경 없음으로 나와?"
 
 2) general  
 - REMON 파이프라인 수정과 무관한 모든 일반 질문/대화
@@ -59,7 +63,17 @@ INTENT_PROMPT = """
 
 intent가 "hitl"인 경우, 아래 규칙에 따라 target_node 를 선택하십시오.
 
-1) map_products (매핑 노드)
+1) detect_changes (변경 감지 노드)
+- 사용자가 "변경", "변동", "change" 등의 단어를 사용하면서
+  현재 시스템이 판단한 "변경 있음/없음" 결과에 대해 이의를 제기하거나
+  변경 여부 자체를 수정하려는 경우
+예시:
+  - "이 섹션은 변경 아닌데 왜 변경으로 나와?"
+  - "실제로는 변경됐으니까 변경 있음으로 처리해줘"
+  - "이 규제 문단은 변경 없다고 봐야 해"
+  - "변경 감지 결과가 잘못됐어. 다시 판단해"
+
+2) map_products (매핑 노드)
 - 사용자가 "매핑", "mapping", "맵핑" 등의 단어를 사용하며
   매핑이 틀렸거나 다시 해야 한다고 말하는 경우
 예시:
@@ -67,7 +81,7 @@ intent가 "hitl"인 경우, 아래 규칙에 따라 target_node 를 선택하십
   - "mapping 다시"
   - "제품이랑 규제 매핑이 잘못된 것 같은데 다시 해줘"
 
-2) generate_strategy (대응 전략 노드)
+3) generate_strategy (대응 전략 노드)
 - 사용자가 "전략", "strategy", "대응", "대응전략" 등의 단어를 사용하며
   전략이 부족하다 / 다시 짜야 한다 / 이상하다고 말하는 경우
 예시:
@@ -77,7 +91,7 @@ intent가 "hitl"인 경우, 아래 규칙에 따라 target_node 를 선택하십
   - "전략 다시 짜줘"
   - "대응 방향 이상한데 generate_strategy 다시"
 
-3) score_impact (영향도 평가 노드)
+4) score_impact (영향도 평가 노드)
 - 사용자가 "영향도", "impact", "점수", "스코어", "위험도" 등의 단어를 사용하며
   점수/평가를 다시 하라고 요구하는 경우
 예시:
@@ -93,7 +107,7 @@ intent가 "hitl"인 경우, 아래 규칙에 따라 target_node 를 선택하십
 
 {
   "intent": "hitl" | "general",
-  "target_node": "map_products" | "generate_strategy" | "score_impact" | null
+  "target_node": "detect_changes" | "map_products" | "generate_strategy" | "score_impact" | null
 }
 
 규칙:
@@ -120,7 +134,7 @@ def detect_intent(user_message: str) -> dict:
     dict
         {
             "intent": "hitl" | "general",
-            "target_node": "map_products" | "generate_strategy" | "score_impact" | None
+            "target_node": "detect_changes" | "map_products" | "generate_strategy" | "score_impact" | None
         }
     """
     resp = client.chat.completions.create(

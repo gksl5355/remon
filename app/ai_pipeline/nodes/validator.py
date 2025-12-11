@@ -72,32 +72,90 @@ def generate_refined_prompt(node_name: str, pipeline_state: dict, error_summary:
 # ------------------------------------------------------------
 # Main Validator Node
 # ------------------------------------------------------------
-def validator_node(state):  
+def validator_node(state):
     logger.info("[Validator] Running Global Validation…")
 
     retry_count = state.get("validation_retry_count", 0) or 0
     state["validation_retry_count"] = retry_count + 1
 
-    # -----------------------------
-    # 검증 입력 데이터 준비
-    # -----------------------------
-    compiled_input = {  
+    compiled_input = {
         "mapping": state.get("mapping"),
         "strategy": state.get("strategies"),
         "impact": state.get("impact_scores"),
         "regulation": state.get("regulation"),
     }
 
-    # [HITL] Human-in-the-Loop 분기: 사용자가 명시적으로 노드/피드백을 지정한 경우
+    # ------------------------------------------------
+    # [HITL] Human-in-the-Loop 분기
+    # ------------------------------------------------
     hitl_target_node = state.get("hitl_target_node")
     hitl_feedback_text = state.get("hitl_feedback_text")
 
     if hitl_target_node and hitl_feedback_text:
+
+        state["validation_retry_count"] = 0 #hitl마다 초기화
+
         logger.warning(
             f"[Validator][HITL] Human feedback override detected → "
-            f"restarting node: {hitl_target_node}"
+            f"target_node={hitl_target_node}"
         )
 
+        # ===============================
+        # 2-1) detect_changes 전용 HITL
+        # ===============================
+        if hitl_target_node == "detect_changes":
+            # clean_hitl_feedback 에서 이미 "true"/"false"로 정제돼 있다고 가정
+            cleaned = str(hitl_feedback_text).strip().lower()
+            manual_flag = cleaned == "true"
+
+            state["manual_change_flag"] = manual_flag
+
+            # HITL 변경 감지 == 결과 강제
+            if manual_flag:
+                # 변경 있음 → Embedding 필요
+                state["needs_embedding"] = True
+            else:
+                # 변경 없음 → Embedding 불필요
+                state["needs_embedding"] = False
+            logger.warning(
+                f"[Validator][HITL][detect_changes] "
+                f"manual_change_flag set to {manual_flag}"
+            )
+
+            # 변경 감지 이후에 의존하는 결과들 초기화
+            for key in [
+                "detect_changes_results",
+                "change_summary",
+                "regulation_analysis_hints",
+                "detect_changes_index",
+                "mapping",
+                "strategies",
+                "impact_scores",
+                "report",
+            ]:
+                if key in state:
+                    state[key] = None
+
+            # HITL 메타데이터 초기화
+            state["hitl_target_node"] = None
+            state["hitl_feedback_text"] = None
+
+            validation_result = {
+                "is_valid": False,
+                "restart_node": "detect_changes",
+                "reason": "hitl_override_detect_changes",
+                "source": "hitl",
+            }
+
+            return {
+                **state,
+                "validation_result": validation_result,
+                "restarted_node": "detect_changes",
+            }
+
+        # ===============================
+        # 2-2) 나머지 노드(map/strategy/impact) HITL
+        # ===============================
         restart_node = hitl_target_node
         error_summary = hitl_feedback_text  # 사람 피드백을 그대로 error_summary로 사용
 
@@ -114,7 +172,7 @@ def validator_node(state):
                 f"state['refined_{restart_node}_prompt']"
             )
 
-        # [HITL] 문제 발생 노드 초기화 (기존 로직 재사용)
+        # 문제 발생 노드 초기화
         if restart_node == "map_products":
             state["mapping"] = None
         elif restart_node == "generate_strategy":
@@ -125,7 +183,6 @@ def validator_node(state):
         state["hitl_target_node"] = None
         state["hitl_feedback_text"] = None
 
-        # [HITL] HITL 분기는 LLM Validator를 건너뛰고 바로 반환
         validation_result = {
             "is_valid": False,
             "restart_node": restart_node,
