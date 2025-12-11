@@ -29,33 +29,28 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 # 1) Intent Detection
 # ============================================================
 
-INTENT_PROMPT = """
-당신은 REMON의 HITL 인텐트 분류기입니다.
+TARGET_NODE_PROMPT = """
+당신은 REMON의 HITL target_node 분류기입니다.
 
-사용자 메시지를 다음 중 하나로 분류하십시오:
+사용자 메시지에서 수정하려는 파이프라인 단계를 식별하십시오:
 
-1) "hitl" → 파이프라인 결과 수정 요구
-2) "general" → 일반 대화
-
-hitl이면 target_node는 다음 중 하나:
-- change_detection
-- map_products
-- generate_strategy
-- score_impact
+- change_detection: 변경 감지 관련
+- map_products: 제품 매핑 관련  
+- generate_strategy: 전략 생성 관련
+- score_impact: 영향도 점수 관련
 
 출력(JSON):
 {
-  "intent": "hitl" | "general",
-  "target_node": "change_detection" | "map_products" | "generate_strategy" | "score_impact" | null
+  "target_node": "change_detection" | "map_products" | "generate_strategy" | "score_impact"
 }
 """
 
-def detect_hitl_intent(message: str) -> Dict[str, Any]:
-    """사용자 메시지 → intent + target_node"""
+def detect_target_node(message: str) -> str:
+    """사용자 메시지 → target_node"""
     resp = client.chat.completions.create(
         model=OPENAI_MODEL,
         messages=[
-            {"role": "system", "content": INTENT_PROMPT},
+            {"role": "system", "content": TARGET_NODE_PROMPT},
             {"role": "user", "content": message},
         ],
         temperature=0,
@@ -63,9 +58,10 @@ def detect_hitl_intent(message: str) -> Dict[str, Any]:
     raw = resp.choices[0].message.content.strip()
 
     try:
-        return json.loads(raw)
+        result = json.loads(raw)
+        return result.get("target_node", "map_products")
     except Exception:
-        return {"intent": "general", "target_node": None}
+        return "map_products"
 
 
 # ============================================================
@@ -146,7 +142,8 @@ def hitl_node(state: AppState) -> AppState:
     LangGraph에서 report 이후 호출되는 HITL 노드.
 
     - 외부에서 사용자 피드백을 state["external_hitl_feedback"]에 넣어 준다고 가정
-    - 여기서 intent 분류 + 피드백 정제 + state 패치까지 수행
+    - 모든 입력을 HITL 피드백으로 처리 (general 분류 제거)
+    - target_node 식별 + 피드백 정제 + state 패치까지 수행
     - 이후 validator_node가 HITL 모드로 실행되며 restarted_node를 결정
     """
 
@@ -158,18 +155,9 @@ def hitl_node(state: AppState) -> AppState:
 
     logger.info(f"[HITL Node] 사용자 피드백 수신: {user_msg}")
 
-    # (1) 인텐트 분류
-    intent = detect_hitl_intent(user_msg)
-    logger.info(f"[HITL Intent] {intent}")
-
-    if intent.get("intent") != "hitl":
-        logger.info("[HITL Node] 일반 대화로 판단 → HITL 처리 없이 종료")
-        return state
-
-    target = intent.get("target_node")
-    if not target:
-        logger.warning("[HITL Node] target_node 식별 실패 → HITL 처리 스킵")
-        return state
+    # (1) target_node 식별
+    target = detect_target_node(user_msg)
+    logger.info(f"[HITL Target] target_node = {target}")
 
     # (2) 피드백 정제
     cleaned = refine_hitl_feedback(user_msg, target)

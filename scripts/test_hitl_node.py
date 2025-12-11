@@ -27,7 +27,7 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.ai_pipeline.state import AppState
-from app.ai_pipeline.nodes.hitl import hitl_node, detect_hitl_intent
+from app.ai_pipeline.nodes.hitl import hitl_node, detect_target_node
 
 
 
@@ -144,12 +144,9 @@ def main():
             print("\nHITL 테스트를 종료합니다.")
             break
 
-        # 1) 인텐트 분류 (디버그용)
-        intent = detect_hitl_intent(user_msg)
-        print(
-            f"\n[Intents] intent = {intent.get('intent')}, "
-            f"target_node = {intent.get('target_node')}"
-        )
+        # 1) target_node 식별 (디버그용)
+        target_node = detect_target_node(user_msg)
+        print(f"\n[Target] target_node = {target_node}")
 
         # 2) hitl_node 가 읽을 external_hitl_feedback 세팅
         state["external_hitl_feedback"] = user_msg
