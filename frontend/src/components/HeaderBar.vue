@@ -15,8 +15,8 @@
 
       <div class="flex items-center gap-2">
         <span
-          class="w-2 h-2 rounded-full animate-pulse"
-          :class="healthStatus ? 'bg-green-400' : 'bg-red-500'"
+          class="w-2 h-2 rounded-full "
+          :class="healthStatus ? 'bg-green-400 animate-pulse' : 'bg-red-500'"
         ></span>
         <span>{{ healthStatus ? '서버 정상 작동 중' : '서버 연결 오류' }}</span>
       </div>
@@ -119,6 +119,8 @@
 </template>
 
 <script setup>
+import api from "@/services/api.js"
+import { Spring_Api } from "@/services/api.js"
 import { inject, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
@@ -146,10 +148,17 @@ const goAdminPage = () => {
 };
 
 // 로그아웃 기능
-const logout = () => {
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("user_role");
-  router.push("/");
+const logout = async () => {
+  try {
+    // Spring 서버 세션 무효화
+    await Spring_Api.post('/auth/logout');
+  } catch (err) {
+    console.error('로그아웃 실패:', err);
+  } finally {
+    // 로컬 데이터 정리 (에러 발생해도 실행)
+    localStorage.removeItem("user_role");
+    router.push("/");
+  }
 };
 
 // 날짜/시간
@@ -174,8 +183,15 @@ onUnmounted(() => clearInterval(timer));
 // 서버 상태 체크
 const checkHealth = async () => {
   try {
-    healthStatus.value = true;
-  } catch {
+    const res = await api.get("/health", { timeout: 2000 });
+    // FastAPI에서 { "status": "ok" } 형태로 내려온 경우만 정상
+    if (res.status === 200 && res.data?.status === "ok") {
+      healthStatus.value = true;
+    } else {
+      healthStatus.value = false;
+    }
+  } catch (err) {
+    console.warn("🚨 서버 헬스체크 실패:", err.message);
     healthStatus.value = false;
   }
 };

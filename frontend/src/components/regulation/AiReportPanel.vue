@@ -56,6 +56,15 @@
       <!-- ============================= -->
       <div v-else-if="!isStreaming && baseSection1">
 
+        <!-- SECTION 0 -->
+        <section>
+          <h3 class="sec-title">0. 종합 요약</h3>
+
+          <p class="text-gray-300 whitespace-pre-line">
+            {{ baseOverall }}
+          </p>
+        </section>
+
         <!-- SECTION 1 -->
         <section>
           <h3 class="sec-title">1. 규제 변경 요약</h3>
@@ -107,7 +116,7 @@
         </section>
 
         <section class="mt-6">
-          <h3 class="sec-title">6. 출처</h3>
+          <h3 class="sec-title">6. 참고 및 원문 링크</h3>
           <p class="text-gray-300 whitespace-pre-line">{{ baseUrl }}</p>
         </section>
 
@@ -117,6 +126,16 @@
       <!-- STREAMING MODE (TYPEWRITER) -->
       <!-- ========================== -->
       <div v-else-if="isStreaming">
+
+        <!-- SECTION 0 (ONE TEXT STREAM) -->
+        <section v-if="showSection0">
+          <h3 class="sec-title">0. 종합 요약</h3>
+
+          <p class="text-gray-300 whitespace-pre-line leading-relaxed">
+            {{ streamedOverrall }}
+            <span v-if="cursorAt === 'Overrall'" class="cursor">|</span>
+          </p>
+        </section>
 
         <!-- SECTION 1 (ONE TEXT STREAM) -->
         <section v-if="showSection1">
@@ -188,11 +207,11 @@
         </section>
 
         <section v-if="showSection6" class="mt-6">
-          <h3 class="sec-title">6. 출처</h3>
+          <h3 class="sec-title">6. 참고 및 원문 링크</h3>
 
           <p class="text-gray-300 whitespace-pre-line">
-            {{ streamedImpactReason }}
-            <span v-if="cursorAt === 'impactReason'" class="cursor">|</span>
+            {{ streamedReferences }}
+            <span v-if="cursorAt === 'references'" class="cursor">|</span>
           </p>
         </section>
 
@@ -311,23 +330,27 @@ function autoScroll() {
 /* STREAM VARIABLES */
 const isStreaming = ref(false);
 
+const streamedOverrall = ref("");
 const streamedSection1 = ref("");
-
 const streamedProducts = ref([]);
 const streamedAnalysis = ref([]);
 const streamedStrategy = ref([]);
 const streamedImpactReason = ref("");
+const streamedReferences = ref("");
 
 const cursorAt = ref(null);
 
 /* SECTION FLAGS */
+const showSection0 = ref(false);
 const showSection1 = ref(false);
 const showSection2 = ref(false);
 const showSection3 = ref(false);
 const showSection4 = ref(false);
 const showSection5 = ref(false);
+const showSection6 = ref(false);
 
 /* BASE STATIC VALUES */
+const baseOverall = ref([]);
 const baseSection1 = ref("");
 const baseProducts = ref([]);
 const baseAnalysis = ref([]);
@@ -427,7 +450,9 @@ watch(
       // sections 배열을 파싱하여 각 섹션에 맞게 할당
       if (data.sections && Array.isArray(data.sections)) {
         data.sections.forEach(section => {
-          if (section.title.includes('규제 변경 요약')) {
+          if (section.title.includes('종합 요약')){
+            baseOverall.value = section.content;
+          } else if (section.title.includes('규제 변경 요약')) {
             baseSection1.value = section.content.join('\n');
           } else if (section.title.includes('제품 분석')) {
             baseProducts.value = section.tables.flatMap(table => 
@@ -449,11 +474,13 @@ watch(
         });
       }
 
+      streamedOverrall.value = "";
       streamedSection1.value = "";
       streamedProducts.value = [];
       streamedAnalysis.value = [];
       streamedStrategy.value = [];
       streamedImpactReason.value = [];
+      streamedReferences.value = [];
 
       isStreaming.value = false;
     } catch (err) {
@@ -475,11 +502,16 @@ const runHV = async () => {
 
   isStreaming.value = true;
 
+  showSection0.value = false;
   showSection1.value = false;
   showSection2.value = false;
   showSection3.value = false;
   showSection4.value = false;
   showSection5.value = false;
+  showSection6.value = false;
+
+  showSection0.value = true;
+  await typeList(streamedOverrall, baseOverall.value, "Overrall");
 
   /* SECTION 1: ONE TEXT STREAM */
   showSection1.value = true;
@@ -502,7 +534,7 @@ const runHV = async () => {
   await typeText(streamedImpactReason, baseImpactReason.value, "impactReason");
 
   showSection6.value = true;
-  await typeText(streamedImpactReason, baseUrl.value, "references");
+  await typeList(streamedReferences, baseUrl.value, "references");
 
   isStreaming.value = false;
 };

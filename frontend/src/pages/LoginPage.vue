@@ -55,7 +55,7 @@
 </template>
 
 <script setup>
-import api from "@/services/api";
+import { Spring_Api } from "@/services/api";
 import { nextTick, ref } from "vue";
 import { useRouter } from "vue-router";
 
@@ -84,42 +84,37 @@ const login = async () => {
     return;
   }
 
-  // ⭐ 테스트 계정
-  const testUsers = {
-    user: { id: "user", pw: "1234" },
-    admin: { id: "admin", pw: "1234" },
-  };
-
-  const selected = userType.value;
-  const testId = testUsers[selected].id;
-  const testPw = testUsers[selected].pw;
-
-  if (ID.value === testId && password.value === testPw) {
-    localStorage.setItem("access_token", "test-token");
-    localStorage.setItem("user_role", selected);
-    router.push("/main"); // 메인으로 이동
-    return;
-  }
-
   try {
-    const endpoint =
-      selected === "user" ? "/auth/login-user" : "/auth/login-admin";
-
-    // ⭐ 서버는 "ID"가 아니라 "username" 을 사용함
-    const res = await api.post(endpoint, {
+    const res = await Spring_Api.post('/auth/login', {
       username: ID.value,
       password: password.value,
     });
 
-    localStorage.setItem("access_token", res.data.access_token);
-    localStorage.setItem("user_role", selected);
+    const userId = res.data.userId;
+    const isAdmin = userId === 1;
 
-    router.push("/");
+    // UI에서 선택한 타입과 실제 권한 비교
+    if (userType.value === 'admin' && !isAdmin) {
+      alert('관리자 계정이 아닙니다.');
+      await Spring_Api.post('/auth/logout');
+      return;
+    }
+
+    if (userType.value === 'user' && isAdmin) {
+      alert('일반 사용자로 로그인해주세요.');
+      await Spring_Api.post('/auth/logout');
+      return;
+    }
+
+    // 권한 저장
+    localStorage.setItem('user_role', userType.value);
+    router.push('/main');
+
   } catch (err) {
     if (err.response?.status === 401) {
-      alert("아이디 또는 비밀번호가 올바르지 않습니다.");
+      alert('아이디 또는 비밀번호가 올바르지 않습니다.');
     } else {
-      alert("서버 오류가 발생했습니다.");
+      alert('서버 오류가 발생했습니다.');
     }
   }
 };
