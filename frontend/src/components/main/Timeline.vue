@@ -108,13 +108,20 @@
 
 <script setup>
 import { inject, onMounted, ref } from "vue";
+import api from "@/services/api.js";
+
 const isDark = inject("isDark");
 
 const timeline = ref([]);
 
 const fetchTimeline = async () => {
-  const response = await fetch('http://localhost:8000/api/main/timeline');
-  timeline.value = await response.json();
+  try {
+    const response = await api.get('/main/timeline');
+    timeline.value = response.data;
+  } catch (error) {
+    console.error('Failed to load timeline:', error);
+    timeline.value = [];
+  }
 };
 
 onMounted(() => {

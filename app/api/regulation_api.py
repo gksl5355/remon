@@ -62,3 +62,26 @@ async def get_regulation(
         raise HTTPException(status_code=404, detail="Regulation not found")
     
     return reg
+
+
+@router.get("/regulations/country/{country}")
+async def get_regulations_by_country(
+    country: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    국가별 규제 목록 조회
+    
+    Args:
+        country: 국가 코드 (US, ID, RU)
+        
+    Returns:
+        dict: {"collectedTime": str, "files": list}
+    """
+    logger.info(f"GET /regulations/country/{country}")
+
+    reg = await service.get_regulations_by_country(db, country)
+    if not reg:
+        logger.warning(f"Regulation not found: country={country}")
+        raise HTTPException(status_code=404, detail="Regulation not found")
+    return reg

@@ -216,9 +216,7 @@
       <!-- RIGHT -->
       <AiReportPanel
         class="lg:col-span-8"
-        :selectedArticle="selectedArticle"
-        :aiReports="aiReports"
-        :countryCode="countryCode"
+        :fileId="fileId"
       />
 
     </div>
@@ -242,7 +240,6 @@ const toggleFileList = () => (isFileOpen.value = !isFileOpen.value);
 
 const documentInfo = ref({});
 const articles = ref([]);
-const aiReports = ref({});
 const files = ref([]);
 
 const selectedFileTitle = ref("");  // ⭐ 현재 파일 제목 표시용
@@ -263,7 +260,6 @@ async function loadData() {
     selectedFileTitle.value = selectedFile.title;  // ⭐ header에 파일명 반영
     documentInfo.value = selectedFile.documentInfo;
     articles.value = selectedFile.articles;
-    aiReports.value = selectedFile.aiReports;
   }
 }
 
@@ -347,11 +343,11 @@ const betterItemClass = (item) => [
 const confidenceBadgeClass = (level) => {
   switch (level) {
     case 3:
-      return "bg-green-400/10 text-green-300 border-green-400/30";
+      return "bg-red-400/10 text-red-300 border-red-400/30";
     case 2:
       return "bg-yellow-400/10 text-yellow-300 border-yellow-400/30";
     case 1:
-      return "bg-red-400/10 text-red-300 border-red-400/30";
+      return "bg-green-400/10 text-green-300 border-green-400/30";
     default:
       return "bg-gray-400/10 text-gray-300 border-gray-400/30";
   }
