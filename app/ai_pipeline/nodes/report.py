@@ -97,52 +97,6 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
     # product_name은 mapping에서 가져오기
     product_name = mapping.get("product_name", "Unknown")
 
-    # ✅ 수정: 제품별 × feature별 조합으로 중복 제거
-    seen_rows = set()
-    product_rows = []
-    for item in mapping_items:
-        feature_name = item.get("feature_name", "")
-        # item에서 product_name 가져오기 (멀티 제품 지원)
-        item_product_name = item.get("product_name") or product_name
-
-        # 제품명 + feature로 유니크 키 생성
-        row_key = (item_product_name, feature_name)
-        if row_key in seen_rows:
-            continue
-        seen_rows.add(row_key)
-
-        # reasoning은 이미 LLM에서 250자 이내로 생성됨
-        reasoning = item.get("reasoning", "")
-
-        # required_value 표시 개선
-        required_value = item.get("required_value")
-        if required_value is None:
-            # reasoning에서 이유 추출
-            reasoning_lower = reasoning.lower()
-            if "not regulated" in reasoning_lower or "규제하지 않" in reasoning:
-                required_display = "규제 대상 아님"
-            elif "already compliant" in reasoning_lower or "충족" in reasoning:
-                required_display = "기준 충족"
-            elif (
-                "unrelated" in reasoning_lower
-                or "무관" in reasoning
-                or "비적용" in reasoning
-            ):
-                required_display = "해당 없음"
-            else:
-                required_display = "규제 없음"
-        else:
-            required_display = str(required_value)
-
-        product_rows.append(
-            [
-                feature_name,
-                item_product_name,  # ✅ 각 행마다 올바른 제품명
-                f"현재: {item.get('current_value', '-')}, 필요: {required_display}",
-                reasoning,
-            ]
-        )
-
     # ✅ 제품별로 그룹화
     from collections import defaultdict
 
@@ -154,7 +108,7 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
         feature_name = item.get("feature_name", "")
         item_product_name = item.get("product_name") or product_name
 
-        logger.debug(f"  - {item_product_name} / {feature_name}")
+        logger.info(f"  - 제품: {item_product_name} / feature: {feature_name}")
 
         # required_value 표시
         reasoning = item.get("reasoning", "")

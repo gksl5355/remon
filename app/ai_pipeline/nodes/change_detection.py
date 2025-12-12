@@ -254,12 +254,13 @@ class ChangeDetectionNode:
         legacy_regul_data = None
         legacy_regulation_id = None  # 초기화
 
-        # citation_code 기반으로 Legacy 검색 (DB 세션 사용)
+        # citation_code 기반으로 Legacy 검색 (새 DB 세션 생성)
         if not legacy_regul_data:
             from app.core.repositories.regulation_repository import RegulationRepository
             from app.core.database import AsyncSessionLocal
 
             repo = RegulationRepository()
+            # 새 세션 생성 (이전 세션 연결 끊김 방지)
             async with AsyncSessionLocal() as session:
                 if not new_regul_data:
                     if not new_regulation_id:
@@ -312,23 +313,27 @@ class ChangeDetectionNode:
                                 f"🔍 citation_code로 Legacy 검색: {new_citation} ({new_country})"
                             )
 
-                            # citation_code + country로 Legacy 직접 조회
-                            result = await session.execute(
-                                text(
+                            # citation_code + country로 Legacy 직접 조회 (재시도 로직)
+                            try:
+                                result = await session.execute(
+                                    text(
+                                        """
+                                        SELECT regul_data FROM regulations
+                                        WHERE citation_code = :citation
+                                        AND country_code = :country
+                                        AND DATE(created_at) < CURRENT_DATE
+                                        ORDER BY created_at DESC LIMIT 1
                                     """
-                                    SELECT regul_data FROM regulations
-                                    WHERE citation_code = :citation
-                                    AND country_code = :country
-                                    AND DATE(created_at) < CURRENT_DATE
-                                    ORDER BY created_at DESC LIMIT 1
-                                """
-                                ),
-                                {"citation": new_citation, "country": new_country},
-                            )
-                            row = result.fetchone()
-                            if row:
-                                legacy_regul_data = row[0]
-                                logger.info(f"✅ Legacy 발견: citation={new_citation}")
+                                    ),
+                                    {"citation": new_citation, "country": new_country},
+                                )
+                                row = result.fetchone()
+                                if row:
+                                    legacy_regul_data = row[0]
+                                    logger.info(f"✅ Legacy 발견: citation={new_citation}")
+                            except Exception as db_err:
+                                logger.error(f"❌ DB 쿼리 실패 (연결 끊김): {db_err}")
+                                logger.info("⚠️ Legacy 검색 실패 - 신규 규제로 처리")
 
                     if not legacy_regul_data:
                         logger.warning("⚠️ Legacy 검색 실패 - 신규 규제로 처리")

@@ -84,7 +84,9 @@ def build_graph(start_node: str = "preprocess"):
     graph.add_edge("preprocess", "detect_changes")
     graph.add_edge("map_products",      "generate_strategy")
     graph.add_edge("generate_strategy", "score_impact")
-    graph.add_edge("score_impact",      "validator")
+    # [TEST] validator 노드 비활성화 - 원복 시 아래 주석 해제
+    # graph.add_edge("score_impact",      "validator")
+    graph.add_edge("score_impact",      "report_node")  # validator 우회
 
     # detect_changes → embedding (변경 감지 또는 신규) | map_products (변경 없음)
     graph.add_conditional_edges(
@@ -99,17 +101,18 @@ def build_graph(start_node: str = "preprocess"):
     # embedding → map_products
     graph.add_edge("embedding", "map_products")
 
+    # [TEST] validator 노드 비활성화 - 원복 시 아래 주석 해제
     # validator → validation only for 3 nodes
-    graph.add_conditional_edges(
-        "validator",
-        _route_validation,
-        {
-            "ok": "report_node",              # 마지막 노드
-            "map_products": "map_products",   # 실패 시 재시도 노드들
-            "generate_strategy": "generate_strategy",
-            "score_impact": "score_impact",
-        },
-    )
+    # graph.add_conditional_edges(
+    #     "validator",
+    #     _route_validation,
+    #     {
+    #         "ok": "report_node",              # 마지막 노드
+    #         "map_products": "map_products",   # 실패 시 재시도 노드들
+    #         "generate_strategy": "generate_strategy",
+    #         "score_impact": "score_impact",
+    #     },
+    # )
 
     # report → END
     graph.add_edge("report_node", END)
