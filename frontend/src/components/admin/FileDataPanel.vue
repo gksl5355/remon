@@ -150,7 +150,7 @@
           <!-- Download -->
           <button
             class="p-1.5 rounded-md bg-white/10 hover:bg-white/20 transition"
-            @click.stop="downloadItem(item)"
+            @click.stop="handleDownload(item)"
           >
             <svg xmlns="http://www.w3.org/2000/svg"
                 class="w-4 h-4 text-gray-200"
@@ -159,7 +159,7 @@
                     d="M12 4v12m0 0l-5-5m5 5l5-5" />
             </svg>
           </button>
-
+          
           <!-- Delete -->
           <button
             class="p-1.5 rounded-md bg-white/10 hover:bg-white/20 transition"
@@ -211,16 +211,43 @@
       @save="updateReport"
     />
   </div>
+
+  <!-- 다운로드 선택 팝업 -->
+  <DownloadPopup
+    v-if="showDownloadPopup"
+    @close="showDownloadPopup = false"
+    @download-original="downloadOriginal"
+    @download-translated="downloadTranslated"
+  />
+
+  <!-- 번역 진행 상황 모달 -->
+  <TranslationProgressModal
+    v-if="showTranslationProgress"
+    :progress="translationProgress"
+  />
+
+  <LoadingOverlay v-if="isLoading" />
 </template>
 
 <script setup>
 import AddModal from "@/components/admin/AddModal.vue";
+import DownloadPopup from "@/components/admin/DownloadPopup.vue";
 import ReportModal from "@/components/admin/ReportModal.vue";
+import TranslationProgressModal from "@/components/admin/TranslationProgressModal.vue";
+
 import { computed, ref } from "vue";
+
+const showTranslationProgress = ref(false);
+const translationProgress = ref(0);
 
 const showAddModal = ref(false);
 const showReportModal = ref(false);
 const selectedReport = ref(null);
+
+const showDownloadPopup = ref(false);
+const popupTargetItem = ref(null);
+
+const isLoading = ref(false);       // 로딩 표시 여부
 
 /* ------------------ Toggle 상태 ------------------ */
 const view = ref("all");
@@ -265,10 +292,6 @@ function deleteItem(id) {
   fileList.value = fileList.value.filter(f => f.id !== id);
 }
 
-function downloadItem(item) {
-  alert(`Downloading: ${item.name}`);
-}
-
 const dummyReports = {
   2: {
     summary: {
@@ -306,6 +329,59 @@ function updateReport(newData) {
   selectedReport.value = JSON.parse(JSON.stringify(newData));
 }
 
+function openDownloadPopup(item) {
+  popupTargetItem.value = item;
+  showDownloadPopup.value = true;
+}
+
+function downloadOriginal() {
+  alert(`원문 다운로드: ${popupTargetItem.value.name}`);
+  showDownloadPopup.value = false;
+}
+
+async function downloadTranslated() {
+  showDownloadPopup.value = false;
+  showTranslationProgress.value = true;
+  translationProgress.value = 0;
+
+  // Progress 상승 애니메이션
+  const interval = setInterval(() => {
+    if (translationProgress.value < 100) {
+
+      // 다음 증가가 100을 넘으면, 그냥 100으로 보정
+      if (translationProgress.value + 4 >= 100) {
+        translationProgress.value = 100;
+      } else {
+        translationProgress.value += 4;
+      }
+
+    } else {
+      clearInterval(interval);
+
+      // 100%가 UI에 실제로 표시되도록 약간 대기
+      setTimeout(() => {
+        showTranslationProgress.value = false;
+        alert(`번역본 다운로드 완료: ${popupTargetItem.value.name}`);
+      }, 200);
+    }
+  }, 70);
+}
+
+function handleDownload(item) {
+  if (item.type === "reg") {
+    // 규제 파일 → 팝업 띄우기
+    popupTargetItem.value = item;
+    showDownloadPopup.value = true;
+  } else if (item.type === "report") {
+    // 리포트 → 즉시 다운로드
+    downloadReport(item);
+  }
+}
+
+function downloadReport(item) {
+  alert(`리포트 다운로드: ${item.name}`);
+  // 실제 파일 다운로드 로직 위치
+}
 </script>
 
 <style scoped>
