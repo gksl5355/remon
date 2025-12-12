@@ -1,28 +1,5 @@
 package com.global17.auth_service.service;
 
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.model.ListObjectsV2Request;
-import com.amazonaws.services.s3.model.ListObjectsV2Result;
-import com.amazonaws.services.s3.model.ObjectMetadata;
-import com.amazonaws.services.s3.model.S3ObjectSummary;
-import com.global17.auth_service.entity.CrawlTarget;
-import com.global17.auth_service.repository.CrawlTargetRepository;
-import com.global17.auth_service.util.TavilyClient;
-import lombok.RequiredArgsConstructor;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.ContentDisposition;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
-
 import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.net.URL;
@@ -37,6 +14,28 @@ import java.util.Map;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
+
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.global17.auth_service.entity.CrawlTarget;
+import com.global17.auth_service.repository.CrawlTargetRepository;
+import com.global17.auth_service.util.TavilyClient;
+
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -58,11 +57,9 @@ public class CrawlService_prefix {
     @Value("${aws.s3.app-prefix}")
     private String appPrefix;
 
-    @Value("${api.fast-url}")
-    private String fastApiUrl;
-
-    // --- 실행 로직 ---
-
+    // ==========================================
+    // 1. 크롤링 실행 로직 (Main)
+    // ==========================================
     public void runBatchCrawling() {
         System.out.println("🔄 [Versioning Mode] S3 버저닝 기반 크롤링 시작 (FDA 패치 + 옵션 적용)...");
         List<CrawlTarget> targets = targetRepository.findByEnabledTrue();
@@ -85,34 +82,9 @@ public class CrawlService_prefix {
             }
         }
         System.out.println("🎉 [Batch] 완료!");
-        System.out.println("FastApi runpipeline 호출");
-        // [수정 - 조영우] FastApi 호출 로직 추가
-        callFastApiRunPipeline();
     }
 
-    private void callFastApiRunPipeline() {
-        try {
-            
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("Content-Type", "application/json");
-            
-            HttpEntity<String> request = new HttpEntity<>("{}", headers);
-            
-            ResponseEntity<String> response = restTemplate.postForEntity(
-                fastApiUrl, 
-                request, 
-                String.class
-            );
-            
-            System.out.println("✅ FastAPI 신호 전송 완료: " + response.getStatusCode());
-        } catch (Exception e) {
-            System.err.println("❌ FastAPI 신호 전송 실패: " + e.getMessage());
-        }
-    }
-
-
-
-    private void processCrawling(String country, String countryCode, String keyword, String category) {
+    private void processCrawling(CrawlTarget target, String keyword) {
         System.out.println("   🚀 탐색: " + keyword);
         
         // --- 1. 검색어 동적 조립 (프론트엔드 연동) ---
