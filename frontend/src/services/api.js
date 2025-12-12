@@ -3,6 +3,7 @@ import axios from "axios";
 
 const api = axios.create({
   baseURL: "http://localhost:8000/api", // ✅ FastAPI 기본 엔드포인트
+  // baseURL: "http://172.25.155.179:8000/api", //또는 본인 ip 주소
   timeout: 5000, // 5초 타임아웃
   headers: {
     "Content-Type": "application/json",

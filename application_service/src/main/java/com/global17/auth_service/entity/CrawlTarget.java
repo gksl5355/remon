@@ -1,5 +1,6 @@
 package com.global17.auth_service.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDate;
@@ -16,32 +17,41 @@ public class CrawlTarget {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // [신규 필드 추가] 프론트엔드 Title (예: US Regulation Crawler)
+    // 프론트엔드 Title
     private String title;
 
     @Column(nullable = false)
-    private String country; // 예: USA FDA
+    private String country; // "US"
 
     @Column(length = 10)
-    private String code;    // 예: US
+    private String code;    // "US"
 
-    private boolean enabled; // 활성화 여부
+    private boolean enabled = true;
 
-    private String category; // regulation or news (type)
+    // [매핑] 프론트엔드 "type": "reg" -> 백엔드 category
+    @JsonProperty("type")
+    private String category;
     
-    // [신규 필드 추가] 화면 표시용 라벨 (예: Regulation)
+    // [매핑] 화면 표시용 라벨 "typeLabel": "Regulation"
+    @JsonProperty("typeLabel")
     private String typeLabel; 
 
-    // [신규 필드 추가] 상세 검색 옵션
-    private String targetDomain;    // 예: govinfo.gov (site: 옵션용)
-    private String documentFormat;  // 예: pdf (filetype: 옵션용)
-    private LocalDate baseDate;     // 예: 2024-12-01 (after: 옵션용)
-    private String targetUrl;       // (프론트 데이터에 있어서 추가함)
+    // [매핑] "domain": "govinfo.gov" -> targetDomain
+    @JsonProperty("domain")
+    private String targetDomain;    
 
-    // 키워드 리스트를 별도 테이블로 관리 (1:N)
+    // [매핑] "format": "pdf" -> documentFormat
+    @JsonProperty("format")
+    private String documentFormat;  
+
+    // [매핑] "date": "2024-12-01" -> baseDate
+    @JsonProperty("date")
+    private LocalDate baseDate;     
+
+    private String targetUrl;       
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "crawl_target_keywords", joinColumns = @JoinColumn(name = "target_id"))
     @Column(name = "keyword", columnDefinition = "TEXT")
     private List<String> keywords;
 }
-
