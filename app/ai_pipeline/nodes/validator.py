@@ -150,6 +150,7 @@ def validator_node(state):
     # -----------------------------
     if restart_node == "map_products":
         state["mapping"] = None
+        state["product_info"] = None  # ⭐ 재시도 시 제품 재선택 허용
 
     elif restart_node == "generate_strategy":
         state["strategies"] = None
