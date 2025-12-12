@@ -1,3 +1,4 @@
+#app/ai_pipeline/nodes/map_products.py
 """
 module: map_products.py
 description: 검색 TOOL + LLM 매핑 Node

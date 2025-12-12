@@ -1,3 +1,4 @@
+# app/ai_pipeline/nodes/change_detection.py
 """
 module: change_detection.py
 description: 규제 변경 감지 노드 (Reference ID 기반, 전처리 후 임베딩 전)
@@ -241,6 +242,8 @@ class ChangeDetectionNode:
                 "status": "skipped",
                 "reason": "no_preprocess_results",
             }
+            # 실행 상태 마킹
+            self._mark_execution_state(state)
             return state
 
         new_regul_data = pre_results[0]
@@ -270,6 +273,7 @@ class ChangeDetectionNode:
                             "status": "error",
                             "reason": "no_new_regulation_id",
                         }
+                        self._mark_execution_state(state)
                         return state
 
                     new_regul_data = await repo.get_regul_data(
@@ -284,6 +288,7 @@ class ChangeDetectionNode:
                             "status": "error",
                             "reason": "no_new_regul_data",
                         }
+                        self._mark_execution_state(state)
                         return state
 
                 if not legacy_regul_data:
@@ -330,7 +335,9 @@ class ChangeDetectionNode:
                                 row = result.fetchone()
                                 if row:
                                     legacy_regul_data = row[0]
-                                    logger.info(f"✅ Legacy 발견: citation={new_citation}")
+                                    logger.info(
+                                        f"✅ Legacy 발견: citation={new_citation}"
+                                    )
                             except Exception as db_err:
                                 logger.error(f"❌ DB 쿼리 실패 (연결 끊김): {db_err}")
                                 logger.info("⚠️ Legacy 검색 실패 - 신규 규제로 처리")
@@ -359,6 +366,7 @@ class ChangeDetectionNode:
                             "total_changes": 0,
                         }
                         state["needs_embedding"] = True
+                        self._mark_execution_state(state)
                         return state
                 # end session block
 
@@ -516,6 +524,8 @@ class ChangeDetectionNode:
         state["needs_embedding"] = needs_embedding
         logger.info(f"📦 임베딩 필요: {needs_embedding}")
 
+        # 실행 상태 마킹 (정상 완료)
+        self._mark_execution_state(state)
         return state
 
     def _extract_reference_blocks(
