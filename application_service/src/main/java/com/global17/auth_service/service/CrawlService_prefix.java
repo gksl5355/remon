@@ -1,5 +1,28 @@
 package com.global17.auth_service.service;
 
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.model.ListObjectsV2Request;
+import com.amazonaws.services.s3.model.ListObjectsV2Result;
+import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.amazonaws.services.s3.model.S3ObjectSummary;
+import com.global17.auth_service.entity.CrawlTarget;
+import com.global17.auth_service.repository.CrawlTargetRepository;
+import com.global17.auth_service.util.TavilyClient;
+import lombok.RequiredArgsConstructor;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
+
 import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.net.URL;
@@ -15,26 +38,6 @@ import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
-
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.model.ObjectMetadata;
-import com.global17.auth_service.entity.CrawlTarget;
-import com.global17.auth_service.repository.CrawlTargetRepository;
-import com.global17.auth_service.util.TavilyClient;
-
-import lombok.RequiredArgsConstructor;
-
 @Service
 @RequiredArgsConstructor
 public class CrawlService_prefix {
@@ -49,7 +52,6 @@ public class CrawlService_prefix {
     @Value("${aws.s3.target-arn}")
     private String bucket;
 
-    // [수정] 상위 경로 설정값 가져오기
     @Value("${aws.s3.base-prefix}")
     private String basePrefix;
 
@@ -62,18 +64,24 @@ public class CrawlService_prefix {
     // --- 실행 로직 ---
 
     public void runBatchCrawling() {
-        System.out.println("🔄 [Versioning Mode] S3 버저닝 기반 크롤링 시작...");
+        System.out.println("🔄 [Versioning Mode] S3 버저닝 기반 크롤링 시작 (FDA 패치 + 옵션 적용)...");
         List<CrawlTarget> targets = targetRepository.findByEnabledTrue();
+        
         if (targets.isEmpty()) {
             System.out.println("⚠️ 활성화된 타겟이 없습니다.");
             return;
         }
 
         for (CrawlTarget target : targets) {
-            System.out.println("👉 Target: " + target.getCountry());
+            String label = (target.getTitle() != null) ? target.getTitle() : target.getCountry();
+            System.out.println("👉 Target: " + label);
+            
             for (String keyword : target.getKeywords()) {
-                processCrawling(target.getCountry(), target.getCode(), keyword, target.getCategory());
-                randomSleep(3000, 5000);
+                // 개별 키워드 검색 수행
+                processCrawling(target, keyword);
+                
+                // [속도 조절] Tavily API Rate Limit 방지 (15초 이상)
+                randomSleep(15000, 20000);
             }
         }
         System.out.println("🎉 [Batch] 완료!");
@@ -106,25 +114,55 @@ public class CrawlService_prefix {
 
     private void processCrawling(String country, String countryCode, String keyword, String category) {
         System.out.println("   🚀 탐색: " + keyword);
-        String query = keyword;
-        if ("regulation".equalsIgnoreCase(category)) {
-             query += " filetype:pdf";
+        
+        // --- 1. 검색어 동적 조립 (프론트엔드 연동) ---
+        StringBuilder queryBuilder = new StringBuilder(keyword);
+
+        // (A) 도메인 필터 (site:govinfo.gov)
+        if (target.getTargetDomain() != null && !target.getTargetDomain().isEmpty()) {
+            queryBuilder.append(" site:").append(target.getTargetDomain());
         }
 
+        // (B) 날짜 필터 (after:YYYY-MM-DD)
+        if (target.getBaseDate() != null) {
+            queryBuilder.append(" after:").append(target.getBaseDate().toString());
+        } else {
+            // 기본값: 100일 전
+            String defaultDate = LocalDate.now().minusDays(100).toString();
+            queryBuilder.append(" after:").append(defaultDate);
+        }
+
+        // (C) 파일 포맷
+        String format = "pdf"; // 기본값
+        if (target.getDocumentFormat() != null && !target.getDocumentFormat().isEmpty()) {
+            format = target.getDocumentFormat();
+        }
+        if (isRegulation(target.getCategory()) || target.getDocumentFormat() != null) {
+             queryBuilder.append(" filetype:").append(format);
+        }
+
+        String query = queryBuilder.toString();
+        // System.out.println("      🔎 Query: " + query);
+
+        // --- 2. API 호출 ---
         List<Map<String, String>> searchResults = tavilyClient.search(query);
         if (searchResults.isEmpty()) {
             System.out.println("      💨 결과 없음");
             return;
         }
 
+        // --- 3. 다운로드 및 처리 ---
         for (Map<String, String> result : searchResults) {
             String rawUrl = result.get("url");
-            String title = result.get("title");
+            String title = result.get("title"); 
 
-            randomSleep(2000, 4000);
+            // 사람처럼 보이기 위한 딜레이 (FDA 보안 우회용)
+            randomSleep(3000, 6000); 
 
             try {
                 URI safeUri = encodeUrl(rawUrl);
+                
+                // [중요] FDA 접속을 위한 강력한 헤더 및 쿠키 적용
                 HttpHeaders requestHeaders = createBrowserHeaders();
                 HttpEntity<String> entity = new HttpEntity<>(requestHeaders);
 
@@ -133,58 +171,150 @@ public class CrawlService_prefix {
                 );
                 
                 byte[] fileContent = response.getBody();
+                HttpHeaders responseHeaders = response.getHeaders();
 
                 if (fileContent != null && fileContent.length > 2000) {
                     boolean isPdf = isPdfContent(fileContent);
-                    String ext = isPdf ? ".pdf" : ".txt";
+                    String ext = isPdf ? ".pdf" : "." + format;
 
-                    String fileName = cleanFileName(title) + ext;
+                    // 실제 파일명 추출 (헤더 -> URL -> 제목 순)
+                    String realFileName = extractRealFileName(responseHeaders, rawUrl, title, ext);
+                    
+                    // 경로 조립
+                    String fullKey = buildFullPath(target.getCategory(), target.getCode(), realFileName);
 
-                    // [수정] 전체 경로 생성 로직 (Prefix 포함)
-                    // 예: skala2/skala-2.4.17/regulation/RU/파일명.pdf
-                    String fullKey = buildFullPath(category, countryCode, fileName);
-
-                    // [디버깅 로그] 실제로 저장하려는 경로를 콘솔에 찍음
-                    // System.out.println("      👀 저장 시도 경로: " + fullKey);
-
+                    // 중복 체크 (ETag 비교)
                     if (isSameContentExists(fullKey, fileContent)) {
-                        System.out.println("      ⏭️ 변경 없음(Skip Upload): " + fileName);
+                        System.out.println("      ⏭️ 변경 없음(Skip): " + realFileName);
                         continue;
                     }
                     
                     byte[] finalContent = isPdf ? fileContent : cleanHtmlToText(fileContent);
-                    HttpHeaders responseHeaders = response.getHeaders();
+                    // 5단계 날짜 추출 로직 적용
                     String publishDate = resolvePublishDate(result, rawUrl, finalContent, isPdf, responseHeaders);
 
                     uploadToS3(fullKey, fileContent, isPdf, publishDate, rawUrl);
-                    
-                    // [로그 수정] 전체 경로를 출력해서 어디에 저장됐는지 확인
-                    System.out.println("      ✅ S3 버전 업데이트 완료: " + fullKey);
+                    System.out.println("      ✅ S3 업데이트: " + fullKey);
 
                 } else {
-                    System.out.println("      ⚠️ 파일 크기 작음/차단됨 -> Skip");
+                    System.out.println("      ⚠️ 파일 작음/차단 -> Skip");
                 }
+
+            } catch (org.springframework.web.client.HttpClientErrorException.NotFound e) {
+                System.out.println("      ⚠️ 페이지 없음(404 Fake) - FDA 등 보안 사이트일 가능성: " + rawUrl);
+            } catch (org.springframework.web.client.HttpClientErrorException.Forbidden e) {
+                System.err.println("      ⛔ 접근 차단(403) - 헤더/쿠키 보완 필요: " + rawUrl);
             } catch (Exception e) {
                 System.err.println("      ❌ 실패: " + rawUrl + " -> " + e.toString());
             }
         }
     }
 
-    // --- [신규 메서드] 전체 경로 조립기 ---
-    private String buildFullPath(String category, String countryCode, String fileName) {
-        // basePrefix + appPrefix + category + countryCode + fileName
-        // 슬래시(/)가 중복되지 않도록 깔끔하게 조립
-        StringBuilder path = new StringBuilder();
+    // ==========================================
+    // 2. [핵심] 보안 헤더 및 쿠키 설정 (FDA 대응)
+    // ==========================================
+    private HttpHeaders createBrowserHeaders() {
+        HttpHeaders headers = new HttpHeaders();
         
-        if (basePrefix != null && !basePrefix.isEmpty()) path.append(basePrefix).append("/");
-        if (appPrefix != null && !appPrefix.isEmpty()) path.append(appPrefix).append("/");
+        // 1. 최신 크롬 User-Agent
+        headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
         
-        path.append(category).append("/").append(countryCode).append("/").append(fileName);
+        // 2. Accept
+        headers.set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7");
         
-        return path.toString();
+        // 3. 언어
+        headers.set("Accept-Language", "en-US,en;q=0.9,ko;q=0.8");
+        headers.set("Accept-Encoding", "gzip, deflate, br"); 
+        
+        // 4. Client Hints (봇 탐지 회피 필수)
+        headers.set("Sec-Ch-Ua", "\"Chromium\";v=\"122\", \"Not(A:Brand\";v=\"24\", \"Google Chrome\";v=\"122\"");
+        headers.set("Sec-Ch-Ua-Mobile", "?0");
+        headers.set("Sec-Ch-Ua-Platform", "\"Windows\"");
+        headers.set("Sec-Fetch-Dest", "document");
+        headers.set("Sec-Fetch-Mode", "navigate");
+        headers.set("Sec-Fetch-Site", "none"); 
+        headers.set("Sec-Fetch-User", "?1");
+        headers.set("Upgrade-Insecure-Requests", "1");
+        headers.set("Connection", "keep-alive");
+        
+        // 5. [필수] Referer & Cookie (FDA 접속 성공의 열쇠)
+        headers.set("Referer", "https://www.google.com/");
+        
+        // ★★★ 여기에 브라우저에서 딴 쿠키를 넣으세요 ★★★
+        headers.set("Cookie", "SSESS...=...; TS01...=..."); 
+
+        return headers;
     }
 
-    // --- S3 관련 핵심 로직 ---
+    // ==========================================
+    // 3. 데이터 관리 (CRUD) - 프론트엔드 연동
+    // ==========================================
+
+    public List<CrawlTarget> getAllTargets() { 
+        return targetRepository.findAll(); 
+    }
+
+    public CrawlTarget addTarget(CrawlTarget target) {
+        normalizeTargetData(target);
+        return targetRepository.save(target);
+    }
+
+    @Transactional
+    public CrawlTarget patchTarget(Long id, CrawlTarget source) {
+        CrawlTarget target = targetRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Target ID not found: " + id));
+
+        if (source.getTitle() != null) target.setTitle(source.getTitle());
+        if (source.getCountry() != null) target.setCountry(source.getCountry());
+        if (source.getCode() != null) target.setCode(source.getCode());
+        if (source.getCategory() != null) target.setCategory(source.getCategory());
+        if (source.getTypeLabel() != null) target.setTypeLabel(source.getTypeLabel());
+        target.setEnabled(source.isEnabled()); 
+        
+        if (source.getTargetDomain() != null) target.setTargetDomain(source.getTargetDomain());
+        if (source.getDocumentFormat() != null) target.setDocumentFormat(source.getDocumentFormat());
+        if (source.getBaseDate() != null) target.setBaseDate(source.getBaseDate());
+        if (source.getTargetUrl() != null) target.setTargetUrl(source.getTargetUrl());
+
+        if (source.getKeywords() != null) {
+            target.getKeywords().clear();
+            target.getKeywords().addAll(source.getKeywords());
+        }
+        normalizeTargetData(target);
+        return target;
+    }
+
+    public void deleteTarget(Long id) { targetRepository.deleteById(id); }
+    public CrawlTarget updateTarget(Long id, CrawlTarget updatedInfo) { return patchTarget(id, updatedInfo); }
+    public void updateTargetStatus(Long id, boolean enabled) {
+        CrawlTarget target = targetRepository.findById(id).orElseThrow();
+        target.setEnabled(enabled);
+        targetRepository.save(target);
+    }
+
+    private void normalizeTargetData(CrawlTarget target) {
+        if (target.getCode() == null || target.getCode().isEmpty()) target.setCode(target.getCountry());
+        if ("reg".equalsIgnoreCase(target.getCategory())) target.setCategory("regulation");
+        // [신규 추가] 3. TypeLabel 채우기 (이게 없어서 DB에 안 들어감)
+        if (target.getTypeLabel() == null || target.getTypeLabel().isEmpty()) {
+            // category가 regulation이면 "Regulation", news면 "News"로 자동 설정
+            if ("regulation".equalsIgnoreCase(target.getCategory())) {
+                target.setTypeLabel("Regulation");
+            } else if ("news".equalsIgnoreCase(target.getCategory())) {
+                target.setTypeLabel("News");
+            } else {
+                target.setTypeLabel(target.getCategory()); // 그 외엔 category 그대로
+            }
+        }
+    }
+    
+    private boolean isRegulation(String category) {
+        return "regulation".equalsIgnoreCase(category) || "reg".equalsIgnoreCase(category);
+    }
+
+    // ==========================================
+    // 4. 유틸리티 (S3, 파일명, 날짜 등)
+    // ==========================================
 
     private boolean isSameContentExists(String key, byte[] newContent) {
         try {
@@ -208,45 +338,56 @@ public class CrawlService_prefix {
     private String calculateMD5(byte[] content) {
         try {
             StringBuilder sb = new StringBuilder();
-            for (byte b : MessageDigest.getInstance("MD5").digest(content)) {
-                sb.append(String.format("%02x", b));
-            }
+            for (byte b : MessageDigest.getInstance("MD5").digest(content)) sb.append(String.format("%02x", b));
             return sb.toString();
         } catch (Exception e) { throw new RuntimeException(e); }
     }
 
-    // --- 유틸 메서드 ---
-    private String cleanFileName(String title) {
-        String safeTitle = title.replaceAll("[\\\\/:*?\"<>|]", "").trim().replaceAll("\\s+", "_");
-        if (safeTitle.length() > 80) safeTitle = safeTitle.substring(0, 80);
-        return safeTitle;
+    private String buildFullPath(String category, String countryCode, String fileName) {
+        StringBuilder path = new StringBuilder();
+        if (basePrefix != null && !basePrefix.isEmpty()) path.append(basePrefix).append("/");
+        if (appPrefix != null && !appPrefix.isEmpty()) path.append(appPrefix).append("/");
+        path.append(category).append("/").append(countryCode).append("/").append(fileName);
+        return path.toString();
     }
 
-    private HttpHeaders createBrowserHeaders() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-        headers.set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8");
-        headers.set("Accept-Language", "en-US,en;q=0.9,ko;q=0.8");
-        headers.set("Referer", "https://www.google.com/");
-        headers.set("Connection", "keep-alive");
-        return headers;
+    private String extractRealFileName(HttpHeaders headers, String fileUrl, String fallbackTitle, String defaultExt) {
+        String filename = null;
+        try {
+            ContentDisposition contentDisposition = headers.getContentDisposition();
+            if (contentDisposition != null && contentDisposition.getFilename() != null) filename = contentDisposition.getFilename();
+        } catch (Exception ignored) {}
+        if (filename == null || filename.isEmpty()) {
+            try {
+                String path = new URL(fileUrl).getPath();
+                if (path != null && path.contains("/")) {
+                    filename = path.substring(path.lastIndexOf("/") + 1);
+                    filename = URLDecoder.decode(filename, StandardCharsets.UTF_8.name());
+                }
+            } catch (Exception ignored) {}
+        }
+        if (filename == null || filename.trim().length() < 3) filename = cleanFileName(fallbackTitle);
+        filename = sanitizeFileName(filename);
+        if (!filename.toLowerCase().endsWith(defaultExt)) filename += defaultExt;
+        return filename;
     }
-    
-    private void randomSleep(int min, int max) {
-        try { Thread.sleep(random.nextInt(max - min + 1) + min); } catch (Exception e) {}
+
+    private String sanitizeFileName(String name) {
+        String safeName = name.replaceAll("[\\\\/:*?\"<>|]", "_").trim().replaceAll("\\s+", "_");
+        if (safeName.length() > 200) safeName = safeName.substring(0, 200);
+        return safeName;
     }
-    
+    private String cleanFileName(String title) { return sanitizeFileName(title); }
+    private void randomSleep(int min, int max) { try { Thread.sleep(random.nextInt(max - min + 1) + min); } catch (Exception e) {} }
     private URI encodeUrl(String urlStr) throws Exception {
         String decoded = URLDecoder.decode(urlStr, StandardCharsets.UTF_8.name());
         URL url = new URL(decoded);
         return new URI(url.getProtocol(), url.getUserInfo(), url.getHost(), url.getPort(), url.getPath(), url.getQuery(), null);
     }
-    
-    private boolean isPdfContent(byte[] data) {
-        return data.length > 4 && data[0]==0x25 && data[1]==0x50 && data[2]==0x44;
-    }
+    private boolean isPdfContent(byte[] data) { return data.length > 4 && data[0]==0x25 && data[1]==0x50 && data[2]==0x44; }
+    private byte[] cleanHtmlToText(byte[] b) { try { return Jsoup.parse(new String(b, StandardCharsets.UTF_8)).text().getBytes(StandardCharsets.UTF_8); } catch(Exception e){return b;} }
 
-    // 날짜 추출 메서드
+    // 날짜 추출 5단계 방어 로직
     private String resolvePublishDate(Map<String, String> searchResult, String url, byte[] fileContent, boolean isPdf, HttpHeaders headers) {
         String foundDate = extractDateFromUrl(url);
         if (foundDate != null) return formatDateToYYYYMMDD(foundDate);
@@ -276,8 +417,6 @@ public class CrawlService_prefix {
         if (searchResult.get("content") != null) foundDate = findDatePatternInText(searchResult.get("content"));
         return formatDateToYYYYMMDD(foundDate);
     }
-    
-    // 날짜 세부 추출기
     private String extractDateFromJsonLd(Document doc) {
         Elements scripts = doc.select("script[type=application/ld+json]");
         for (Element script : scripts) {
@@ -345,27 +484,6 @@ public class CrawlService_prefix {
         } catch (Exception e) {
             return LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
         }
-    }
-    private byte[] cleanHtmlToText(byte[] b) { try { return Jsoup.parse(new String(b, StandardCharsets.UTF_8)).text().getBytes(StandardCharsets.UTF_8); } catch(Exception e){return b;} }
-
-    // CRUD 메서드 (TargetController 호환용)
-    public List<CrawlTarget> getAllTargets() { return targetRepository.findAll(); }
-    public CrawlTarget addTarget(CrawlTarget target) { return targetRepository.save(target); }
-    public void deleteTarget(Long id) { targetRepository.deleteById(id); }
-    public CrawlTarget updateTarget(Long id, CrawlTarget updatedInfo) {
-        CrawlTarget target = targetRepository.findById(id).orElseThrow();
-        target.setCountry(updatedInfo.getCountry());
-        target.setCode(updatedInfo.getCode());
-        target.setCategory(updatedInfo.getCategory());
-        target.setEnabled(updatedInfo.isEnabled());
-        if (target.getKeywords() != null) target.getKeywords().clear();
-        if (updatedInfo.getKeywords() != null) target.getKeywords().addAll(updatedInfo.getKeywords());
-        return targetRepository.save(target);
-    }
-    public void updateTargetStatus(Long id, boolean enabled) {
-        CrawlTarget target = targetRepository.findById(id).orElseThrow();
-        target.setEnabled(enabled);
-        targetRepository.save(target);
     }
 }
 
