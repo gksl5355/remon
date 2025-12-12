@@ -6,8 +6,6 @@ import axios from 'axios';
 /* API 설정 */
 const API_BASE_URL = `http://localhost:8081/api/crawl`;
 
-// const API_BASE_URL = `http://내 ip 주소:8081/api/crawl`;
-
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },

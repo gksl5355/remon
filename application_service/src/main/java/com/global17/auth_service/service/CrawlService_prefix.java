@@ -268,9 +268,16 @@ public class CrawlService_prefix {
     private void normalizeTargetData(CrawlTarget target) {
         if (target.getCode() == null || target.getCode().isEmpty()) target.setCode(target.getCountry());
         if ("reg".equalsIgnoreCase(target.getCategory())) target.setCategory("regulation");
-        if (target.getTitle() == null || target.getTitle().isEmpty()) {
-            String type = (target.getTypeLabel() != null) ? target.getTypeLabel() : target.getCategory();
-            target.setTitle(target.getCountry() + " " + type + " Crawler");
+        // [신규 추가] 3. TypeLabel 채우기 (이게 없어서 DB에 안 들어감)
+        if (target.getTypeLabel() == null || target.getTypeLabel().isEmpty()) {
+            // category가 regulation이면 "Regulation", news면 "News"로 자동 설정
+            if ("regulation".equalsIgnoreCase(target.getCategory())) {
+                target.setTypeLabel("Regulation");
+            } else if ("news".equalsIgnoreCase(target.getCategory())) {
+                target.setTypeLabel("News");
+            } else {
+                target.setTypeLabel(target.getCategory()); // 그 외엔 category 그대로
+            }
         }
     }
     

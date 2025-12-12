@@ -160,7 +160,10 @@ watch(
       form.country = val.country || "";
       form.code = val.code || "";
       
-      form.type = (val.type === 'regulation' || val.category === 'regulation') ? 'reg' : (val.type || ''); 
+      let typeVal = val.type || val.category || ""; // 둘 다 확인
+      if (typeVal === 'regulation') typeVal = 'reg';
+      form.type = typeVal;
+      
       if (val.category === 'news') form.type = 'news';
       
       form.domain = val.domain || val.targetDomain || "";
