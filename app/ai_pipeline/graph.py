@@ -105,9 +105,9 @@ def build_graph(start_node: str = "preprocess"):
     graph.add_edge("preprocess", "detect_changes")
     graph.add_edge("map_products", "generate_strategy")
     graph.add_edge("generate_strategy", "score_impact")
-    # [TEST] validator 노드 비활성화 - 원복 시 아래 주석 해제
-    # graph.add_edge("score_impact",      "validator")
-    graph.add_edge("score_impact", "report_node")  # validator 우회
+    # [TEST] validator 비활성화
+    # graph.add_edge("score_impact", "validator")
+    graph.add_edge("score_impact", "report")  # validator 우회
 
     # detect_changes → embedding or map_products
     graph.add_conditional_edges(
@@ -119,45 +119,30 @@ def build_graph(start_node: str = "preprocess"):
         },
     )
 
-    # [TEST] validator 노드 비활성화 - 원복 시 아래 주석 해제
-    # validator → validation only for 3 nodes
+    graph.add_edge("embedding", "map_products")
+
+    # -------------------------
+    # 검증 결과에 따른 분기 [TEST: 주석처리]
+    # -------------------------
     # graph.add_conditional_edges(
     #     "validator",
     #     _route_validation,
     #     {
-    #         "ok": "report_node",              # 마지막 노드
-    #         "map_products": "map_products",   # 실패 시 재시도 노드들
+    #         "ok": "report",
+    #         "map_products": "map_products",
     #         "generate_strategy": "generate_strategy",
     #         "score_impact": "score_impact",
+    #         "detect_changes": "detect_changes",
     #     },
     # )
-    graph.add_edge("embedding", "map_products")
-    graph.add_edge("map_products", "generate_strategy")
-    graph.add_edge("generate_strategy", "score_impact")
-    graph.add_edge("score_impact", "validator")
 
     # -------------------------
-    # 검증 결과에 따른 분기
+    # 보고서 후 HITL 노드 연결 [TEST: 주석처리]
     # -------------------------
-    graph.add_conditional_edges(
-        "validator",
-        _route_validation,
-        {
-            "ok": "report",
-            "map_products": "map_products",
-            "generate_strategy": "generate_strategy",
-            "score_impact": "score_impact",
-            "detect_changes": "detect_changes",
-        },
-    )
-
-    # -------------------------
-    # 보고서 후 HITL 노드 연결
-    # -------------------------
-    graph.add_edge("report", "hitl")
+    # graph.add_edge("report", "hitl")
 
     # HITL → validator (state 패치 → 검증 → 재실행)
-    graph.add_edge("hitl", "validator")
+    # graph.add_edge("hitl", "validator")
 
     # -------------------------
     # 파이프라인 종료

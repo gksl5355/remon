@@ -232,8 +232,14 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
     # 1. 규제 변경 요약 (change_detection_results 활용)
     change_items = []
     change_results = state.get("change_detection_results", [])
-    for result in change_results:
-        if not result.get("change_detected"):
+    
+    logger.info(f"🔍 변경 감지 결과 처리: {len(change_results)}개")
+    
+    for idx, result in enumerate(change_results):
+        change_detected = result.get("change_detected")
+        logger.debug(f"  [{idx}] section={result.get('section_ref')}, detected={change_detected}")
+        
+        if not change_detected:
             continue
 
         section = result.get("section_ref", "Unknown")
@@ -248,6 +254,8 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
         else:
             change_type = result.get("change_type", "변경")
             change_items.append(f"- {section}: {change_type}")
+    
+    logger.info(f"✅ 변경 항목 생성: {len(change_items)}개")
 
     change_summary_section = {
         "id": "change_summary",
@@ -352,11 +360,11 @@ def send_slack_notification(message: str, webhook_url: Optional[str] = None) -> 
 # 메인 Report Node
 # -----------------------------
 async def report_node(state: AppState) -> Dict[str, Any]:
-    meta = state.get("product_info", {})
+    meta = state.get("product_info") or {}
     mapping_items = state.get("mapping", {}).get("items", [])
     strategies = state.get("strategies", [])
     impact_score = (state.get("impact_scores") or [{}])[0]
-    regulation_trace = meta.get("regulation_trace")
+    regulation_trace = meta.get("regulation_trace") if meta else None
 
     context_parts = [
         f"국가: {meta.get('country','')}, 지역: {meta.get('region','')}",
@@ -393,12 +401,19 @@ async def report_node(state: AppState) -> Dict[str, Any]:
             # Change Detection Keynote 저장 (우선)
             change_keynote_data = state.get("change_keynote_data")
             if change_keynote_data:
+                logger.info(f"📝 Change Keynote 데이터 확인: {len(str(change_keynote_data))} bytes")
+                logger.info(f"   - regulation_id: {change_keynote_data.get('regulation_id')}")
+                logger.info(f"   - section_changes: {len(change_keynote_data.get('section_changes', []))}개")
+                
                 keynote = await keynote_repo.create_keynote(
                     db_session, change_keynote_data
                 )
-                logger.info(f"✅ Change Keynote 저장: {keynote.keynote_id}")
+                logger.info(f"✅ Change Keynote 저장 완료: keynote_id={keynote.keynote_id}")
             else:
-                # Fallback: 기존 방식 (Mapping 기반)
+                # ⚠️ Fallback: change_keynote_data 없음 (문제 발생)
+                logger.warning("⚠️ change_keynote_data 없음 - Fallback 실행 (간소화된 데이터)")
+                logger.warning("   원인: change_detection 노드가 실행되지 않았거나 state 전달 실패")
+                
                 keynote = await keynote_repo.create_keynote(
                     db_session,
                     {
@@ -416,7 +431,7 @@ async def report_node(state: AppState) -> Dict[str, Any]:
                         "impact": impact_score.get("impact_level", "N/A"),
                     },
                 )
-                logger.info(f"Keynote 저장 완료: {keynote.keynote_id}")
+                logger.warning(f"⚠️ Fallback Keynote 저장: keynote_id={keynote.keynote_id}")
 
             summary = await summary_repo.create_report_summary(db_session, sections)
             # 규제 trace 저장
