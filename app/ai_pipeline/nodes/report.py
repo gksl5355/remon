@@ -85,6 +85,7 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
     mapping_items = mapping.get("items", [])
     strategies = state.get("strategies", [])
     impact_score = (state.get("impact_scores") or [{}])[0]
+    regulation = state.get("regulation", {})
 
     # fallback data
     major_analysis = llm_struct.get("major_analysis") or [
@@ -96,6 +97,9 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
 
     # product_name은 mapping에서 가져오기
     product_name = mapping.get("product_name", "Unknown")
+    
+    # country 정보 우선순위: product_info > regulation > mapping
+    country = meta.get('country') or regulation.get('country') or regulation.get('jurisdiction_code') or mapping.get('country') or ''
 
     # ✅ 제품별로 그룹화
     from collections import defaultdict
@@ -214,7 +218,7 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
     )
 
     summary_content = [
-        f"국가 / 지역: {meta.get('country', '')} ({meta.get('region', '')})",
+        f"국가 / 지역: {country} ({meta.get('region', '')})",
         f"카테고리: {mapping_items[0].get('parsed',{}).get('category','') if mapping_items else ''}",
         f"규제 요약: {mapping_items[0].get('regulation_summary','') if mapping_items else ''}",
         f"영향도: {impact_score.get('impact_level','N/A')} (점수 {impact_score.get('weighted_score',0.0)})",
