@@ -55,6 +55,8 @@ async def translate_report_node(state: AppState) -> AppState:
     # JSON 문자열로 변환
     sections_json = json.dumps(sections, ensure_ascii=False, indent=2)
     
+    logger.info(f"📊 번역 대상 크기: {len(sections_json)} chars")
+    
     # LLM 번역
     client = AsyncOpenAI()
     
@@ -64,45 +66,51 @@ async def translate_report_node(state: AppState) -> AppState:
             messages=[
                 {
                     "role": "system",
-                    "content": """Translate ALL English text in the JSON to Korean.
+                    "content": """You are a JSON translator. Translate ONLY English text to Korean while preserving JSON structure.
 
 RULES:
-- Keep JSON structure intact
-- Keep: numbers, units (mg, %), citations (§1160.5), country codes (US, KR), URLs
-- Translate: titles, content arrays, reasoning text
-- Return ONLY valid JSON"""
+- Keep JSON structure EXACTLY as is
+- Keep: numbers, units (mg, %), citations (§1160.5), country codes, URLs, null values
+- Translate: English text in "title", "content" arrays, "reasoning" fields
+- Output MUST be valid JSON (no markdown, no explanations)"""
                 },
-                {"role": "user", "content": f"Translate to Korean:\n{sections_json}"}
+                {"role": "user", "content": sections_json}
             ],
-            temperature=0
+            temperature=0,
+            max_tokens=16384
         )
         
+        # ✅ LLM 출력을 그대로 사용 (파싱 없음)
         translated_json = response.choices[0].message.content.strip()
         
-        # JSON 파싱
+        # 마크다운 코드 블록 제거만 수행
         if "```json" in translated_json:
             start = translated_json.find("```json") + 7
             end = translated_json.find("```", start)
             translated_json = translated_json[start:end].strip()
+        elif "```" in translated_json:
+            start = translated_json.find("```") + 3
+            end = translated_json.find("```", start)
+            translated_json = translated_json[start:end].strip()
         
-        translated_sections = json.loads(translated_json)
+        # ✅ Dict로 래핑 (DB 스키마 호환)
+        translation_data = {"sections": json.loads(translated_json)}
         
-        # ✅ List를 Dict로 래핑 후 JSON 문자열로 변환 (JSONB 호환)
-        translation_data = {"sections": translated_sections}
-        
-        # DB 저장 (JSONB는 JSON 문자열 필요)
+        # DB 저장
         async with AsyncSessionLocal() as db_session:
             await db_session.execute(
                 text("UPDATE report_summaries SET translation = :trans::jsonb WHERE summary_id = :id"),
                 {"trans": json.dumps(translation_data, ensure_ascii=False), "id": report_id}
             )
             await db_session.commit()
-            logger.info(f"✅ 번역 완료 및 DB 저장: summary_id={report_id}")
+            logger.info(f"✅ 번역 완료: summary_id={report_id}")
     
     except json.JSONDecodeError as e:
-        logger.error(f"번역 JSON 파싱 실패: {e}")
+        logger.error(f"❌ 번역 JSON 파싱 실패: {e}")
+        logger.warning("⚠️ 번역 스킵, 원본 데이터 유지")
     except Exception as e:
-        logger.error(f"번역 실패: {e}")
+        logger.error(f"❌ 번역 실패: {e}")
+        logger.warning("⚠️ 번역 스킵, 원본 데이터 유지")
     
     return state
 
