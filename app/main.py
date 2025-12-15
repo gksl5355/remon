@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import regulation_api, report_api, ai_api, translation_api
-from app.api.admin import s3_manager_api, admin_regulation_api, admin_summary_api, admin_websearch_api
+from app.api.admin import s3_manager_api
 
 app = FastAPI(
     title="REMON Regulatory Monitoring API",
@@ -29,9 +29,6 @@ app.include_router(ai_api.router, prefix="/api")
 app.include_router(translation_api.router, prefix="/api")
 
 #관리자 페이지 엔드포인트
-app.include_router(admin_regulation_api.router, prefix="/api")
-app.include_router(admin_summary_api.router, prefix="/api")
-app.include_router(admin_websearch_api.router, prefix="/api")
 app.include_router(s3_manager_api.router, prefix="/api/admin/s3", tags=["Admin-S3"])
 
 @app.get("/")
