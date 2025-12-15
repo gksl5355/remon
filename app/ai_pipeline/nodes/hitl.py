@@ -14,11 +14,17 @@ HITL(Human-In-The-Loop) 통합 노드
 import os
 import json
 import logging
+import re
 from typing import Dict, Any
 
 from openai import OpenAI
 from app.ai_pipeline.state import AppState
-from app.ai_pipeline.nodes.validator import validator_node
+
+# Import prompts for refined prompt generation
+from app.ai_pipeline.prompts.mapping_prompt import MAPPING_PROMPT, MAPPING_SCHEMA
+from app.ai_pipeline.prompts.strategy_prompt import STRATEGY_PROMPT, STRATEGY_SCHEMA
+from app.ai_pipeline.prompts.impact_prompt import IMPACT_PROMPT, IMPACT_SCHEMA
+from app.ai_pipeline.prompts.refined_prompt import REFINED_PROMPT
 
 logger = logging.getLogger(__name__)
 client = OpenAI()
@@ -78,11 +84,40 @@ CHANGE_FEEDBACK_PROMPT = """
 { "manual_change": false }  ← 변경 없음으로 처리
 """
 
+IMPACT_LEVEL_FEEDBACK_PROMPT = """
+사용자의 피드백을 분석해서 원하는 영향도 레벨을 판단하십시오.
+
+사용자가 원하는 것:
+- 낮추고 싶다면: Low
+- 높이고 싶다면: High  
+- 보통/적당히/조금만 수정하고 싶다면: Medium
+
+반드시 아래 JSON 형식으로만 답하십시오:
+
+{ "desired_level": "Low" | "Medium" | "High" }
+"""
+
+STRATEGY_STYLE_FEEDBACK_PROMPT = """
+사용자의 피드백을 분석해서 원하는 전략 스타일을 판단하십시오.
+
+사용자가 원하는 것:
+- 보수적/안전하게/신중하게: conservative
+- 적극적/공격적/빠르게: aggressive
+- 단계적/점진적/차근차근: gradual
+- 간단하게/핵심만/최소한: minimal
+- 자세하게/많이/구체적으로: detailed
+
+반드시 아래 JSON 형식으로만 답하십시오:
+
+{ "strategy_style": "conservative" | "aggressive" | "gradual" | "minimal" | "detailed" | "default" }
+"""
+
 def refine_hitl_feedback(message: str, target_node: str) -> str:
     """
     노드 타입에 따라 피드백 정제
 
     - change_detection: "true" / "false" 문자열로 정제
+    - score_impact: "Low" / "Medium" / "High" 레벨로 정제
     - 나머지 노드: 자연어 피드백 한 문장 그대로 사용
     """
 
@@ -99,12 +134,43 @@ def refine_hitl_feedback(message: str, target_node: str) -> str:
         try:
             data = json.loads(raw)
             flag = bool(data.get("manual_change", False))
-            # validator 쪽에서 "true"/"false" 문자열 기준으로 manual_change_flag 계산함
             return "true" if flag else "false"
         except Exception:
             return "false"
+    
+    elif target_node == "score_impact":
+        resp = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=[
+                {"role": "system", "content": IMPACT_LEVEL_FEEDBACK_PROMPT},
+                {"role": "user", "content": message},
+            ],
+            temperature=0,
+        )
+        raw = resp.choices[0].message.content.strip()
+        try:
+            data = json.loads(raw)
+            return data.get("desired_level", "Medium")
+        except Exception:
+            return "Medium"
+    
+    elif target_node == "generate_strategy":
+        resp = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=[
+                {"role": "system", "content": STRATEGY_STYLE_FEEDBACK_PROMPT},
+                {"role": "user", "content": message},
+            ],
+            temperature=0,
+        )
+        raw = resp.choices[0].message.content.strip()
+        try:
+            data = json.loads(raw)
+            return data.get("strategy_style", "default")
+        except Exception:
+            return "default"
 
-    # map_products / generate_strategy / score_impact → 그냥 자연어 사용
+    # map_products → 그냥 자연어 사용
     return message.strip()
 
 
@@ -112,25 +178,160 @@ def refine_hitl_feedback(message: str, target_node: str) -> str:
 # 3) Apply HITL → Patch State + call validator
 # ============================================================
 
+def generate_refined_prompt(node_name: str, pipeline_state: dict, error_summary: str):
+    """Generate a refined version of the original prompt for a specific node."""
+    
+    if node_name == "map_products":
+        original_prompt = MAPPING_PROMPT
+        schema = MAPPING_SCHEMA
+    elif node_name == "generate_strategy":
+        original_prompt = STRATEGY_PROMPT
+        schema = STRATEGY_SCHEMA
+    elif node_name == "score_impact":
+        original_prompt = IMPACT_PROMPT
+        schema = IMPACT_SCHEMA
+    else:
+        logger.error(f"[HITL] Unknown node for refinement: {node_name}")
+        return None
+
+    refine_request = REFINED_PROMPT.format(
+        original_prompt=original_prompt.strip(),
+        error_summary=error_summary,
+        pipeline_state=json.dumps(pipeline_state, ensure_ascii=False, indent=2),
+        schema=json.dumps(schema, ensure_ascii=False, indent=2),
+    )
+
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You rewrite prompts to be strict and error-proof.",
+                },
+                {"role": "user", "content": refine_request},
+            ],
+            temperature=0,
+        )
+        refined_prompt_text = resp.choices[0].message.content.strip()
+        return refined_prompt_text
+
+    except Exception as e:
+        logger.error(f"[HITL] Failed to generate refined prompt: {e}")
+        return None
+
+
 def apply_hitl_patch(state: AppState, target_node: str, cleaned_feedback: str) -> AppState:
     """
-    HITL 피드백을 state에 반영한 뒤, validator_node를 호출한다.
-
-    여기서는:
-    - hitl_target_node
-    - hitl_feedback_text
-
-    두 가지만 세팅하고, 나머지 세부 로직(필드 초기화, manual_change_flag, refined_prompt 생성 등)은
-    전부 validator_node에 맡긴다.
+    HITL 피드백을 독립적으로 처리 (validator 의존성 제거)
     """
+    
+    logger.info(f"[HITL] Processing feedback for {target_node}: {cleaned_feedback}")
+    
+    compiled_input = {
+        "mapping": state.get("mapping"),
+        "strategy": state.get("strategies"),
+        "impact": state.get("impact_scores"),
+        "regulation": state.get("regulation"),
+    }
+    
+    # ===============================
+    # change_detection 전용 HITL
+    # ===============================
+    if target_node == "change_detection":
+        # 문자열("true"/"false") 처리
+        if isinstance(cleaned_feedback, str):
+            cleaned = cleaned_feedback.strip().lower()
+            manual_flag = cleaned == "true"
+        else:
+            manual_flag = bool(cleaned_feedback)
 
-    state["hitl_target_node"] = target_node
-    state["hitl_feedback_text"] = cleaned_feedback
-    state["validation_retry_count"] = 0  # HITL 들어올 때마다 retry 카운터 리셋
+        state["manual_change_flag"] = manual_flag
+        state["needs_embedding"] = manual_flag
 
-    # 나머지 로직은 validator가 처리
-    updated_state = validator_node(state)
-    return updated_state
+        logger.info(
+            f"[HITL][change_detection] "
+            f"manual_change_flag set to {manual_flag}, needs_embedding={manual_flag}"
+        )
+
+        # change_detection만 초기화 (의존성 체인 제거)
+        for key in [
+            "change_detection_results",
+            "change_summary",
+            "regulation_analysis_hints",
+            "change_detection_index",
+        ]:
+            if key in state:
+                state[key] = None
+
+        state["restarted_node"] = "change_detection"
+        
+    # ===============================
+    # 나머지 노드들 HITL
+    # ===============================
+    else:
+        # score_impact는 직접 결과 조작으로 확실한 반영
+        if target_node == "score_impact":
+            desired_level = cleaned_feedback
+            
+            # 기존 impact_scores가 있으면 직접 수정
+            if state.get("impact_scores"):
+                current_impact = state["impact_scores"][0]
+                
+                # 직접 레벨과 점수 강제 설정
+                if desired_level == "Low":
+                    current_impact["impact_level"] = "Low"
+                    current_impact["weighted_score"] = 2.0
+                    current_impact["reasoning"] = "Human in the loop"
+                elif desired_level == "High":
+                    current_impact["impact_level"] = "High"
+                    current_impact["weighted_score"] = 4.5
+                    current_impact["reasoning"] = "Human in the loop"
+                else:  # Medium
+                    current_impact["impact_level"] = "Medium"
+                    current_impact["weighted_score"] = 3.0
+                    current_impact["reasoning"] = "Human in the loop"
+                
+                logger.info(f"[HITL] Direct impact override: {desired_level} (score: {current_impact['weighted_score']})")
+                
+                # 직접 수정했으므로 재실행 불필요
+                state["restarted_node"] = None
+                return state
+            
+            # impact_scores가 없으면 기존 방식으로 재실행
+            error_summary = f"CRITICAL INSTRUCTION: Force impact_level to '{desired_level}' and reasoning to 'Human in the loop'."
+        else:
+            # map_products, generate_strategy는 자연어 그대로
+            error_summary = f"HUMAN FEEDBACK: {cleaned_feedback}. INSTRUCTION: Adjust the analysis according to this feedback."
+
+        # refined prompt 생성
+        refined_prompt = generate_refined_prompt(
+            node_name=target_node,
+            pipeline_state=compiled_input,
+            error_summary=error_summary,
+        )
+
+        if refined_prompt:
+            state[f"refined_{target_node}_prompt"] = refined_prompt
+            logger.info(f"[HITL] Refined prompt saved to state['refined_{target_node}_prompt']")
+
+        # 타겟 노드만 초기화 (의존성 체인 제거로 정확한 시작점 보장)
+        if target_node == "map_products":
+            state["mapping"] = None
+        elif target_node == "generate_strategy":
+            state["strategies"] = None
+        elif target_node == "score_impact":
+            state["impact_scores"] = None
+            logger.info("[HITL] Clearing existing impact reasoning for HITL override")
+            
+        state["restarted_node"] = target_node
+    
+    # HITL 메타데이터 초기화
+    state["hitl_target_node"] = None
+    state["hitl_feedback_text"] = None
+    state.pop("hitl_feedback", None)
+    
+    return state
 
 
 # ============================================================
@@ -155,6 +356,9 @@ def hitl_node(state: AppState) -> AppState:
 
     logger.info(f"[HITL Node] 사용자 피드백 수신: {user_msg}")
 
+    # 🔹 피드백 처리 후 즉시 제거 (무한 루프 방지)
+    state["external_hitl_feedback"] = None
+
     # (1) target_node 식별
     target = detect_target_node(user_msg)
     logger.info(f"[HITL Target] target_node = {target}")
@@ -162,8 +366,8 @@ def hitl_node(state: AppState) -> AppState:
     # (2) 피드백 정제
     cleaned = refine_hitl_feedback(user_msg, target)
 
-    # (3) state 패치 + validator 호출
+    # (3) state 패치 (독립적 처리)
     new_state = apply_hitl_patch(state, target, cleaned)
 
-    logger.info(f"[HITL Node] validator 결과 → restarted_node={new_state.get('restarted_node')}")
+    logger.info(f"[HITL Node] 처리 완료 → restarted_node={new_state.get('restarted_node')}")
     return new_state

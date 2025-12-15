@@ -1,4 +1,4 @@
-#scripts/run_full_pipeline.py
+# scripts/run_full_pipeline.py
 """
 module: run_full_pipeline.py
 description: REMON AI Pipeline 전체 실행 스크립트 (S3 PDF → 최종 리포트)
@@ -19,21 +19,19 @@ import asyncio
 import logging
 import sys
 import argparse
-import copy
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any
+
 from sqlalchemy import text
 
 # 프로젝트 루트 경로 추가
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.ai_pipeline.graph import build_graph
-from app.ai_pipeline.preprocess import preprocess_node
 from app.ai_pipeline.state import AppState
 from app.core.database import AsyncSessionLocal
 from langsmith import traceable
-from app.core.repositories.product_repository import ProductRepository
 
 # 로그 디렉토리 생성
 Path("logs").mkdir(exist_ok=True)
@@ -46,7 +44,7 @@ logging.basicConfig(
     handlers=[
         logging.StreamHandler(),
         logging.FileHandler(
-            f'logs/pipeline_run_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
+            f"logs/pipeline_run_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
         ),
     ],
 )
@@ -62,7 +60,7 @@ def print_pipeline_summary(final_state: AppState):
     # 변경 감지
     change_summary = final_state.get("change_summary", {})
     if change_summary:
-        logger.info(f"\n🔍 변경 감지:")
+        logger.info("\n🔍 변경 감지:")
         logger.info(f"  - 상태: {change_summary.get('status')}")
         logger.info(f"  - 변경 건수: {change_summary.get('total_changes', 0)}")
         logger.info(f"  - 고신뢰도: {change_summary.get('high_confidence_changes', 0)}")
@@ -70,7 +68,7 @@ def print_pipeline_summary(final_state: AppState):
         # 변경 상세
         change_results = final_state.get("change_detection_results", [])
         if change_results:
-            logger.info(f"\n  📝 변경 상세 (상위 5개):")
+            logger.info("\n  📝 변경 상세 (상위 5개):")
             for idx, result in enumerate(change_results[:5], 1):
                 if result.get("change_detected"):
                     logger.info(
@@ -79,36 +77,42 @@ def print_pipeline_summary(final_state: AppState):
                     )
 
     # 매핑
-    mapping = final_state.get("mapping", {})
-    mapping_items = mapping.get("items", [])
+    mapping = final_state.get("mapping", {}) or {}
+    mapping_items = mapping.get("items", []) or []
     if mapping_items:
-        logger.info(f"\n🔗 제품-규제 매핑:")
+        logger.info("\n🔗 제품-규제 매핑:")
         logger.info(f"  - 매핑 항목: {len(mapping_items)}개")
         applies_count = sum(1 for item in mapping_items if item.get("applies"))
         logger.info(f"  - 적용 대상: {applies_count}개")
 
     # 전략
-    strategies = final_state.get("strategies", [])
+    strategies = final_state.get("strategies", []) or []
     if strategies:
-        logger.info(f"\n💡 대응 전략:")
+        logger.info("\n💡 대응 전략:")
         logger.info(f"  - 전략 개수: {len(strategies)}개")
         for i, strategy in enumerate(strategies[:3], 1):
-            logger.info(f"  {i}. {strategy[:80]}...")
+            logger.info(f"  {i}. {str(strategy)[:80]}...")
 
     # 영향도
-    impact_scores = final_state.get("impact_scores", [])
+    impact_scores = final_state.get("impact_scores", []) or []
     if impact_scores:
-        impact = impact_scores[0]
-        logger.info(f"\n📊 영향도 평가:")
+        impact = impact_scores[0] or {}
+        try:
+            score = float(impact.get("weighted_score", 0.0))
+        except Exception:
+            score = 0.0
+        logger.info("\n📊 영향도 평가:")
         logger.info(f"  - 영향도: {impact.get('impact_level')}")
-        logger.info(f"  - 점수: {impact.get('weighted_score'):.2f}")
+        logger.info(f"  - 점수: {score:.2f}")
+    else:
+        logger.info("\n📊 영향도 평가: 없음")
 
     # 리포트
-    report = final_state.get("report", {})
+    report = final_state.get("report", {}) or {}
     if report:
-        logger.info(f"\n📋 최종 리포트:")
+        logger.info("\n📋 최종 리포트:")
         logger.info(f"  - 생성 시각: {report.get('generated_at')}")
-        logger.info(f"  - 섹션 수: {len(report.get('sections', []))}")
+        logger.info(f"  - 섹션 수: {len(report.get('sections', []) or [])}")
         logger.info(f"  - Report ID: {report.get('report_id')}")
 
     logger.info("\n" + "=" * 80)
@@ -134,7 +138,6 @@ async def download_pdf_from_s3(s3_key: str, local_path: str) -> str:
 async def run_legacy_preprocessing():
     """Legacy 규제 전처리 및 DB 저장 (1회만 실행)"""
 
-    # 테스트용 하드코딩 설정
     legacy_s3_key = "skala2/skala-2.4.17/regulation/US/Regulation Data A (1).pdf"
     local_legacy_path = "/tmp/Regulation_Data_A.pdf"
 
@@ -160,13 +163,11 @@ async def run_legacy_preprocessing():
         local_legacy_path, use_parallel=True, language_code=None
     )
 
-    if legacy_result["status"] != "success":
+    if legacy_result.get("status") != "success":
         logger.error("❌ Legacy 전처리 실패")
         return
 
-    logger.info(
-        f"  ✅ Legacy 전처리 완료: {len(legacy_result['vision_extraction_result'])}페이지"
-    )
+    logger.info(f"  ✅ Legacy 전처리 완료: {len(legacy_result.get('vision_extraction_result', []))}페이지")
 
     # Step 3: DB 저장
     logger.info("\n[Step 3] PostgreSQL DB 저장")
@@ -179,9 +180,7 @@ async def run_legacy_preprocessing():
             legacy_reg = await repo.create_from_vision_result(session, legacy_result)
             await session.commit()
             regulation_id = legacy_reg.regulation_id
-            logger.info(
-                f"  ✅ Legacy 저장 완료: regulation_id={regulation_id}"
-            )
+            logger.info(f"  ✅ Legacy 저장 완료: regulation_id={regulation_id}")
             logger.info(f"  ✅ citation_code: {legacy_reg.citation_code}")
         except Exception as e:
             await session.rollback()
@@ -195,9 +194,9 @@ async def run_legacy_preprocessing():
     logger.info("\n[Step 4] 임베딩 및 VectorDB 저장")
     from app.ai_pipeline.preprocess.semantic_processing import DualIndexer
 
-    chunks = legacy_result.get("chunks", [])
-    graph_data = legacy_result.get("graph_data", {"nodes": [], "edges": []})
-    vision_results = legacy_result.get("vision_extraction_result", [])
+    chunks = legacy_result.get("chunks", []) or []
+    graph_data = legacy_result.get("graph_data", {"nodes": [], "edges": []}) or {"nodes": [], "edges": []}
+    vision_results = legacy_result.get("vision_extraction_result", []) or []
 
     if chunks:
         indexer = DualIndexer()
@@ -206,7 +205,7 @@ async def run_legacy_preprocessing():
             graph_data=graph_data,
             source_file=Path(local_legacy_path).name,
             regulation_id=regulation_id,
-            vision_results=vision_results
+            vision_results=vision_results,
         )
         logger.info(f"  ✅ 임베딩 완료: {index_summary.get('qdrant_chunks', 0)}개 청크")
     else:
@@ -216,25 +215,32 @@ async def run_legacy_preprocessing():
     logger.info("🎉 Legacy 규제 전처리 완료 (임베딩 포함)!")
     logger.info("=" * 80)
 
-##sa-mj 통합 (219 - 364)
+
 @traceable(name="REMON_Full_Pipeline", run_type="chain")
 async def run_full_pipeline(citation_code: str | None = None):
     """
     전체 파이프라인 실행 (S3 자동 로드 + LangGraph + HITL 루프)
 
-    Args:
-        citation_code: 규제 식별 코드.
-            - None이면 전처리/변경감지 단계에서 자동 추출 및 매핑을 시도함.
+    1차 실행:
+        - preprocess → ... → validator → report → END
+
+    HITL 재실행:
+        - hitl 를 엔트리 포인트로 사용 (✅ validator보다 먼저 HITL 해석)
+        - hitl → validator(HITL) → fallback 노드 → ... → report → END
     """
 
     logger.info("=" * 80)
     logger.info("🚀 REMON AI Pipeline 전체 실행 시작")
     logger.info("=" * 80)
 
-    # ------- 그래프 컴파일 (HITL 통합 버전) -------
-    app = build_graph()  # entry_point = preprocess
+    # ------- 그래프 컴파일 -------
+    # 1) 전체 자동 실행용 (preprocess부터)
+    app_full = build_graph(start_node="preprocess")
 
-    # Step 1: Legacy regulation_id DB 조회 (citation_code 기반)
+    # 2) HITL 재실행용 (hitl부터) ✅
+    app_hitl = build_graph(start_node="hitl")
+
+    # Step 1: Legacy regulation_id DB 조회 (citation_code 기반) - 선택
     logger.info("\n[Step 1] Legacy regulation_id DB 조회")
     from app.core.repositories.regulation_repository import RegulationRepository
 
@@ -287,18 +293,19 @@ async def run_full_pipeline(citation_code: str | None = None):
 
     state: AppState = {
         "preprocess_request": {
-            "load_from_s3": True,          # S3 자동 로드 활성화
-            "s3_date": None,               # None이면 오늘 날짜
+            "load_from_s3": True,           # S3 자동 로드 활성화
+            "s3_date": None,                # None이면 오늘 날짜
             "use_vision_pipeline": True,
             "enable_change_detection": True,
         },
-        "change_context": {},  # 전처리 후 자동 채워짐
+        "change_context": {},               # 전처리 후 자동 채워짐
         "mapping_filters": {},
         "validation_retry_count": 0,
     }
 
     try:
-        state = await app.ainvoke(state, config={"configurable": {}})
+        # ✅ 1차 실행은 preprocess부터 전체 파이프라인
+        state = await app_full.ainvoke(state, config={"configurable": {}})
         logger.info("✅ 1차 파이프라인 실행 완료")
     except Exception as e:
         logger.error(f"❌ 파이프라인 실행 실패: {e}", exc_info=True)
@@ -311,11 +318,9 @@ async def run_full_pipeline(citation_code: str | None = None):
     # ------------------------------------------------------------------
     # Step 5: HITL 인터랙티브 루프
     #   - 사람이 결과를 보고 피드백을 입력하면
-    #     → external_hitl_feedback 에 넣고 그래프 재실행
+    #     → external_hitl_feedback 에 넣고 HITL 그래프(hitl entry)로 재실행
     #   - 그래프 안에서는:
-    #       report → hitl_node → validator (HITL 모드)
-    #       → restart_node(예: map_products, generate_strategy, score_impact, change_detection)
-    #       → ... → report → (다시 hitl 진입 가능)
+    #       hitl → validator(HITL) → restart_node → ... → report → END
     # ------------------------------------------------------------------
     logger.info("\n[Step 5] HITL 피드백 루프 시작 (엔터만 입력하면 종료)")
 
@@ -347,13 +352,16 @@ async def run_full_pipeline(citation_code: str | None = None):
         state.pop("hitl_target_node", None)
         state.pop("hitl_feedback_text", None)
         state.pop("hitl_feedback", None)
+        state.pop("hitl_session_active", None)
 
-        logger.info(f"[HITL] 새로운 피드백으로 그래프 재실행: '{feedback}'")
+        logger.info(f"[HITL] 새로운 피드백으로 그래프 재실행 (hitl entry): '{feedback}'")
+        logger.info(f"[HITL] State 전: external_hitl_feedback={state.get('external_hitl_feedback')}, hitl_target_node={state.get('hitl_target_node')}")
 
         try:
-            # 동일 그래프에 기존 state를 다시 태움
-            state = await app.ainvoke(state, config={"configurable": {}})
+            # ✅ HITL 재실행은 hitl을 엔트리포인트로 사용하는 그래프
+            state = await app_hitl.ainvoke(state, config={"configurable": {}})
             logger.info("✅ HITL 반영 후 파이프라인 재실행 완료")
+            logger.info(f"[HITL] State 후: external_hitl_feedback={state.get('external_hitl_feedback')}, hitl_target_node={state.get('hitl_target_node')}")
         except Exception as e:
             logger.error(f"❌ HITL 재실행 중 오류: {e}", exc_info=True)
             break
@@ -362,7 +370,7 @@ async def run_full_pipeline(citation_code: str | None = None):
         logger.info("\n[HITL] 재실행 결과 요약")
         print_pipeline_summary(state)
 
-    return state 
+    return state
 
 
 async def main():
@@ -377,7 +385,7 @@ async def main():
     parser.add_argument(
         "--citation-code",
         default=None,
-        help="(선택) 규제 식별용 citation_code (미지정 시 전처리에서 자동 추출)"
+        help="(선택) 규제 식별용 citation_code (미지정 시 전처리에서 자동 추출)",
     )
     args = parser.parse_args()
 
