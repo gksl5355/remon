@@ -85,3 +85,59 @@ async def get_regulations_by_country(
         logger.warning(f"Regulation not found: country={country}")
         raise HTTPException(status_code=404, detail="Regulation not found")
     return reg
+
+
+@router.get("/regulations/country/{country}/file/{file_id}")
+async def get_regulation_file_detail(
+    country: str,
+    file_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    특정 국가의 특정 파일 상세 정보 조회 (더미 데이터)
+    
+    Args:
+        country: 국가 코드
+        file_id: 파일 ID
+        
+    Returns:
+        dict: 파일 상세 정보
+    """
+    logger.info(f"GET /regulations/country/{country}/file/{file_id}")
+    
+    # 더미 데이터
+    return {
+        "id": file_id,
+        "fileName": f"{country}_Tobacco_Control_Act_2026_Amendment_Main.pdf",
+        "title": f"{country} Tobacco Control Act - 2026 Amendment",
+        "impactLevel": 2,
+        "documentInfo": {
+            "promulgationDate": "2025-12-01",
+            "effectiveDate": "2026-01-01",
+            "collectedTime": "2025-12-09 11:40"
+        },
+        "articles": [
+            {
+                "id": file_id,
+                "title": "스위트향 제품 판매 제한.",
+                "summary": "스위트향 제품 판매 제한.",
+                "reviewLevel": 3,
+                "hasChange": True
+            },
+            {
+                "id": file_id,
+                "title": "니코틴 함량 상한을 20mg/mL로 조정",
+                "reviewLevel": 2,
+                "summary": "니코틴 함량 상한을 20mg/mL로 조정.",
+                "hasChange": True
+            },
+            {
+                "id": file_id,
+                "title": "멘솔 제품은 이번 규제에서 제외",
+                "summary": "멘솔 제품은 이번 규제에서 제외.",
+                "reviewLevel": 1,
+                "hasChange": False
+            }
+        ],
+        "aiReports": {}
+    }

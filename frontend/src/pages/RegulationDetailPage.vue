@@ -111,8 +111,9 @@
                 </div>
 
                 <div class="text-xs text-gray-400 flex gap-6 mt-1">
-                    <span>공포일: <span class="text-gray-300">{{ file.documentInfo.promulgationDate }}</span></span>
-                    <span>시행일: <span class="text-gray-300">{{ file.documentInfo.effectiveDate }}</span></span>
+                    <!-- <span>공포일: <span class="text-gray-300">{{ file.documentInfo.promulgationDate }}</span></span>
+                    <span>시행일: <span class="text-gray-300">{{ file.documentInfo.effectiveDate }}</span></span> -->
+                    <span>카테고리: <span class="text-gray-300">{{ file.category }}</span></span>
                 </div>
                 </div>
             </div>
@@ -228,6 +229,7 @@
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AiReportPanel from "../components/regulation/AiReportPanel.vue";
+import api from "@/services/api";
 
 const route = useRoute();
 const router = useRouter();
@@ -249,17 +251,20 @@ const flagUrl = computed(() =>
 );
 
 async function loadData() {
-  const module = await import(`@/data/regulations/${countryCode.value}.json`);
-  const data = module.default;
+  try {
+    // API로 국가별 파일 목록 가져오기
+    const countryRes = await api.get(`/regulations/country/${countryCode.value}`);
+    files.value = countryRes.data.files || [];
 
-  files.value = data.files;
+    // API로 특정 파일 상세 정보 가져오기
+    const fileRes = await api.get(`/regulations/country/${countryCode.value}/file/${fileId.value}`);
+    const fileData = fileRes.data;
 
-  const selectedFile = files.value.find(f => f.id === fileId.value);
-
-  if (selectedFile) {
-    selectedFileTitle.value = selectedFile.title;  // ⭐ header에 파일명 반영
-    documentInfo.value = selectedFile.documentInfo;
-    articles.value = selectedFile.articles;
+    selectedFileTitle.value = fileData.title;
+    documentInfo.value = fileData.documentInfo;
+    articles.value = fileData.articles;
+  } catch (err) {
+    console.error('데이터 로드 실패:', err);
   }
 }
 
