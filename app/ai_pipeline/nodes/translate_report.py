@@ -79,11 +79,14 @@ RULES:
         
         translated_sections = json.loads(translated_json)
         
+        # ✅ List를 Dict로 래핑 (JSONB 호환)
+        translation_data = {"sections": translated_sections}
+        
         # DB 저장
         async with AsyncSessionLocal() as db_session:
             await db_session.execute(
                 text("UPDATE report_summaries SET translation = :trans WHERE summary_id = :id"),
-                {"trans": translated_sections, "id": report_id}
+                {"trans": translation_data, "id": report_id}
             )
             await db_session.commit()
             logger.info(f"✅ 번역 완료 및 DB 저장: summary_id={report_id}")
