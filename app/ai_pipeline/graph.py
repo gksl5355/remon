@@ -102,7 +102,7 @@ def build_graph(start_node: str = "preprocess"):
     graph.add_node("score_impact", score_impact_node)
     graph.add_node("validator", validator_node)
     graph.add_node("report", report_node)
-    graph.add_node("translate", translate_report_node)
+    # graph.add_node("translate", translate_report_node)  # 번역 노드 비활성화
     graph.add_node("hitl", hitl_node)
 
     # -------------------------
@@ -131,7 +131,7 @@ def build_graph(start_node: str = "preprocess"):
     # [TEST] validator 비활성화
     # graph.add_edge("score_impact", "validator")
     graph.add_edge("score_impact", "report")  # validator 우회
-    graph.add_edge("report", "translate")  # 번역 노드 추가
+    # graph.add_edge("report", "translate")  # 번역 노드 비활성화
 
     # detect_changes → embedding or map_products
     graph.add_conditional_edges(
@@ -161,10 +161,10 @@ def build_graph(start_node: str = "preprocess"):
     # )
 
     # -------------------------
-    # 번역 후 HITL / 종료 분기
+    # 보고서 후 HITL / 종료 분기 (번역 건너뛰기)
     # -------------------------
     graph.add_conditional_edges(
-        "translate",
+        "report",
         _route_after_report,
         {
             "hitl": "hitl",
