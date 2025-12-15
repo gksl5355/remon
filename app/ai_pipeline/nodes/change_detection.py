@@ -715,131 +715,149 @@ class ChangeDetectionNode:
         self, new_blocks: List[Dict[str, Any]], legacy_blocks: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         """
-        Strict Section Matching: 조항 번호 기반 정확한 1:1 매칭 (텍스트 병합).
+        LLM 기반 능동적 매칭: 전체 컨텍스트를 LLM에 전달하여 의미적 매칭 수행.
         """
-        logger.info("🔍 Strict Section Matching 시작 (텍스트 병합)")
+        logger.info("🤖 LLM 기반 능동적 매칭 시작")
 
-        # 중복 제거 + 텍스트 병합: 같은 section_ref의 모든 텍스트를 병합
-        def deduplicate_blocks(blocks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-            section_map = {}  # {section_ref: merged_block}
+        # 블록 요약 (LLM 입력 크기 제한)
+        def summarize_blocks(blocks: List[Dict[str, Any]], max_blocks: int = 20) -> List[Dict[str, Any]]:
+            summarized = []
+            for idx, block in enumerate(blocks[:max_blocks]):
+                summarized.append({
+                    "id": f"block_{idx}",
+                    "section_ref": block.get("section_ref", f"Page {block.get('page_num')}"),
+                    "text_preview": block.get("text", "")[:300],
+                    "keywords": block.get("keywords", [])[:5],
+                    "page_num": block.get("page_num")
+                })
+            return summarized
 
-            for block in blocks:
-                section = self._normalize_section_ref(block.get("section_ref", ""))
-                if not section:
+        new_summary = summarize_blocks(new_blocks)
+        legacy_summary = summarize_blocks(legacy_blocks)
+
+        # LLM 매칭 프롬프트
+        prompt = f"""You are a regulatory document comparison expert.
+
+**Task**: Match corresponding blocks between NEW and LEGACY regulations based on semantic similarity.
+
+**NEW Regulation Blocks** ({len(new_summary)} blocks):
+{json.dumps(new_summary, indent=2, ensure_ascii=False)}
+
+**LEGACY Regulation Blocks** ({len(legacy_summary)} blocks):
+{json.dumps(legacy_summary, indent=2, ensure_ascii=False)}
+
+**Instructions**:
+1. Match blocks that discuss the SAME regulatory topic (even if section numbers differ)
+2. Consider: keywords, content similarity, regulatory intent
+3. Return ONLY matched pairs (skip unmatched blocks)
+4. Assign confidence: 1.0 (exact), 0.8 (high), 0.6 (medium), 0.4 (low)
+
+**Output JSON** (array of matches):
+[
+  {{
+    "new_block_id": "block_0",
+    "legacy_block_id": "block_3",
+    "confidence": 0.9,
+    "reason": "Both discuss nicotine concentration limits"
+  }}
+]
+
+**CRITICAL**: Return ONLY valid JSON array. If no matches, return [].
+"""
+
+        try:
+            response = await self.llm.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "system", "content": "You are a regulatory document matcher. Return JSON only."},
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"}
+            )
+
+            content = response.choices[0].message.content
+            
+            # JSON 파싱 (배열 또는 객체 처리)
+            try:
+                parsed = json.loads(content)
+                if isinstance(parsed, dict) and "matches" in parsed:
+                    matches = parsed["matches"]
+                elif isinstance(parsed, list):
+                    matches = parsed
+                else:
+                    matches = []
+            except json.JSONDecodeError:
+                logger.error(f"LLM 매칭 JSON 파싱 실패: {content[:200]}")
+                matches = []
+
+            # 매칭 결과를 matched_pairs 형태로 변환
+            matched_pairs = []
+            for match in matches:
+                new_id = match.get("new_block_id", "")
+                legacy_id = match.get("legacy_block_id", "")
+                
+                try:
+                    new_idx = int(new_id.split("_")[1])
+                    legacy_idx = int(legacy_id.split("_")[1])
+                    
+                    if new_idx < len(new_blocks) and legacy_idx < len(legacy_blocks):
+                        matched_pairs.append({
+                            "new_block": new_blocks[new_idx],
+                            "legacy_block": legacy_blocks[legacy_idx],
+                            "match_confidence": match.get("confidence", 0.5),
+                            "match_reason": match.get("reason", "LLM semantic match")
+                        })
+                except (IndexError, ValueError) as e:
+                    logger.warning(f"매칭 인덱스 파싱 실패: {e}")
                     continue
 
-                if section not in section_map:
-                    # 첫 발견: 초기화
-                    section_map[section] = block.copy()
-                    section_map[section]["end_page"] = block.get("page_num")
-                    section_map[section]["page_range"] = [block.get("page_num")]
-                else:
-                    # 재발견: 텍스트 병합
-                    existing_text = section_map[section].get("text", "")
-                    new_text = block.get("text", "")
-                    section_map[section]["text"] = existing_text + "\n\n" + new_text
-                    section_map[section]["end_page"] = block.get("page_num")
-                    section_map[section]["page_range"].append(block.get("page_num"))
+            logger.info(f"✅ LLM 매칭 완료: {len(matched_pairs)}개 쌍")
+            return matched_pairs
 
-            return list(section_map.values())
+        except Exception as e:
+            logger.error(f"❌ LLM 매칭 실패, Fallback 사용: {e}")
+            return self._fallback_keyword_matching(new_blocks, legacy_blocks)
 
-        new_blocks_unique = deduplicate_blocks(new_blocks)
-        legacy_blocks_unique = deduplicate_blocks(legacy_blocks)
-
-        logger.info(
-            f"🧹 중복 제거: New {len(new_blocks)} → {len(new_blocks_unique)}, "
-            f"Legacy {len(legacy_blocks)} → {len(legacy_blocks_unique)}"
-        )
-
+    def _fallback_keyword_matching(
+        self, new_blocks: List[Dict[str, Any]], legacy_blocks: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """LLM 실패 시 키워드 기반 매칭."""
+        logger.info("🔄 Fallback: 키워드 기반 매칭")
         matched_pairs = []
-        matched_legacy_sections = set()
+        matched_legacy = set()
 
-        # 정규화된 조항 번호 기반 1:1 매칭 (부분 일치 지원)
-        for new_block in new_blocks_unique:
-            new_section = new_block.get("section_ref", "")
-            new_normalized = self._normalize_section_ref(new_section)
-
-            if not new_normalized:
+        for new_block in new_blocks[:20]:
+            new_kw = set(new_block.get("keywords", []))
+            if not new_kw:
                 continue
 
-            for legacy_block in legacy_blocks_unique:
-                legacy_section = legacy_block.get("section_ref", "")
-                legacy_normalized = self._normalize_section_ref(legacy_section)
+            best_match = None
+            best_score = 0.0
 
-                if legacy_normalized in matched_legacy_sections:
+            for idx, legacy_block in enumerate(legacy_blocks[:20]):
+                if idx in matched_legacy:
                     continue
 
-                # 정확 일치 또는 부분 일치 (§ 1160.5 ↔ § 1160.5(a))
-                is_exact_match = new_normalized == legacy_normalized
-                is_parent_match = (
-                    new_normalized.startswith(legacy_normalized + "(")
-                    or legacy_normalized.startswith(new_normalized + "(")
-                )
-                
-                if is_exact_match or is_parent_match:
-                    confidence = 1.0 if is_exact_match else 0.95
-                    matched_pairs.append(
-                        {
-                            "new_block": new_block,
-                            "legacy_block": legacy_block,
-                            "match_confidence": confidence,
-                            "match_reason": f"{'Exact' if is_exact_match else 'Parent'} section: {new_normalized}",
-                        }
-                    )
-                    matched_legacy_sections.add(legacy_normalized)
-                    logger.debug(f"✅ Matched: {new_section} ↔ {legacy_section}")
-                    break
-
-        # 매칭 실패한 섹션 로그 + Fallback 매칭
-        unmatched_new = [
-            b for b in new_blocks_unique
-            if not any(p["new_block"] == b for p in matched_pairs)
-        ]
-        if unmatched_new:
-            logger.warning(f"⚠️ 매칭 실패한 신규 섹션: {[b.get('section_ref') for b in unmatched_new][:5]}...")
-            
-            # Fallback: 키워드 기반 유사도 매칭
-            for new_block in unmatched_new:
-                new_keywords = set(new_block.get("keywords", []))
-                if not new_keywords:
+                legacy_kw = set(legacy_block.get("keywords", []))
+                if not legacy_kw:
                     continue
-                
-                best_match = None
-                best_score = 0.0
-                
-                for legacy_block in legacy_blocks_unique:
-                    if self._normalize_section_ref(legacy_block.get("section_ref", "")) in matched_legacy_sections:
-                        continue
-                    
-                    legacy_keywords = set(legacy_block.get("keywords", []))
-                    if not legacy_keywords:
-                        continue
-                    
-                    # Jaccard 유사도
-                    intersection = len(new_keywords & legacy_keywords)
-                    union = len(new_keywords | legacy_keywords)
-                    score = intersection / union if union > 0 else 0.0
-                    
-                    if score > best_score and score >= 0.3:  # 30% 이상 유사
-                        best_score = score
-                        best_match = legacy_block
-                
-                if best_match:
-                    matched_pairs.append({
-                        "new_block": new_block,
-                        "legacy_block": best_match,
-                        "match_confidence": best_score,
-                        "match_reason": f"Keyword similarity: {best_score:.2f}",
-                    })
-                    matched_legacy_sections.add(self._normalize_section_ref(best_match.get("section_ref", "")))
-                    logger.info(f"🔍 Fallback matched: {new_block.get('section_ref')} ↔ {best_match.get('section_ref')} (score: {best_score:.2f})")
 
-        exact_matches = sum(1 for p in matched_pairs if p['match_confidence'] == 1.0)
-        fallback_matches = sum(1 for p in matched_pairs if p['match_confidence'] < 1.0)
-        logger.info(
-            f"✅ 매칭 완료: {len(matched_pairs)}개 쌍 "
-            f"(Exact: {exact_matches}, Fallback: {fallback_matches})"
-        )
+                score = len(new_kw & legacy_kw) / len(new_kw | legacy_kw) if (new_kw | legacy_kw) else 0.0
+
+                if score > best_score and score >= 0.3:
+                    best_score = score
+                    best_match = (idx, legacy_block)
+
+            if best_match:
+                matched_pairs.append({
+                    "new_block": new_block,
+                    "legacy_block": best_match[1],
+                    "match_confidence": best_score,
+                    "match_reason": f"Keyword fallback: {best_score:.2f}"
+                })
+                matched_legacy.add(best_match[0])
+
+        logger.info(f"✅ Fallback 매칭: {len(matched_pairs)}개 쌍")
         return matched_pairs
 
     async def _detect_change_by_ref_id(
