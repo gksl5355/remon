@@ -62,3 +62,8 @@ deploy/
 output/
 regulation_file/
 notebooks/
+SAVE/
+SAVE/*
+
+package-lock.json
+package.json
