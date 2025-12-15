@@ -3,7 +3,7 @@
 LangGraph 파이프라인 구성 (HITL 통합 버전)
 
 흐름:
-    preprocess → detect_changes → [embedding] → map_products 
+    preprocess → detect_changes → [embedding] → map_products
     → generate_strategy → score_impact → validator → report
     → (조건부) hitl → validator → ...
 
@@ -115,9 +115,15 @@ def build_graph(start_node: str = "preprocess"):
     # Entry point 설정
     # -------------------------
     if start_node not in {
-        "preprocess", "detect_changes", "embedding", "map_products",
-        "generate_strategy", "score_impact", "validator",
-        "report", "hitl"
+        "preprocess",
+        "detect_changes",
+        "embedding",
+        "map_products",
+        "generate_strategy",
+        "score_impact",
+        "validator",
+        "report",
+        "hitl",
     }:
         raise ValueError(f"Invalid start_node: {start_node}")
     graph.set_entry_point(start_node)
@@ -126,6 +132,11 @@ def build_graph(start_node: str = "preprocess"):
     # 메인 파이프라인
     # -------------------------
     graph.add_edge("preprocess", "detect_changes")
+    graph.add_edge("map_products", "generate_strategy")
+    graph.add_edge("generate_strategy", "score_impact")
+    # [TEST] validator 비활성화
+    # graph.add_edge("score_impact", "validator")
+    graph.add_edge("score_impact", "report")  # validator 우회
 
     # detect_changes → embedding or map_products
     graph.add_conditional_edges(
@@ -138,24 +149,21 @@ def build_graph(start_node: str = "preprocess"):
     )
 
     graph.add_edge("embedding", "map_products")
-    graph.add_edge("map_products", "generate_strategy")
-    graph.add_edge("generate_strategy", "score_impact")
-    graph.add_edge("score_impact", "validator")
 
     # -------------------------
-    # 검증 결과에 따른 분기
+    # 검증 결과에 따른 분기 [TEST: 주석처리]
     # -------------------------
-    graph.add_conditional_edges(
-        "validator",
-        _route_validation,
-        {
-            "ok": "report",
-            "map_products": "map_products",
-            "generate_strategy": "generate_strategy",
-            "score_impact": "score_impact",
-            "detect_changes": "detect_changes",
-        },
-    )
+    # graph.add_conditional_edges(
+    #     "validator",
+    #     _route_validation,
+    #     {
+    #         "ok": "report",
+    #         "map_products": "map_products",
+    #         "generate_strategy": "generate_strategy",
+    #         "score_impact": "score_impact",
+    #         "detect_changes": "detect_changes",
+    #     },
+    # )
 
     # -------------------------
     # 보고서 후 HITL / 종료 분기
@@ -170,6 +178,6 @@ def build_graph(start_node: str = "preprocess"):
     )
 
     # HITL → validator (state 패치 → 검증 → 재실행)
-    graph.add_edge("hitl", "validator")
+    # graph.add_edge("hitl", "validator")
 
     return graph.compile()

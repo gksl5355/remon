@@ -1,5 +1,7 @@
 #!/bin/bash
 # Qdrant 도커 컨테이너 실행
+# Qdrant 컬렉션 내 전체포인트 삭제: curl -X DELETE "http://localhost:6333/collections/{collection_name}/points" -H "accept: application/json" -H "Content-Type: application/json" -d "{\"points\": [1, 2, 3]}"
+
 
 echo "🚀 Qdrant 서버 시작 중..."
 

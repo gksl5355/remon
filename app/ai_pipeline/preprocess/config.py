@@ -44,7 +44,7 @@ class PreprocessConfig:
     # ==================== Chunking ====================
     MAX_CHUNK_SIZE: int = 1024
     """청크 최대 토큰 크기. 기본값: 1024"""
-    
+
     # ==================== Embedding ====================
     EMBEDDING_MODEL: str = "BAAI/bge-m3"
     """임베딩 모델명. 기본값: BAAI/bge-m3"""
@@ -61,15 +61,6 @@ class PreprocessConfig:
     EMBEDDING_BATCH_SIZE: int = 32
     """배치 임베딩 크기. 기본값: 32"""
 
-    
-
-    
-
-    
-
-    
-
-    
     # ==================== VectorDB (Qdrant) ====================
     QDRANT_HOST: str = os.getenv("QDRANT_HOST", "localhost")
     """Qdrant 서버 호스트. 기본값: localhost"""
@@ -105,61 +96,87 @@ class PreprocessConfig:
 
     OPENAI_TIMEOUT: int = int(os.getenv("OPENAI_TIMEOUT", "30"))
     """OpenAI 요청 타임아웃 (초). 기본값: 30"""
-    
+
     # ==================== Change Detection ====================
-    CHANGE_DETECTION_MODEL: str = os.getenv("CHANGE_DETECTION_MODEL", "gpt-5-nano")
-    """변경 감지 전용 모델. 기본값: gpt-5-nano"""
-    
+    CHANGE_DETECTION_MODEL: str = os.getenv("CHANGE_DETECTION_MODEL", "gpt-5.2")
+    """변경 감지 전용 모델. 기본값: gpt-5-mini (복잡한 추론 작업)"""
+
+    CHANGE_DETECTION_REASONING_EFFORT: str = os.getenv(
+        "CHANGE_DETECTION_REASONING_EFFORT", "medium"
+    )
+    """변경 감지 추론 깊이. 기본값: medium (문서 권장: none→medium 순차 증가)"""
+
+    CHANGE_DETECTION_OUTPUT_VERBOSITY: str = os.getenv(
+        "CHANGE_DETECTION_OUTPUT_VERBOSITY", "medium"
+    )
+    """변경 감지 출력 상세도. 기본값: medium (기본 설정)"""
+
+    # ==================== Mapping Node ====================
+    MAPPING_MODEL: str = os.getenv("MAPPING_MODEL", "gpt-5-mini")
+    """매핑 노드 전용 모델. 기본값: gpt-5-mini (비용 최적화)"""
+
+    MAPPING_REASONING_EFFORT: str = os.getenv("MAPPING_REASONING_EFFORT", "low")
+    """매핑 노드 추론 깊이. 기본값: low (속도 우선)"""
+
+    MAPPING_OUTPUT_VERBOSITY: str = os.getenv("MAPPING_OUTPUT_VERBOSITY", "low")
+    """매핑 노드 출력 상세도. 기본값: low (간결한 응답)"""
+
     # ==================== Vision Pipeline ====================
     VISION_MODEL_COMPLEX: str = os.getenv("VISION_MODEL_COMPLEX", "gpt-4o")
     """복잡한 표 처리용 Vision 모델. 기본값: gpt-4o"""
-    
+
     VISION_MODEL_SIMPLE: str = os.getenv("VISION_MODEL_SIMPLE", "gpt-4o-mini")
     """단순 텍스트 처리용 Vision 모델. 기본값: gpt-4o-mini"""
-    
+
     VISION_DPI: int = int(os.getenv("VISION_DPI", "300"))
     """PDF 이미지 렌더링 DPI. 기본값: 300"""
-    
+
     COMPLEXITY_THRESHOLD: float = float(os.getenv("COMPLEXITY_THRESHOLD", "0.3"))
     """표 복잡도 임계값 (0-1). 이상이면 GPT-4o 사용. 기본값: 0.3"""
-    
+
     VISION_MAX_TOKENS: int = int(os.getenv("VISION_MAX_TOKENS", "16384"))
     """Vision LLM 최대 출력 토큰. 기본값: 16384 (Prompt Caching 효율화)"""
-    
+
     VISION_TEMPERATURE: float = float(os.getenv("VISION_TEMPERATURE", "0.2"))
     """Vision LLM 온도 (구조 추출용). 기본값: 0.2"""
-    
-    ENABLE_GRAPH_EXTRACTION: bool = os.getenv("ENABLE_GRAPH_EXTRACTION", "true").lower() == "true"
+
+    ENABLE_GRAPH_EXTRACTION: bool = (
+        os.getenv("ENABLE_GRAPH_EXTRACTION", "true").lower() == "true"
+    )
     """지식 그래프 추출 활성화. 기본값: True"""
-    
+
     DOCUMENT_ANALYSIS_PAGES: int = int(os.getenv("DOCUMENT_ANALYSIS_PAGES", "3"))
     """문서 규칙 파악용 초기 분석 페이지 수. 기본값: 3"""
-    
+
     # ==================== 병렬 처리 설정 ====================
     VISION_MAX_CONCURRENCY: int = int(os.getenv("VISION_MAX_CONCURRENCY", "30"))
     """페이지별 Vision LLM 호출 최대 동시 실행 수. 기본값: 30"""
-    
+
     VISION_TOKEN_BUDGET: Optional[int] = (
-        int(os.getenv("VISION_TOKEN_BUDGET")) if os.getenv("VISION_TOKEN_BUDGET") else None
+        int(os.getenv("VISION_TOKEN_BUDGET"))
+        if os.getenv("VISION_TOKEN_BUDGET")
+        else None
     )
     """문서 단위 토큰 예산 (None이면 제한 없음). 기본값: None"""
-    
+
     # ==================== 배치 처리 설정 ====================
     VISION_BATCH_SIZE_SIMPLE: int = int(os.getenv("VISION_BATCH_SIZE_SIMPLE", "5"))
     """gpt-4o-mini용 배치 크기. 기본값: 5"""
-    
+
     VISION_BATCH_SIZE_COMPLEX: int = int(os.getenv("VISION_BATCH_SIZE_COMPLEX", "2"))
     """gpt-4o용 배치 크기. 기본값: 2"""
-    
+
     VISION_REQUEST_TIMEOUT: int = int(os.getenv("VISION_REQUEST_TIMEOUT", "120"))
     """Vision API 요청 타임아웃 (초). 기본값: 120"""
-    
+
     VISION_RETRY_MAX_ATTEMPTS: int = int(os.getenv("VISION_RETRY_MAX_ATTEMPTS", "2"))
     """Vision API 실패 시 최대 재시도 횟수. 기본값: 2"""
-    
-    VISION_RETRY_BACKOFF_SECONDS: float = float(os.getenv("VISION_RETRY_BACKOFF_SECONDS", "1.0"))
+
+    VISION_RETRY_BACKOFF_SECONDS: float = float(
+        os.getenv("VISION_RETRY_BACKOFF_SECONDS", "1.0")
+    )
     """재시도 간 대기 시간 (초). 기본값: 1.0"""
-    
+
     # ==================== LangSmith (추적) ====================
     ENABLE_LANGSMITH: bool = (
         os.getenv("LANGCHAIN_TRACING_V2", "false").lower() == "true"
@@ -257,7 +274,7 @@ class PreprocessConfig:
             "model_answer": cls.OPENAI_MODEL_ANSWER,
             "timeout": cls.OPENAI_TIMEOUT,
         }
-    
+
     @classmethod
     def get_vision_config(cls) -> dict:
         """Vision Pipeline 설정 딕셔너리 반환."""
@@ -281,7 +298,7 @@ class PreprocessConfig:
             "batch_size_simple": cls.VISION_BATCH_SIZE_SIMPLE,
             "batch_size_complex": cls.VISION_BATCH_SIZE_COMPLEX,
         }
-    
+
     @classmethod
     def get_qdrant_config(cls) -> dict:
         """Qdrant 설정 딕셔너리 반환."""
@@ -291,6 +308,3 @@ class PreprocessConfig:
             "path": cls.QDRANT_PATH,
             "collection": cls.QDRANT_COLLECTION,
         }
-
-        
-    

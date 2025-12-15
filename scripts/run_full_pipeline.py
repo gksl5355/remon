@@ -167,7 +167,9 @@ async def run_legacy_preprocessing():
         logger.error("❌ Legacy 전처리 실패")
         return
 
-    logger.info(f"  ✅ Legacy 전처리 완료: {len(legacy_result.get('vision_extraction_result', []))}페이지")
+    logger.info(
+        f"  ✅ Legacy 전처리 완료: {len(legacy_result.get('vision_extraction_result', []))}페이지"
+    )
 
     # Step 3: DB 저장
     logger.info("\n[Step 3] PostgreSQL DB 저장")
@@ -195,7 +197,10 @@ async def run_legacy_preprocessing():
     from app.ai_pipeline.preprocess.semantic_processing import DualIndexer
 
     chunks = legacy_result.get("chunks", []) or []
-    graph_data = legacy_result.get("graph_data", {"nodes": [], "edges": []}) or {"nodes": [], "edges": []}
+    graph_data = legacy_result.get("graph_data", {"nodes": [], "edges": []}) or {
+        "nodes": [],
+        "edges": [],
+    }
     vision_results = legacy_result.get("vision_extraction_result", []) or []
 
     if chunks:
@@ -219,6 +224,9 @@ async def run_legacy_preprocessing():
 @traceable(name="REMON_Full_Pipeline", run_type="chain")
 async def run_full_pipeline(citation_code: str | None = None):
     """
+    Args:
+        citation_code: 규제 식별 코드 (None이면 전처리에서 자동 추출)
+
     전체 파이프라인 실행 (S3 자동 로드 + LangGraph + HITL 루프)
 
     1차 실행:
@@ -257,7 +265,9 @@ async def run_full_pipeline(citation_code: str | None = None):
                 )
                 if legacy_reg:
                     legacy_regulation_id = legacy_reg.regulation_id
-                    logger.info(f"  ✅ Legacy 발견: regulation_id={legacy_regulation_id}")
+                    logger.info(
+                        f"  ✅ Legacy 발견: regulation_id={legacy_regulation_id}"
+                    )
                 else:
                     logger.info("  ℹ️ Legacy 없음 (신규 규제로 처리)")
             except Exception as e:
@@ -277,7 +287,9 @@ async def run_full_pipeline(citation_code: str | None = None):
                     logger.info(f"  ✅ 최신 규제: regulation_id={new_regulation_id}")
                 if previous:
                     legacy_regulation_id = previous.regulation_id
-                    logger.info(f"  ✅ 이전(legacy): regulation_id={legacy_regulation_id}")
+                    logger.info(
+                        f"  ✅ 이전(legacy): regulation_id={legacy_regulation_id}"
+                    )
                 elif not legacy_regulation_id:
                     logger.info("  ℹ️ 이전 버전 없음")
             except Exception as e:
@@ -293,12 +305,12 @@ async def run_full_pipeline(citation_code: str | None = None):
 
     state: AppState = {
         "preprocess_request": {
-            "load_from_s3": True,           # S3 자동 로드 활성화
-            "s3_date": None,                # None이면 오늘 날짜
+            "load_from_s3": True,  # S3 자동 로드 활성화
+            "s3_date": None,  # None이면 오늘 날짜
             "use_vision_pipeline": True,
             "enable_change_detection": True,
         },
-        "change_context": {},               # 전처리 후 자동 채워짐
+        "change_context": {},  # 전처리 후 자동 채워짐
         "mapping_filters": {},
         "validation_retry_count": 0,
     }
@@ -327,7 +339,9 @@ async def run_full_pipeline(citation_code: str | None = None):
     while True:
         print("\n" + "-" * 80)
         print("💬 결과에 대한 HITL 피드백을 입력하세요.")
-        print("   - 예) '변경 없음으로 처리해줘', '매핑 다시 해줘', '전략 좀 더 보수적으로'")
+        print(
+            "   - 예) '변경 없음으로 처리해줘', '매핑 다시 해줘', '전략 좀 더 보수적으로'"
+        )
         print("   - 아무것도 입력하지 않고 엔터 → HITL 종료")
         print("   - 'exit' / 'quit' / '완료' 입력 → HITL 종료")
         print("-" * 80)
@@ -354,14 +368,20 @@ async def run_full_pipeline(citation_code: str | None = None):
         state.pop("hitl_feedback", None)
         state.pop("hitl_session_active", None)
 
-        logger.info(f"[HITL] 새로운 피드백으로 그래프 재실행 (hitl entry): '{feedback}'")
-        logger.info(f"[HITL] State 전: external_hitl_feedback={state.get('external_hitl_feedback')}, hitl_target_node={state.get('hitl_target_node')}")
+        logger.info(
+            f"[HITL] 새로운 피드백으로 그래프 재실행 (hitl entry): '{feedback}'"
+        )
+        logger.info(
+            f"[HITL] State 전: external_hitl_feedback={state.get('external_hitl_feedback')}, hitl_target_node={state.get('hitl_target_node')}"
+        )
 
         try:
             # ✅ HITL 재실행은 hitl을 엔트리포인트로 사용하는 그래프
             state = await app_hitl.ainvoke(state, config={"configurable": {}})
             logger.info("✅ HITL 반영 후 파이프라인 재실행 완료")
-            logger.info(f"[HITL] State 후: external_hitl_feedback={state.get('external_hitl_feedback')}, hitl_target_node={state.get('hitl_target_node')}")
+            logger.info(
+                f"[HITL] State 후: external_hitl_feedback={state.get('external_hitl_feedback')}, hitl_target_node={state.get('hitl_target_node')}"
+            )
         except Exception as e:
             logger.error(f"❌ HITL 재실행 중 오류: {e}", exc_info=True)
             break

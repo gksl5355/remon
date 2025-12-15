@@ -14,7 +14,7 @@ from app.ai_pipeline.prompts.mapping_prompt import MAPPING_PROMPT, MAPPING_SCHEM
 from app.ai_pipeline.prompts.strategy_prompt import STRATEGY_PROMPT, STRATEGY_SCHEMA
 from app.ai_pipeline.prompts.impact_prompt import IMPACT_PROMPT, IMPACT_SCHEMA
 
-# Global validator prompt 
+# Global validator prompt
 from app.ai_pipeline.prompts.validator_prompt import VALIDATOR_PROMPT
 from app.ai_pipeline.prompts.refined_prompt import REFINED_PROMPT
 
@@ -175,6 +175,8 @@ def validator_node(state: AppState):
     # -----------------------------
     if restart_node == "map_products":
         state["mapping"] = None
+        state["product_info"] = None  # ⭐ 재시도 시 제품 재선택 허용
+
     elif restart_node == "generate_strategy":
         state["strategies"] = None
     elif restart_node == "score_impact":

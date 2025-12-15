@@ -256,7 +256,8 @@ def generate_strategy_node(state: AppState) -> Dict[str, Any]:
         raise ValueError("MappingItem.regulation_summary 가 비어 있습니다.")
 
     # 제품 리스트: 현재 파이프라인은 단일 product 기준이므로 product_id 하나만 리스트로 사용
-    product_name = state.get("product_info", {}).get("product_name")
+    product_info = state.get("product_info") or {}
+    product_name = product_info.get("product_name") if isinstance(product_info, dict) else None
     mapped_products = [product_name] if product_name else []
 
     # 2) history 검색 (HybridRetriever)

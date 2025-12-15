@@ -85,6 +85,7 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
     mapping_items = mapping.get("items", [])
     strategies = state.get("strategies", [])
     impact_score = (state.get("impact_scores") or [{}])[0]
+    regulation = state.get("regulation", {})
 
     # fallback data
     major_analysis = llm_struct.get("major_analysis") or [
@@ -96,52 +97,9 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
 
     # product_name은 mapping에서 가져오기
     product_name = mapping.get("product_name", "Unknown")
-
-    # ✅ 수정: 제품별 × feature별 조합으로 중복 제거
-    seen_rows = set()
-    product_rows = []
-    for item in mapping_items:
-        feature_name = item.get("feature_name", "")
-        # item에서 product_name 가져오기 (멀티 제품 지원)
-        item_product_name = item.get("product_name") or product_name
-
-        # 제품명 + feature로 유니크 키 생성
-        row_key = (item_product_name, feature_name)
-        if row_key in seen_rows:
-            continue
-        seen_rows.add(row_key)
-
-        # reasoning은 이미 LLM에서 250자 이내로 생성됨
-        reasoning = item.get("reasoning", "")
-
-        # required_value 표시 개선
-        required_value = item.get("required_value")
-        if required_value is None:
-            # reasoning에서 이유 추출
-            reasoning_lower = reasoning.lower()
-            if "not regulated" in reasoning_lower or "규제하지 않" in reasoning:
-                required_display = "규제 대상 아님"
-            elif "already compliant" in reasoning_lower or "충족" in reasoning:
-                required_display = "기준 충족"
-            elif (
-                "unrelated" in reasoning_lower
-                or "무관" in reasoning
-                or "비적용" in reasoning
-            ):
-                required_display = "해당 없음"
-            else:
-                required_display = "규제 없음"
-        else:
-            required_display = str(required_value)
-
-        product_rows.append(
-            [
-                feature_name,
-                item_product_name,  # ✅ 각 행마다 올바른 제품명
-                f"현재: {item.get('current_value', '-')}, 필요: {required_display}",
-                reasoning,
-            ]
-        )
+    
+    # country 정보 우선순위: product_info > regulation > mapping
+    country = meta.get('country') or regulation.get('country') or regulation.get('jurisdiction_code') or mapping.get('country') or ''
 
     # ✅ 제품별로 그룹화
     from collections import defaultdict
@@ -154,7 +112,7 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
         feature_name = item.get("feature_name", "")
         item_product_name = item.get("product_name") or product_name
 
-        logger.debug(f"  - {item_product_name} / {feature_name}")
+        logger.info(f"  - 제품: {item_product_name} / feature: {feature_name}")
 
         # required_value 표시
         reasoning = item.get("reasoning", "")
@@ -260,7 +218,7 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
     )
 
     summary_content = [
-        f"국가 / 지역: {meta.get('country', '')} ({meta.get('region', '')})",
+        f"국가 / 지역: {country} ({meta.get('region', '')})",
         f"카테고리: {mapping_items[0].get('parsed',{}).get('category','') if mapping_items else ''}",
         f"규제 요약: {mapping_items[0].get('regulation_summary','') if mapping_items else ''}",
         f"영향도: {impact_score.get('impact_level','N/A')} (점수 {impact_score.get('weighted_score',0.0)})",
@@ -278,8 +236,14 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
     # 1. 규제 변경 요약 (change_detection_results 활용)
     change_items = []
     change_results = state.get("change_detection_results", [])
-    for result in change_results:
-        if not result.get("change_detected"):
+    
+    logger.info(f"🔍 변경 감지 결과 처리: {len(change_results)}개")
+    
+    for idx, result in enumerate(change_results):
+        change_detected = result.get("change_detected")
+        logger.debug(f"  [{idx}] section={result.get('section_ref')}, detected={change_detected}")
+        
+        if not change_detected:
             continue
 
         section = result.get("section_ref", "Unknown")
@@ -294,6 +258,8 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
         else:
             change_type = result.get("change_type", "변경")
             change_items.append(f"- {section}: {change_type}")
+    
+    logger.info(f"✅ 변경 항목 생성: {len(change_items)}개")
 
     change_summary_section = {
         "id": "change_summary",
@@ -398,11 +364,11 @@ def send_slack_notification(message: str, webhook_url: Optional[str] = None) -> 
 # 메인 Report Node
 # -----------------------------
 async def report_node(state: AppState) -> Dict[str, Any]:
-    meta = state.get("product_info", {})
+    meta = state.get("product_info") or {}
     mapping_items = state.get("mapping", {}).get("items", [])
     strategies = state.get("strategies", [])
     impact_score = (state.get("impact_scores") or [{}])[0]
-    regulation_trace = meta.get("regulation_trace")
+    regulation_trace = meta.get("regulation_trace") if meta else None
 
     context_parts = [
         f"국가: {meta.get('country','')}, 지역: {meta.get('region','')}",
@@ -439,12 +405,19 @@ async def report_node(state: AppState) -> Dict[str, Any]:
             # Change Detection Keynote 저장 (우선)
             change_keynote_data = state.get("change_keynote_data")
             if change_keynote_data:
+                logger.info(f"📝 Change Keynote 데이터 확인: {len(str(change_keynote_data))} bytes")
+                logger.info(f"   - regulation_id: {change_keynote_data.get('regulation_id')}")
+                logger.info(f"   - section_changes: {len(change_keynote_data.get('section_changes', []))}개")
+                
                 keynote = await keynote_repo.create_keynote(
                     db_session, change_keynote_data
                 )
-                logger.info(f"✅ Change Keynote 저장: {keynote.keynote_id}")
+                logger.info(f"✅ Change Keynote 저장 완료: keynote_id={keynote.keynote_id}")
             else:
-                # Fallback: 기존 방식 (Mapping 기반)
+                # ⚠️ Fallback: change_keynote_data 없음 (문제 발생)
+                logger.warning("⚠️ change_keynote_data 없음 - Fallback 실행 (간소화된 데이터)")
+                logger.warning("   원인: change_detection 노드가 실행되지 않았거나 state 전달 실패")
+                
                 keynote = await keynote_repo.create_keynote(
                     db_session,
                     {
@@ -462,7 +435,7 @@ async def report_node(state: AppState) -> Dict[str, Any]:
                         "impact": impact_score.get("impact_level", "N/A"),
                     },
                 )
-                logger.info(f"Keynote 저장 완료: {keynote.keynote_id}")
+                logger.warning(f"⚠️ Fallback Keynote 저장: keynote_id={keynote.keynote_id}")
 
             summary = await summary_repo.create_report_summary(db_session, sections)
             # 규제 trace 저장
