@@ -113,7 +113,7 @@
                 <div class="text-xs text-gray-400 flex gap-6 mt-1">
                     <!-- <span>공포일: <span class="text-gray-300">{{ file.documentInfo.promulgationDate }}</span></span>
                     <span>시행일: <span class="text-gray-300">{{ file.documentInfo.effectiveDate }}</span></span> -->
-                    <span>카테고리: <span class="text-gray-300">{{ file.category }}</span></span>
+                    <span>수집일자: <span class="text-gray-300">{{ file.category }}</span></span>
                 </div>
                 </div>
             </div>

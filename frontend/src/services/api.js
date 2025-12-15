@@ -11,7 +11,7 @@ const api = axios.create({
 
 // Spring 인증용 api (조영우 작성)
 export const Spring_Api = axios.create({
-  baseURL: "http://remon-ai:8080/api",
+  baseURL: "https://ingress.skala25a.project.skala-ai.com/skala2-4-17/spring/api",
   withCredentials: true, // 세션 쿠키
   timeout: 5000,
   headers: {
