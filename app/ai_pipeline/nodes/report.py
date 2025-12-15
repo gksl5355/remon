@@ -446,34 +446,14 @@ async def report_node(state: AppState) -> Dict[str, Any]:
                     f"✅ Change Keynote 저장 완료: keynote_id={keynote.keynote_id}"
                 )
             else:
-                # ⚠️ Fallback: change_keynote_data 없음 (문제 발생)
+                # ⚠️ Fallback: change_keynote_data 없음 (DB 저장 스킵)
                 logger.warning(
-                    "⚠️ change_keynote_data 없음 - Fallback 실행 (간소화된 데이터)"
+                    "⚠️ change_keynote_data 없음 - Keynote DB 저장 스킵"
                 )
                 logger.warning(
                     "   원인: change_detection 노드가 실행되지 않았거나 state 전달 실패"
                 )
-
-                keynote = await keynote_repo.create_keynote(
-                    db_session,
-                    {
-                        "country": meta.get("country", ""),
-                        "category": (
-                            mapping_items[0].get("parsed", {}).get("category", "")
-                            if mapping_items
-                            else ""
-                        ),
-                        "summary": (
-                            mapping_items[0].get("regulation_summary", "")
-                            if mapping_items
-                            else ""
-                        ),
-                        "impact": impact_score.get("impact_level", "N/A"),
-                    },
-                )
-                logger.warning(
-                    f"⚠️ Fallback Keynote 저장: keynote_id={keynote.keynote_id}"
-                )
+                logger.info("   → Slack 알림에 간소화된 정보 포함 예정")
 
             summary = await summary_repo.create_report_summary(db_session, sections)
             await db_session.commit()  # 즉시 commit
@@ -518,14 +498,22 @@ async def report_node(state: AppState) -> Dict[str, Any]:
         valid_features = sorted(list(valid_features_set))
         valid_features_str = ", ".join(valid_features[:2]) if valid_features else "없음"
         
-        # Key Change 추출
+        # Key Change 추출 (우선순위: change_detection_results > mapping fallback)
         key_change = "No changes detected"
         change_results = state.get("change_detection_results", [])
+        
         if change_results:
             high_conf = [c for c in change_results if c.get("confidence_level") == "HIGH" and c.get("change_detected")]
             if high_conf:
                 first = high_conf[0]
                 key_change = f"{first.get('section_ref', '')}: {first.get('change_type', 'updated')}"
+        else:
+            # Fallback: mapping에서 category + summary 추출
+            if mapping_items:
+                category = mapping_items[0].get("parsed", {}).get("category", "")
+                summary = mapping_items[0].get("regulation_summary", "")[:100]
+                if category and summary:
+                    key_change = f"[{category}] {summary}..."
         
         report_id = report_json.get('report_id', 'N/A')
         report_url = "https://ingress.skala25a.project.skala-ai.com/skala2-4-17/"
