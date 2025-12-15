@@ -1,17 +1,25 @@
 package com.global17.auth_service.controller;
 
-import com.global17.auth_service.dto.CrawlConfig;
+import java.util.List;
+
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.global17.auth_service.entity.CrawlTarget;
 import com.global17.auth_service.service.CrawlService_prefix;
-import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/crawl")
 @RequiredArgsConstructor
-// @CrossOrigin(origins = "*") 
 public class CrawlController {
 
     private final CrawlService_prefix crawlServicePrefix;
@@ -55,7 +63,3 @@ public class CrawlController {
         return "✅ 상태가 변경되었습니다.";
     }
 }
-
-
-
-

@@ -92,6 +92,20 @@
           <li>{{ item }}</li>
         {% endfor %}
         </ul>
+      {% elif section.type == "nested_tables" %}
+        {% for table in section.tables %}
+          <h3 class="subsection-header">{{ table.product_name }}</h3>
+          <table>
+            <thead>
+              <tr>{% for h in table.headers %}<th>{{ h }}</th>{% endfor %}</tr>
+            </thead>
+            <tbody>
+              {% for row in table.rows %}
+                <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% endfor %}
       {% elif section.type == "table" %}
         <table>
           <thead>

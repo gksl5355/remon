@@ -23,7 +23,7 @@ public class AuthController {
     
     private final AuthService authService;
     
-    @PostMapping("/login")
+    @PostMapping("/auth/login")
     public ResponseEntity<?> login(
             @RequestBody Map<String, String> request,
             HttpSession session
@@ -49,10 +49,9 @@ public class AuthController {
         ));
     }
     
-    @GetMapping("/check-auth")
+    @GetMapping("/auth/check-auth")
     public ResponseEntity<?> checkAuth(HttpSession session) {
     Integer userId = (Integer) session.getAttribute("userId");
-    System.out.println("userId: "+userId);
     if (userId == null) {
         return ResponseEntity.status(401)
                 .body(Map.of("message", "로그인 필요"));
@@ -65,7 +64,7 @@ public class AuthController {
     ));
 }
 
-    @PostMapping("/logout")
+    @PostMapping("/auth/logout")
     public ResponseEntity<?> logout(HttpSession session) {
         session.invalidate();
         return ResponseEntity.ok(Map.of("message", "Logout successful"));

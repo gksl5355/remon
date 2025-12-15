@@ -3,8 +3,9 @@
     
     <HeaderBar   v-if="route.path !== '/' && route.path !== '/login'" ref="headerRef" class="fixed top-0 left-0 w-full z-50" />
     
-    <div
-      class="w-full h-full"
+    <!-- 스크롤 가능하게 수정-->
+    <div 
+      class="w-full h-full overflow-y-auto"
       :style="contentStyle" 
     >
       <router-view :header-height="headerHeight" />
@@ -69,5 +70,15 @@ body, html, #app {
   margin: 0;
   padding: 0;
   background-color: #040E1B; /* 다크 배경 */
+}
+
+/* 스크롤바 숨기기 */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE, Edge */
+}
+
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari */
 }
 </style>
