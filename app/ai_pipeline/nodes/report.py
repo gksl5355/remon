@@ -7,9 +7,6 @@ import os
 import json
 import re
 import logging
-import json
-import re
-import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from dotenv import load_dotenv
@@ -122,10 +119,10 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
         or ""
     )
 
-    # ✅ 제품별로 그룹화
+    # ✅ 제품별로 그룹화 (feature 중복 제거)
     from collections import defaultdict
 
-    product_groups = defaultdict(list)
+    product_groups = defaultdict(dict)  # {product_name: {feature_name: row}}
 
     logger.info(f"📊 mapping_items 개수: {len(mapping_items)}")
 
@@ -155,14 +152,13 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
         else:
             required_display = str(required_value)
 
-        # 제품별로 그룹화
-        product_groups[item_product_name].append(
-            [
+        # 🔑 feature별 중복 제거 (첫 번째만 유지)
+        if feature_name not in product_groups[item_product_name]:
+            product_groups[item_product_name][feature_name] = [
                 feature_name,
                 f"현재: {item.get('current_value', '-')}, 필요: {required_display}",
                 reasoning,
             ]
-        )
 
     # 참고 문헌 생성: Legacy + New 규제 모두 포함
     references_map = {}  # regulation_id를 키로 중복 제거
@@ -291,9 +287,10 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
         "content": change_items if change_items else ["변경 사항 없음"],
     }
 
-    # ✅ 제품별 하위 테이블 생성
+    # ✅ 제품별 하위 테이블 생성 (중복 제거된 데이터)
     product_tables = []
-    for prod_name, rows in sorted(product_groups.items()):
+    for prod_name, features_dict in sorted(product_groups.items()):
+        rows = list(features_dict.values())  # dict → list
         product_tables.append(
             {
                 "product_name": prod_name,
@@ -312,7 +309,8 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
 
     logger.info(f"📊 제품 테이블 생성: {len(product_tables)}개 제품")
 
-    return [
+    # 🔍 디버깅: 각 섹션 크기 확인
+    sections_list = [
         overall_summary,
         change_summary_section,
         {
@@ -341,6 +339,13 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
             "content": references,
         },
     ]
+    
+    logger.info("🔍 [DEBUG] build_sections 반환값 분석")
+    for idx, section in enumerate(sections_list):
+        section_json = json.dumps(section, ensure_ascii=False)
+        logger.info(f"  [{idx}] {section.get('id')}: {len(section_json):,} chars")
+    
+    return sections_list
 
 
 # -----------------------------
