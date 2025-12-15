@@ -190,6 +190,11 @@ def generate_refined_prompt(node_name: str, pipeline_state: dict, error_summary:
     elif node_name == "score_impact":
         original_prompt = IMPACT_PROMPT
         schema = IMPACT_SCHEMA
+        # score_impact 전용: 숫자 출력 강제
+        error_summary += "\n\nCRITICAL REQUIREMENT: All score values MUST be plain NUMBERS (1-5), NOT objects or nested structures.\n" + \
+                        "CORRECT: 'directness': 3, 'legal_severity': 4\n" + \
+                        "WRONG: 'directness': {'score': 3}, 'directness': {'value': 3, 'reason': '...'}\n" + \
+                        "OUTPUT ONLY FLAT JSON with number values. NO nested objects allowed."
     else:
         logger.error(f"[HITL] Unknown node for refinement: {node_name}")
         return None
@@ -230,7 +235,7 @@ def apply_hitl_patch(state: AppState, target_node: str, cleaned_feedback: str) -
     
     compiled_input = {
         "mapping": state.get("mapping"),
-        "strategy": state.get("strategies"),
+        "strategies": state.get("strategies"),  # List[str] 형태 유지
         "impact": state.get("impact_scores"),
         "regulation": state.get("regulation"),
     }
@@ -254,77 +259,86 @@ def apply_hitl_patch(state: AppState, target_node: str, cleaned_feedback: str) -
             f"manual_change_flag set to {manual_flag}, needs_embedding={manual_flag}"
         )
 
-        # change_detection만 초기화 (의존성 체인 제거)
-        for key in [
-            "change_detection_results",
-            "change_summary",
-            "regulation_analysis_hints",
-            "change_detection_index",
-        ]:
-            if key in state:
-                state[key] = None
+        if not manual_flag:  # 변경 없음일 때 - change_detection.py와 동일한 로직
+            # change_detection.py와 동일한 "변경 없음" 상태 설정
+            state["change_detection_results"] = []
+            state["change_summary"] = {
+                "status": "manual_no_change",
+                "total_changes": 0,
+                "high_confidence_changes": 0,
+                "total_reference_blocks": 0,
+            }
+            state["change_detection_index"] = {}
+            state["regulation_analysis_hints"] = {}
+            
+            logger.info("[HITL][change_detection] 변경 없음 상태 직접 설정 완료 (재실행 불필요)")
+            # 재실행 불필요 - 이미 완료된 상태로 설정
+        else:
+            # 변경 있음일 때만 초기화 후 재실행
+            for key in [
+                "change_detection_results",
+                "change_summary",
+                "regulation_analysis_hints",
+                "change_detection_index",
+            ]:
+                if key in state:
+                    state[key] = None
 
-        state["restarted_node"] = "change_detection"
+            state["restarted_node"] = "change_detection"
+            logger.info("[HITL][change_detection] 변경 있음 - 재실행 설정")
         
     # ===============================
     # 나머지 노드들 HITL
     # ===============================
     else:
-        # score_impact는 직접 결과 조작으로 확실한 반영
+        # 모든 노드에 대해 refined prompt 생성
         if target_node == "score_impact":
             desired_level = cleaned_feedback
-            
-            # 기존 impact_scores가 있으면 직접 수정
-            if state.get("impact_scores"):
-                current_impact = state["impact_scores"][0]
-                
-                # 직접 레벨과 점수 강제 설정
-                if desired_level == "Low":
-                    current_impact["impact_level"] = "Low"
-                    current_impact["weighted_score"] = 2.0
-                    current_impact["reasoning"] = "Human in the loop"
-                elif desired_level == "High":
-                    current_impact["impact_level"] = "High"
-                    current_impact["weighted_score"] = 4.5
-                    current_impact["reasoning"] = "Human in the loop"
-                else:  # Medium
-                    current_impact["impact_level"] = "Medium"
-                    current_impact["weighted_score"] = 3.0
-                    current_impact["reasoning"] = "Human in the loop"
-                
-                logger.info(f"[HITL] Direct impact override: {desired_level} (score: {current_impact['weighted_score']})")
-                
-                # 직접 수정했으므로 재실행 불필요
-                state["restarted_node"] = None
-                return state
-            
-            # impact_scores가 없으면 기존 방식으로 재실행
-            error_summary = f"CRITICAL INSTRUCTION: Force impact_level to '{desired_level}' and reasoning to 'Human in the loop'."
+            error_summary = f"CRITICAL INSTRUCTION: Force impact_level to '{desired_level}' and reasoning to 'Human in the loop'.\n" + \
+                           "CRITICAL: All raw_scores values must be plain numbers (1-5), not objects. Example: 'directness': 3"
+            logger.info(f"[HITL] Processing score_impact feedback: {desired_level}")
         else:
             # map_products, generate_strategy는 자연어 그대로
             error_summary = f"HUMAN FEEDBACK: {cleaned_feedback}. INSTRUCTION: Adjust the analysis according to this feedback."
 
-        # refined prompt 생성
-        refined_prompt = generate_refined_prompt(
-            node_name=target_node,
-            pipeline_state=compiled_input,
-            error_summary=error_summary,
-        )
-
-        if refined_prompt:
-            state[f"refined_{target_node}_prompt"] = refined_prompt
-            logger.info(f"[HITL] Refined prompt saved to state['refined_{target_node}_prompt']")
-
-        # 타겟 노드만 초기화 (의존성 체인 제거로 정확한 시작점 보장)
-        if target_node == "map_products":
-            state["mapping"] = None
-        elif target_node == "generate_strategy":
-            state["strategies"] = None
+        # 이전 refined prompt 완전 제거 (새 HITL 피드백 반영을 위해)
+        refined_key = f"refined_{target_node}_prompt"
+        if refined_key in state:
+            del state[refined_key]
+            logger.info(f"[HITL] Removed previous refined prompt for {target_node}")
+        
+        # 노드별 관련 state 초기화 (누적 방지)
+        if target_node == "generate_strategy":
+            state["strategies"] = None  # 기존 전략 초기화
+            logger.info(f"[HITL] Cleared existing strategies for regeneration")
+        elif target_node == "map_products":
+            state["mapping"] = None  # 기존 매핑 초기화
+            state["product_info"] = None  # ⭐ 재시도 시 제품 재선택 허용
+            logger.info(f"[HITL] Cleared existing mapping and product_info for regeneration")
         elif target_node == "score_impact":
-            state["impact_scores"] = None
-            logger.info("[HITL] Clearing existing impact reasoning for HITL override")
-            
+            state["impact_scores"] = None  # 기존 영향도 초기화
+            logger.info(f"[HITL] Cleared existing impact scores for regeneration")
+        
+        # refined prompt 생성 (fallback 처리 추가)
+        try:
+            refined_prompt = generate_refined_prompt(
+                node_name=target_node,
+                pipeline_state=compiled_input,
+                error_summary=error_summary,
+            )
+
+            if refined_prompt:
+                state[refined_key] = refined_prompt
+                logger.info(f"[HITL] NEW refined prompt saved to state['{refined_key}']")
+                logger.debug(f"[HITL] New refined prompt content: {refined_prompt[:200]}...")
+            else:
+                logger.error(f"[HITL] Failed to generate refined prompt for {target_node} → fallback accept")
+        except Exception as e:
+            logger.error(f"[HITL] Refined prompt generation error for {target_node}: {e} → fallback accept")
+
+        # 재시작 노드 설정
         state["restarted_node"] = target_node
+        logger.info(f"[HITL] Set restart node to: {target_node}")
     
     # HITL 메타데이터 초기화
     state["hitl_target_node"] = None
@@ -358,6 +372,7 @@ def hitl_node(state: AppState) -> AppState:
 
     # 🔹 피드백 처리 후 즉시 제거 (무한 루프 방지)
     state["external_hitl_feedback"] = None
+    logger.debug(f"[HITL] Cleared external_hitl_feedback after processing: {user_msg}")
 
     # (1) target_node 식별
     target = detect_target_node(user_msg)

@@ -237,3 +237,9 @@ class AppState(TypedDict, total=False):
     hitl_feedback_text: Optional[Any]  # 과거 버전 호환용 (문자열/불리언 모두 수용)
     hitl_feedback: Optional[Any]       # hitl 노드 → validator로 넘기는 정제된 피드백
     manual_change_flag: Optional[bool]  # 변경 감지용 HITL 플래그
+    
+    # HITL refined prompts
+    refined_score_impact_prompt: Optional[str]
+    refined_map_products_prompt: Optional[str]
+    refined_generate_strategy_prompt: Optional[str]
+    restarted_node: Optional[str]  # HITL에서 재시작할 노드
