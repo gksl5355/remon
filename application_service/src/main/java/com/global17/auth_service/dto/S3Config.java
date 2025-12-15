@@ -1,4 +1,4 @@
-package com.global17.auth_service.config;
+package com.global17.auth_service.dto;
 
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;

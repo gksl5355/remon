@@ -210,11 +210,15 @@ public class CrawlService_prefix {
         headers.set("Upgrade-Insecure-Requests", "1");
         headers.set("Connection", "keep-alive");
         
-        // 5. [필수] Referer & Cookie (FDA 접속 성공의 열쇠)
+        // 5. 캐시 방지 및 연결 유지
+        headers.set("Cache-Control", "max-age=0");
+        headers.set("Connection", "keep-alive");
+
+        // 6. [필수] Referer & Cookie (FDA 접속 성공의 열쇠)
         headers.set("Referer", "https://www.google.com/");
         
         // ★★★ 여기에 브라우저에서 딴 쿠키를 넣으세요 ★★★
-        headers.set("Cookie", "SSESS...=...; TS01...=..."); 
+        headers.set("Cookie", "SSESSf1b...=...; TS01a...=...; dtCookie=..."); 
 
         return headers;
     }
