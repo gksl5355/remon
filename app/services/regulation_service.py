@@ -98,9 +98,9 @@ class RegulationService:
             files = [
                 {
                     "id": k.keynote_id,
-                    "title": k.keynote_text.get("summary", ""),
-                    "impactLevel": impact_map.get(k.keynote_text.get("impact", "Low"), 1),
-                    "category": k.keynote_text.get("category", "")
+                    "title": k.keynote_text.get("title", ""),
+                    "impactLevel": impact_map.get(k.keynote_text.get("impact", "Medium"), 1),
+                    "category": k.keynote_text.get("analysis_date", "")
                 }
                 for k in keynotes
             ]

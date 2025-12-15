@@ -77,7 +77,7 @@
               <div class="text-xs text-gray-400 flex gap-6 mt-2">
                 <!-- <span>공포일: <span class="text-gray-300">{{ file.documentInfo.promulgationDate }}</span></span>
                 <span>시행일: <span class="text-gray-300">{{ file.documentInfo.effectiveDate }}</span></span> -->
-                <span>카테고리: <span class="text-gray-300">{{ file.category }}</span></span>
+                <span>수집일자: <span class="text-gray-300">{{ formatDate(file.category) }}</span></span>
               </div>
 
             </div>
@@ -124,6 +124,17 @@ async function loadFiles() {
     files.value = [];
     collectedTime.value = "";
   }
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hour = String(date.getHours()).padStart(2, '0');
+  const minute = String(date.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hour}:${minute}`;
 }
 
 /* impact style */
