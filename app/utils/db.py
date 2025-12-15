@@ -24,8 +24,8 @@ engine = create_async_engine(
     DATABASE_URL,
     echo=False,
     future=True,
-    pool_pre_ping=True,   # ⭐ 끊긴 커넥션 자동 감지
-    pool_recycle=1800,    # ⭐ 30분 이상 idle 시 재생성
+    pool_pre_ping=True,   # 끊긴 커넥션 자동 감지
+    pool_recycle=1800,    # 30분 이상 idle 시 재생성
 )
 
 AsyncSessionLocal = async_sessionmaker(
@@ -54,14 +54,9 @@ async def fetch_regul_data_by_title(
     db: AsyncSession,
     title: str,
 ) -> Optional[Any]:
-    """
-    regulations 테이블에서 title 기준으로 regul_data(JSONB) 조회
 
-    ⚠️ 반드시 '순수 데이터(dict / list)'만 반환한다.
-    """
-
-    logger.info("🔍 fetch_regul_data_by_title")
-    logger.info("👉 title = %s", title)
+    logger.info("fetch_regul_data_by_title")
+    logger.info("title = %s", title)
 
     result = await db.execute(
         text(
@@ -69,6 +64,8 @@ async def fetch_regul_data_by_title(
             SELECT regul_data
             FROM regulations
             WHERE title = :title
+            ORDER BY created_at DESC
+            LIMIT 1
             """
         ),
         {"title": title},
@@ -88,7 +85,6 @@ async def fetch_regul_data_by_title(
     )
 
     if isinstance(regul_data, (list, dict)):
-        logger.info("📦 regul_data size=%d", len(regul_data))
+        logger.info("regul_data size=%d", len(regul_data))
 
-    # 🔥 핵심: ORM / Row 객체 절대 반환 ❌
     return regul_data

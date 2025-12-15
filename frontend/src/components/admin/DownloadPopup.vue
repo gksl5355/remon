@@ -71,7 +71,6 @@ const emit = defineEmits(["close"]);
 
 const close = () => emit("close");
 
-/* ---------- Original ---------- */
 async function downloadOriginal() {
   const res = await api.post("/admin/s3/download-url", {
     key: props.item.s3_key
@@ -87,16 +86,16 @@ async function downloadTranslated() {
   showProgress.value = true;
   progress.value = 15;
 
-  // ✅ UX용 가짜 progress
   let fakeTimer = setInterval(() => {
     if (progress.value < 88) {
-      progress.value += Math.random() * 3 + 1; // 1~4%
+      progress.value += Math.random() * 3 + 1;
     }
   }, 700);
 
   try {
     progress.value = 35;
 
+    // 🔥 JSON 응답으로 받는다
     const res = await api.post(
       "/admin/s3/translations/generate",
       {
@@ -104,26 +103,21 @@ async function downloadTranslated() {
         target_lang: "ko",
       },
       {
-        responseType: "blob",
         timeout: 0,
       }
     );
 
-    // ✅ 서버 응답 도착
     clearInterval(fakeTimer);
     progress.value = 95;
 
-    // PDF 다운로드
-    const blob = new Blob([res.data], { type: "application/pdf" });
-    const url = window.URL.createObjectURL(blob);
+    const { download_url } = res.data;
 
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${props.item.name.replace(".pdf", "")}_ko.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(url);
+    if (!download_url) {
+      throw new Error("download_url not found in response");
+    }
+
+    // 🔥 실제 PDF 다운로드는 S3에서
+    window.open(download_url, "_blank");
 
     progress.value = 100;
 
