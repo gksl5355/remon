@@ -754,7 +754,7 @@ class ChangeDetectionNode:
         matched_pairs = []
         matched_legacy_sections = set()
 
-        # 정규화된 조항 번호 기반 1:1 매칭
+        # 정규화된 조항 번호 기반 1:1 매칭 (부분 일치 지원)
         for new_block in new_blocks_unique:
             new_section = new_block.get("section_ref", "")
             new_normalized = self._normalize_section_ref(new_section)
@@ -769,31 +769,76 @@ class ChangeDetectionNode:
                 if legacy_normalized in matched_legacy_sections:
                     continue
 
-                if new_normalized == legacy_normalized:
+                # 정확 일치 또는 부분 일치 (§ 1160.5 ↔ § 1160.5(a))
+                is_exact_match = new_normalized == legacy_normalized
+                is_parent_match = (
+                    new_normalized.startswith(legacy_normalized + "(")
+                    or legacy_normalized.startswith(new_normalized + "(")
+                )
+                
+                if is_exact_match or is_parent_match:
+                    confidence = 1.0 if is_exact_match else 0.95
                     matched_pairs.append(
                         {
                             "new_block": new_block,
                             "legacy_block": legacy_block,
-                            "match_confidence": 1.0,
-                            "match_reason": f"Exact section: {new_normalized}",
+                            "match_confidence": confidence,
+                            "match_reason": f"{'Exact' if is_exact_match else 'Parent'} section: {new_normalized}",
                         }
                     )
                     matched_legacy_sections.add(legacy_normalized)
                     logger.debug(f"✅ Matched: {new_section} ↔ {legacy_section}")
                     break
 
-        # 매칭 실패한 섹션 로그
+        # 매칭 실패한 섹션 로그 + Fallback 매칭
         unmatched_new = [
-            b.get("section_ref")
-            for b in new_blocks_unique
+            b for b in new_blocks_unique
             if not any(p["new_block"] == b for p in matched_pairs)
         ]
         if unmatched_new:
-            logger.warning(f"⚠️ 매칭 실패한 신규 섹션: {unmatched_new[:5]}...")
+            logger.warning(f"⚠️ 매칭 실패한 신규 섹션: {[b.get('section_ref') for b in unmatched_new][:5]}...")
+            
+            # Fallback: 키워드 기반 유사도 매칭
+            for new_block in unmatched_new:
+                new_keywords = set(new_block.get("keywords", []))
+                if not new_keywords:
+                    continue
+                
+                best_match = None
+                best_score = 0.0
+                
+                for legacy_block in legacy_blocks_unique:
+                    if self._normalize_section_ref(legacy_block.get("section_ref", "")) in matched_legacy_sections:
+                        continue
+                    
+                    legacy_keywords = set(legacy_block.get("keywords", []))
+                    if not legacy_keywords:
+                        continue
+                    
+                    # Jaccard 유사도
+                    intersection = len(new_keywords & legacy_keywords)
+                    union = len(new_keywords | legacy_keywords)
+                    score = intersection / union if union > 0 else 0.0
+                    
+                    if score > best_score and score >= 0.3:  # 30% 이상 유사
+                        best_score = score
+                        best_match = legacy_block
+                
+                if best_match:
+                    matched_pairs.append({
+                        "new_block": new_block,
+                        "legacy_block": best_match,
+                        "match_confidence": best_score,
+                        "match_reason": f"Keyword similarity: {best_score:.2f}",
+                    })
+                    matched_legacy_sections.add(self._normalize_section_ref(best_match.get("section_ref", "")))
+                    logger.info(f"🔍 Fallback matched: {new_block.get('section_ref')} ↔ {best_match.get('section_ref')} (score: {best_score:.2f})")
 
+        exact_matches = sum(1 for p in matched_pairs if p['match_confidence'] == 1.0)
+        fallback_matches = sum(1 for p in matched_pairs if p['match_confidence'] < 1.0)
         logger.info(
             f"✅ 매칭 완료: {len(matched_pairs)}개 쌍 "
-            f"(Exact: {sum(1 for p in matched_pairs if p['match_confidence'] == 1.0)})"
+            f"(Exact: {exact_matches}, Fallback: {fallback_matches})"
         )
         return matched_pairs
 

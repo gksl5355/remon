@@ -59,9 +59,14 @@ Analyze the document image and extract structured data. Distinguish between **Fe
 ## 2. Reference Blocks (Index for Chunking)
 **Purpose**: Provide section index and keywords WITHOUT duplicating text.
 - `section_ref`: Section identifier (e.g., "§ 1141.1(a)", "Table 1")
+  - **CRITICAL**: Extract ALL section numbers (§ 1160.1, § 1160.5, § 1160.15, etc.)
+  - Include subsections: "§ 1160.5(a)", "§ 1160.5(b)", "§ 1160.5(c)"
+  - Use exact format from document (preserve § symbol)
 - `start_line`: Approximate line number in markdown
 - `end_line`: Approximate end line
 - `keywords`: Key terms for search (3-5 terms)
+  - Include numerical values: ["0.3 mg/g", "50%", "30%", "21 years"]
+  - Include key terms: ["nicotine", "menthol", "warning label"]
 
 **Note**: Full text is in markdown_content. Reference blocks are INDEX ONLY (no text field).
 
