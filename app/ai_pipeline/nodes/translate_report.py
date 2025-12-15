@@ -12,9 +12,9 @@ logger = logging.getLogger(__name__)
 
 async def translate_report_node(state: AppState) -> AppState:
     """
-    보고서 전체를 한 번에 번역 (DB에서 직접 조회).
+    보고서 전체를 한 번에 번역 (state 우선, DB는 fallback).
     
-    INPUT: state["report"]["report_id"]
+    INPUT: state["report"]["sections"] (우선) or DB 조회 (fallback)
     OUTPUT: 번역된 sections를 DB translation 컬럼에 저장
     """
     from openai import AsyncOpenAI
@@ -30,19 +30,27 @@ async def translate_report_node(state: AppState) -> AppState:
     
     report_id = report["report_id"]
     
-    # DB에서 summary_text 조회
-    async with AsyncSessionLocal() as db_session:
-        result = await db_session.execute(
-            text("SELECT summary_text FROM report_summaries WHERE summary_id = :id"),
-            {"id": report_id}
-        )
-        row = result.fetchone()
-        
-        if not row or not row[0]:
-            logger.warning(f"summary_id={report_id}의 데이터 없음")
-            return state
-        
-        sections = row[0]  # JSONB 자동 파싱
+    # ✅ state에서 sections 우선 사용 (메모리 효율)
+    sections = report.get("sections")
+    
+    if not sections:
+        # ⚠️ Fallback: DB에서 조회 (예외 모드)
+        logger.warning(f"state에 sections 없음, DB 조회 모드로 전환")
+        async with AsyncSessionLocal() as db_session:
+            result = await db_session.execute(
+                text("SELECT summary_text FROM report_summaries WHERE summary_id = :id"),
+                {"id": report_id}
+            )
+            row = result.fetchone()
+            
+            if not row or not row[0]:
+                logger.error(f"summary_id={report_id}의 데이터 없음")
+                return state
+            
+            sections = row[0]  # JSONB 자동 파싱
+            logger.info("✅ DB에서 sections 조회 완료")
+    else:
+        logger.info("✅ state에서 sections 직접 사용 (DB 조회 생략)")
     
     # JSON 문자열로 변환
     sections_json = json.dumps(sections, ensure_ascii=False, indent=2)
@@ -79,14 +87,14 @@ RULES:
         
         translated_sections = json.loads(translated_json)
         
-        # ✅ List를 Dict로 래핑 (JSONB 호환)
+        # ✅ List를 Dict로 래핑 후 JSON 문자열로 변환 (JSONB 호환)
         translation_data = {"sections": translated_sections}
         
-        # DB 저장
+        # DB 저장 (JSONB는 JSON 문자열 필요)
         async with AsyncSessionLocal() as db_session:
             await db_session.execute(
-                text("UPDATE report_summaries SET translation = :trans WHERE summary_id = :id"),
-                {"trans": translation_data, "id": report_id}
+                text("UPDATE report_summaries SET translation = :trans::jsonb WHERE summary_id = :id"),
+                {"trans": json.dumps(translation_data, ensure_ascii=False), "id": report_id}
             )
             await db_session.commit()
             logger.info(f"✅ 번역 완료 및 DB 저장: summary_id={report_id}")
