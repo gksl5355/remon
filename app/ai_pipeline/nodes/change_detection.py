@@ -4,12 +4,13 @@ module: change_detection.py
 description: 규제 변경 감지 노드 (Reference ID 기반, 전처리 후 임베딩 전)
 author: AI Agent
 created: 2025-01-18
-updated: 2025-01-22 (프롬프트 분리)
+updated: 2025-01-22 (DB 저장 로직 추가 - regulation_change_keynotes 테이블)
 dependencies:
     - openai
     - app.vectorstore.vector_client
     - app.ai_pipeline.state
     - app.ai_pipeline.prompts.change_detection_prompt
+    - app.core.repositories.regulation_keynote_repository
 """
 
 import json
@@ -295,6 +296,22 @@ class ChangeDetectionNode:
                             f"   - key_requirements: {len(analysis_hints.get('key_requirements', []))}개"
                         )
 
+                        # ========== 신규 규제 Keynote DB 저장 ==========
+                        from app.core.repositories.regulation_keynote_repository import RegulationKeynoteRepository
+                        from app.core.database import AsyncSessionLocal
+
+                        async with AsyncSessionLocal() as save_session:
+                            keynote_repo = RegulationKeynoteRepository()
+                            try:
+                                saved_keynote = await keynote_repo.create_keynote(save_session, keynote_data)
+                                await save_session.commit()
+                                logger.info(f"✅ 신규 규제 Keynote DB 저장 완료: keynote_id={saved_keynote.keynote_id}")
+                            except Exception as db_err:
+                                await save_session.rollback()
+                                logger.error(f"❌ 신규 규제 Keynote DB 저장 실패: {db_err}")
+                                import traceback
+                                traceback.print_exc()
+
                         state["change_detection_results"] = []
                         state["change_summary"] = {
                             "status": "new_regulation",
@@ -459,6 +476,22 @@ class ChangeDetectionNode:
         )
         logger.info(f"   - regulation_id: {keynote_data.get('regulation_id')}")
 
+        # ========== DB 저장 (regulation_change_keynotes 테이블) ==========
+        from app.core.repositories.regulation_keynote_repository import RegulationKeynoteRepository
+        from app.core.database import AsyncSessionLocal
+
+        async with AsyncSessionLocal() as session:
+            keynote_repo = RegulationKeynoteRepository()
+            try:
+                saved_keynote = await keynote_repo.create_keynote(session, keynote_data)
+                await session.commit()
+                logger.info(f"✅ Keynote DB 저장 완료: keynote_id={saved_keynote.keynote_id}")
+            except Exception as db_err:
+                await session.rollback()
+                logger.error(f"❌ Keynote DB 저장 실패: {db_err}")
+                import traceback
+                traceback.print_exc()
+
         # ========== 임베딩 필요 여부 플래그 ==========
         needs_embedding = total_changes > 0
         state["needs_embedding"] = needs_embedding
@@ -466,14 +499,6 @@ class ChangeDetectionNode:
 
         # 실행 상태 마킹 (정상 완료)
         self._mark_execution_state(state)
-
-        # ✅ 최종 확인: state에 change_keynote_data가 제대로 저장되었는지 확인
-        if "change_keynote_data" not in state:
-            logger.error("❌ change_keynote_data가 state에 저장되지 않았습니다!")
-        else:
-            logger.info(
-                f"✅ state['change_keynote_data'] 확인 완료: {len(str(state['change_keynote_data']))} bytes"
-            )
 
         return state
 
