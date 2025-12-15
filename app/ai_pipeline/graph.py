@@ -25,6 +25,7 @@ from app.ai_pipeline.nodes.generate_strategy import generate_strategy_node
 from app.ai_pipeline.nodes.score_impact import score_impact_node
 from app.ai_pipeline.nodes.validator import validator_node
 from app.ai_pipeline.nodes.report import report_node
+from app.ai_pipeline.nodes.translate_report import translate_report_node
 
 # 신규 HITL 통합 노드
 from app.ai_pipeline.nodes.hitl import hitl_node
@@ -101,6 +102,7 @@ def build_graph(start_node: str = "preprocess"):
     graph.add_node("score_impact", score_impact_node)
     graph.add_node("validator", validator_node)
     graph.add_node("report", report_node)
+    graph.add_node("translate", translate_report_node)
     graph.add_node("hitl", hitl_node)
 
     # -------------------------
@@ -129,6 +131,7 @@ def build_graph(start_node: str = "preprocess"):
     # [TEST] validator 비활성화
     # graph.add_edge("score_impact", "validator")
     graph.add_edge("score_impact", "report")  # validator 우회
+    graph.add_edge("report", "translate")  # 번역 노드 추가
 
     # detect_changes → embedding or map_products
     graph.add_conditional_edges(
@@ -158,10 +161,10 @@ def build_graph(start_node: str = "preprocess"):
     # )
 
     # -------------------------
-    # 보고서 후 HITL / 종료 분기
+    # 번역 후 HITL / 종료 분기
     # -------------------------
     graph.add_conditional_edges(
-        "report",
+        "translate",
         _route_after_report,
         {
             "hitl": "hitl",
