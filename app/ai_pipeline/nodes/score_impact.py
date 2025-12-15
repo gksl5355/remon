@@ -156,7 +156,7 @@ async def score_impact_node(state: AppState) -> AppState:
     logger.debug("[Impact] Raw score dict: %s", raw_scores)
 
     # -----------------------------
-    # 가중합 계산
+    # 가중합 계산 및 HITL 강제 레벨 적용
     # -----------------------------
     weights = {
         "directness": 0.20,
@@ -168,15 +168,42 @@ async def score_impact_node(state: AppState) -> AppState:
     }
 
     weighted_score = sum(raw_scores.get(k, 0) * w for k, w in weights.items())
-    impact_level = (
-        "High" if weighted_score >= 4 else
-        "Medium" if weighted_score >= 2.5 else
-        "Low"
-    )
+    
+    # HITL refined prompt에서 강제 레벨 지정이 있는지 확인
+    if state.get("refined_score_impact_prompt"):
+        refined_prompt = state["refined_score_impact_prompt"]
+        if "LOW impact level" in refined_prompt or "impact_level to 'Low'" in refined_prompt:
+            impact_level = "Low"
+            weighted_score = min(weighted_score, 2.4)  # Low 레벨 보장
+        elif "HIGH impact level" in refined_prompt or "impact_level to 'High'" in refined_prompt:
+            impact_level = "High"
+            weighted_score = max(weighted_score, 4.1)  # High 레벨 보장
+        elif "MEDIUM impact level" in refined_prompt or "impact_level to 'Medium'" in refined_prompt:
+            impact_level = "Medium"
+            weighted_score = max(2.5, min(weighted_score, 3.9))  # Medium 레벨 보장
+        else:
+            # 기본 로직
+            impact_level = (
+                "High" if weighted_score >= 4 else
+                "Medium" if weighted_score >= 2.5 else
+                "Low"
+            )
+    else:
+        # 기본 로직
+        impact_level = (
+            "High" if weighted_score >= 4 else
+            "Medium" if weighted_score >= 2.5 else
+            "Low"
+        )
 
     # -----------------------------
-    # 결과 생성
+    # 결과 생성 (HITL 근거 처리)
     # -----------------------------
+    # HITL에서 근거를 'Human in the loop'으로 대체
+    if state.get("refined_score_impact_prompt") and "reasoning to 'Human in the loop'" in state["refined_score_impact_prompt"]:
+        reasoning = "Human in the loop"
+        logger.info("[Impact] HITL override: reasoning set to 'Human in the loop'")
+    
     impact_item: ImpactScoreItem = {
         "raw_scores": raw_scores,
         "weighted_score": round(weighted_score, 2),
@@ -184,12 +211,11 @@ async def score_impact_node(state: AppState) -> AppState:
         "reasoning": reasoning,
     }
 
-    if state.get("impact_scores") is None:
-        state["impact_scores"] = []
+    # HITL 재실행 시 기존 결과 교체
+    state["impact_scores"] = [impact_item]
 
-    state["impact_scores"].append(impact_item)
-
-    logger.info("[Impact] Final Impact Score: %s", impact_item)
+    logger.info("[Impact] Final Impact Score: %s (Level: %s, Score: %.2f)", 
+                impact_item, impact_level, weighted_score)
 
     # refined prompt 제거
     if state.get("refined_score_impact_prompt"):

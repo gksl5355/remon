@@ -4,10 +4,11 @@ LangGraph 파이프라인 구성 (HITL 통합 버전)
 
 흐름:
     preprocess → detect_changes → [embedding] → map_products
-    → generate_strategy → score_impact → validator → report → hitl → validator → ...
+    → generate_strategy → score_impact → validator → report
+    → (조건부) hitl → validator → ...
 
 HITL 구조:
-    - report 이후 hitl 노드를 호출
+    - report 이후, external_hitl_feedback 이 있을 때만 hitl 노드를 호출
     - hitl_node에서 사용자 피드백을 분석하여 state를 수정
     - validator 재실행하여 어떤 노드가 다시 실행될지 결정
 """
@@ -61,6 +62,34 @@ def _route_validation(state: AppState) -> str:
         return restart
 
     return "ok"
+
+
+# --------------------------------------------------------------
+# Report → 다음 노드 결정 (HITL / 종료)
+# --------------------------------------------------------------
+def _route_after_report(state: AppState) -> str:
+    """
+    report 이후 분기.
+
+    - external_hitl_feedback 이 있고,
+      아직 hitl_target_node 가 없다면 → hitl (이번 ainvoke에서 첫 HITL 진입)
+    - 그 외에는 → END (그래프 종료)
+
+    효과:
+    - 1차 자동 실행: report → END (HITL 미사용)
+    - HITL 재실행 시:
+        ... → validator → report → hitl → validator → ... → report → END
+      한 번의 ainvoke 안에서 hitl은 딱 1회만 실행됨.
+    """
+    feedback = state.get("external_hitl_feedback")
+    hitl_target = state.get("hitl_target_node")
+
+    # 외부 HITL 피드백이 있고 아직 hitl이 해석하지 않은 상태라면 → hitl
+    if feedback and not hitl_target:
+        return "hitl"
+
+    # 그 외(피드백 없음 / 이미 hitl 한 번 돌았음) → 종료
+    return "end"
 
 
 # --------------------------------------------------------------
@@ -137,17 +166,18 @@ def build_graph(start_node: str = "preprocess"):
     # )
 
     # -------------------------
-    # 보고서 후 HITL 노드 연결 [TEST: 주석처리]
+    # 보고서 후 HITL / 종료 분기
     # -------------------------
-    # graph.add_edge("report", "hitl")
+    graph.add_conditional_edges(
+        "report",
+        _route_after_report,
+        {
+            "hitl": "hitl",
+            "end": END,
+        },
+    )
 
     # HITL → validator (state 패치 → 검증 → 재실행)
     # graph.add_edge("hitl", "validator")
-
-    # -------------------------
-    # 파이프라인 종료
-    # -------------------------
-    # 기본 실행에서는 report 이후 바로 종료되는 경로도 허용
-    graph.add_edge("report", END)  # 사용자가 피드백 입력 안 하면 바로 END
 
     return graph.compile()

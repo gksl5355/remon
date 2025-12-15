@@ -85,133 +85,22 @@ def validator_node(state: AppState):
         "regulation": state.get("regulation"),
     }
 
-    # ------------------------------------------------
-    # [HITL] Human-in-the-Loop 분기
-    #   - hitl.py에서 hitl_target_node / hitl_feedback 를 넣고 호출
-    # ------------------------------------------------
-    hitl_target_node = state.get("hitl_target_node")
-
-    # False(변경 없음) 도 유효한 값이라서 truthy가 아니라 "키 존재 여부"로 판정
-    has_feedback = ("hitl_feedback_text" in state) or ("hitl_feedback" in state)
-    hitl_feedback_text = state.get("hitl_feedback_text")
-    if hitl_feedback_text is None:
-        hitl_feedback_text = state.get("hitl_feedback")
-
-    if hitl_target_node and has_feedback:
-        # HITL에서 들어온 건 별도 카운트로 보고 다시 0부터 시작
-        state["validation_retry_count"] = 0
-
-        logger.warning(
-            f"[Validator][HITL] Human feedback override detected → "
-            f"target_node={hitl_target_node}"
-        )
-
-        # ===============================
-        # 2-1) change_detection 전용 HITL
-        # ===============================
-        if hitl_target_node == "change_detection":
-            # hitl.py에서 bool(True/False)로 넘어오는 것을 우선 사용,
-            # 문자열("true"/"false")도 호환되게 처리
-            if isinstance(hitl_feedback_text, str):
-                cleaned = hitl_feedback_text.strip().lower()
-                manual_flag = cleaned == "true"
-            else:
-                manual_flag = bool(hitl_feedback_text)
-
-            state["manual_change_flag"] = manual_flag
-
-            # HITL 변경 감지 == 결과 강제
-            #   True  → 변경 있음 → Embedding 필요
-            #   False → 변경 없음 → Embedding 불필요
-            state["needs_embedding"] = manual_flag
-
-            logger.warning(
-                f"[Validator][HITL][change_detection] "
-                f"manual_change_flag set to {manual_flag}, needs_embedding={manual_flag}"
-            )
-
-            # 변경 감지 이후에 의존하는 결과들 초기화
-            for key in [
-                "change_detection_results",
-                "change_summary",
-                "regulation_analysis_hints",
-                "change_detection_index",
-                "mapping",
-                "strategies",
-                "impact_scores",
-                "report",
-            ]:
-                if key in state:
-                    state[key] = None
-
-            # HITL 메타데이터 초기화
-            state["hitl_target_node"] = None
-            state["hitl_feedback_text"] = None
-            state.pop("hitl_feedback", None)
-
-            validation_result = {
-                "is_valid": False,
-                "restart_node": "change_detection",  # graph가 detect_changes로 매핑
-                "reason": "hitl_override_change_detection",
-                "source": "hitl",
-            }
-
-            return {
-                **state,
-                "validation_result": validation_result,
-                "restarted_node": "change_detection",
-            }
-
-        # ===============================
-        # 2-2) 나머지 노드(map/strategy/impact) HITL
-        # ===============================
-        restart_node = hitl_target_node
-        # 사람 피드백을 그대로 error_summary로 사용 (문자열로 강제 변환)
-        error_summary = str(hitl_feedback_text)
-
-        refined_prompt = generate_refined_prompt(
-            node_name=restart_node,
-            pipeline_state=compiled_input,
-            error_summary=error_summary,
-        )
-
-        if refined_prompt:
-            state[f"refined_{restart_node}_prompt"] = refined_prompt
-            logger.info(
-                f"[Validator][HITL] Refined prompt saved to "
-                f"state['refined_{restart_node}_prompt']"
-            )
-
-        # 문제 발생 노드 결과 초기화
-        if restart_node == "map_products":
-            state["mapping"] = None
-        elif restart_node == "generate_strategy":
-            state["strategies"] = None
-        elif restart_node == "score_impact":
-            state["impact_scores"] = None
-
-        # HITL 메타데이터 초기화
-        state["hitl_target_node"] = None
-        state["hitl_feedback_text"] = None
-        state.pop("hitl_feedback", None)
-
-        validation_result = {
-            "is_valid": False,
-            "restart_node": restart_node,
-            "reason": "hitl_override",
-            "source": "hitl",
-        }
-
-        return {
-            **state,
-            "validation_result": validation_result,
-            "restarted_node": restart_node,
-        }
+    # HITL 로직은 hitl.py에서 독립적으로 처리됨
 
     # ------------------------------------------------
     # [자동 검증] (그래프 내에서만 사용)
     # ------------------------------------------------
 
+    # HITL 이후 첫 번째 validator 호출이면 자동 검증 스킵
+    if state.get("restarted_node"):
+        logger.info("[Validator] HITL restart detected → skip validation and proceed")
+        # HITL 플래그 제거
+        state["restarted_node"] = None
+        return {
+            **state,
+            "validation_result": {"is_valid": True, "restart_node": None, "source": "hitl_skip"},
+        }
+    
     # Retry 제한: 1회 (자동 Validator 경로에만 적용)
     #  - retry_count: 이 validator_node가 호출된 횟수-1 이라고 생각하면 됨
     if retry_count >= 1:
@@ -282,7 +171,7 @@ def validator_node(state: AppState):
         )
 
     # -----------------------------
-    # 문제 발생 노드 초기화
+    # 문제 발생 노드만 초기화 (의존성 체인 제거)
     # -----------------------------
     if restart_node == "map_products":
         state["mapping"] = None

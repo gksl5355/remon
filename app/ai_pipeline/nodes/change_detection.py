@@ -24,7 +24,7 @@ from app.vectorstore.vector_client import VectorClient
 from app.ai_pipeline.prompts.change_detection_prompt import (
     CHANGE_DETECTION_SYSTEM_PROMPT,
     SECTION_MATCHING_PROMPT,
-    NEW_REGULATION_ANALYSIS_PROMPT
+    NEW_REGULATION_ANALYSIS_PROMPT,
 )
 
 logger = logging.getLogger(__name__)
@@ -62,6 +62,7 @@ class ConfidenceScorer:
             return "UNCERTAIN"
 
 
+##sa-mj 통합 (160 - 236)
 # ==================== Change Detection Node ====================
 class ChangeDetectionNode:
     """독립 변경 감지 노드 (Reference ID 기반)."""
@@ -218,10 +219,12 @@ class ChangeDetectionNode:
                         new_citation = new_metadata.get("citation_code")
                         new_country = new_metadata.get("jurisdiction_code")
 
-                        if new_citation and new_country:
-                            logger.info(
-                                f"🔍 citation_code로 Legacy 검색: {new_citation} ({new_country})"
+                        if vision_pages:
+                            new_metadata = (
+                                vision_pages[0].get("structure", {}).get("metadata", {})
                             )
+                            new_citation = new_metadata.get("citation_code")
+                            new_country = new_metadata.get("jurisdiction_code")
 
                             # citation_code + country로 Legacy 직접 조회 (월-일 기준)
                             try:
@@ -247,6 +250,7 @@ class ChangeDetectionNode:
                                 logger.error(f"❌ DB 쿼리 실패 (연결 끊김): {db_err}")
                                 logger.info("⚠️ Legacy 검색 실패 - 신규 규제로 처리")
 
+                    # 여전히 legacy_regul_data 없으면 → 완전 신규 규제 처리
                     if not legacy_regul_data:
                         logger.warning("⚠️ Legacy 검색 실패 - 신규 규제로 처리")
                         logger.info(
@@ -287,8 +291,10 @@ class ChangeDetectionNode:
                         logger.info(f"   - regulation_id: {new_regulation_id}")
                         logger.info(f"   - country: {new_country}")
                         logger.info(f"   - citation_code: {new_citation}")
-                        logger.info(f"   - key_requirements: {len(analysis_hints.get('key_requirements', []))}개")
-                        
+                        logger.info(
+                            f"   - key_requirements: {len(analysis_hints.get('key_requirements', []))}개"
+                        )
+
                         state["change_detection_results"] = []
                         state["change_summary"] = {
                             "status": "new_regulation",
@@ -448,7 +454,9 @@ class ChangeDetectionNode:
         state["change_keynote_data"] = keynote_data
         logger.info("📝 Change Keynote 데이터 생성 완료")
         logger.info(f"   - 데이터 크기: {len(str(keynote_data))} bytes")
-        logger.info(f"   - section_changes: {len(keynote_data.get('section_changes', []))}개")
+        logger.info(
+            f"   - section_changes: {len(keynote_data.get('section_changes', []))}개"
+        )
         logger.info(f"   - regulation_id: {keynote_data.get('regulation_id')}")
 
         # ========== 임베딩 필요 여부 플래그 ==========
@@ -458,13 +466,15 @@ class ChangeDetectionNode:
 
         # 실행 상태 마킹 (정상 완료)
         self._mark_execution_state(state)
-        
+
         # ✅ 최종 확인: state에 change_keynote_data가 제대로 저장되었는지 확인
         if "change_keynote_data" not in state:
             logger.error("❌ change_keynote_data가 state에 저장되지 않았습니다!")
         else:
-            logger.info(f"✅ state['change_keynote_data'] 확인 완료: {len(str(state['change_keynote_data']))} bytes")
-        
+            logger.info(
+                f"✅ state['change_keynote_data'] 확인 완료: {len(str(state['change_keynote_data']))} bytes"
+            )
+
         return state
 
     def _extract_reference_blocks(
@@ -473,7 +483,9 @@ class ChangeDetectionNode:
         """Reference Block 추출 (메타데이터 기반)."""
         ref_blocks = []
         vision_pages = regul_data.get("vision_extraction_result", [])
-        doc_id = regul_data.get("regulation_id") or regul_data.get("regulation", {}).get("regulation_id")
+        doc_id = regul_data.get("regulation_id") or regul_data.get(
+            "regulation", {}
+        ).get("regulation_id")
 
         for page in vision_pages:
             structure = page.get("structure", {})
@@ -489,23 +501,28 @@ class ChangeDetectionNode:
                     if end <= start:
                         end = min(len(lines), start + 20)
                     snippet = "\n".join(lines[start:end]) if lines else markdown_content
-                    ref_blocks.append({
-                        "section_ref": ref.get("section_ref", ""),
-                        "text": snippet,
-                        "keywords": ref.get("keywords") or self._extract_keywords(snippet),
+                    ref_blocks.append(
+                        {
+                            "section_ref": ref.get("section_ref", ""),
+                            "text": snippet,
+                            "keywords": ref.get("keywords")
+                            or self._extract_keywords(snippet),
+                            "page_num": page_num,
+                            "doc_id": doc_id,
+                            "meta_doc_id": doc_id,
+                        }
+                    )
+            else:
+                ref_blocks.append(
+                    {
+                        "section_ref": f"Page {page_num}",
+                        "text": markdown_content[:500],
+                        "keywords": self._extract_keywords(markdown_content),
                         "page_num": page_num,
                         "doc_id": doc_id,
                         "meta_doc_id": doc_id,
-                    })
-            else:
-                ref_blocks.append({
-                    "section_ref": f"Page {page_num}",
-                    "text": markdown_content[:500],
-                    "keywords": self._extract_keywords(markdown_content),
-                    "page_num": page_num,
-                    "doc_id": doc_id,
-                    "meta_doc_id": doc_id,
-                })
+                    }
+                )
 
         logger.info(f"Reference Blocks 추출: {len(ref_blocks)}개")
         return ref_blocks
@@ -809,19 +826,24 @@ class ChangeDetectionNode:
                 ],
                 response_format={"type": "json_object"},
             )
-            
+
             # 유연한 JSON 파싱 (파싱 실패 시 fallback)
             content = response.choices[0].message.content
             try:
                 result = json.loads(content)
             except json.JSONDecodeError as parse_err:
-                logger.warning(f"JSON 파싱 실패 (Section {section_ref}), fallback 사용: {parse_err}")
+                logger.warning(
+                    f"JSON 파싱 실패 (Section {section_ref}), fallback 사용: {parse_err}"
+                )
                 logger.debug(f"원본 응답: {content[:200]}...")
                 result = {
                     "change_detected": False,
                     "confidence_score": 0.0,
                     "change_type": "parse_error",
-                    "reasoning": {"error": "LLM JSON 파싱 실패", "raw_response": content[:500]},
+                    "reasoning": {
+                        "error": "LLM JSON 파싱 실패",
+                        "raw_response": content[:500],
+                    },
                     "numerical_changes": [],
                     "keywords": [],
                 }
@@ -866,7 +888,7 @@ class ChangeDetectionNode:
     def _mark_execution_state(self, state: AppState) -> None:
         """실행 상태 마킹 (중복 실행 방지)."""
         state["change_detection_ran_inline"] = True
-    
+
     async def _analyze_new_regulation(
         self, regul_data: Dict[str, Any]
     ) -> Dict[str, Any]:
