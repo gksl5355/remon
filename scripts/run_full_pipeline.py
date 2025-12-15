@@ -249,20 +249,45 @@ async def run_full_pipeline(citation_code: str = None):
     legacy_regulation_id = None
     new_regulation_id = None
 
-    async with AsyncSessionLocal() as session:
-        repo = RegulationRepository()
-        try:
-            legacy_reg = await repo.find_by_citation_code(
-                session,
-                citation_code=citation_code,
-            )
-            if legacy_reg:
-                legacy_regulation_id = legacy_reg.regulation_id
-                logger.info(f"  ✅ Legacy 발견: regulation_id={legacy_regulation_id}")
-            else:
-                logger.info("  ℹ️ Legacy 없음 (신규 규제로 처리)")
-        except Exception as e:
-            logger.warning(f"  ⚠️ Legacy 조회 실패: {e}")
+    # citation_code가 None이면 DB에서 가장 오래된 규제 조회 (Legacy 후보)
+    if not citation_code:
+        logger.info("  ℹ️ citation_code 없음 - DB에서 Legacy 후보 조회")
+        async with AsyncSessionLocal() as session:
+            repo = RegulationRepository()
+            try:
+                # 가장 오래된 규제 조회 (created_at ASC)
+                from sqlalchemy import select
+                from app.core.models.regulation_model import Regulation
+                result = await session.execute(
+                    select(Regulation)
+                    .where(Regulation.citation_code.isnot(None))
+                    .order_by(Regulation.created_at.asc())
+                    .limit(1)
+                )
+                legacy_reg = result.scalar_one_or_none()
+                if legacy_reg:
+                    legacy_regulation_id = legacy_reg.regulation_id
+                    citation_code = legacy_reg.citation_code
+                    logger.info(f"  ✅ Legacy 후보 발견: regulation_id={legacy_regulation_id}, citation={citation_code}")
+                else:
+                    logger.info("  ℹ️ DB에 규제 없음 (신규 규제로 처리)")
+            except Exception as e:
+                logger.warning(f"  ⚠️ Legacy 조회 실패: {e}")
+    else:
+        async with AsyncSessionLocal() as session:
+            repo = RegulationRepository()
+            try:
+                legacy_reg = await repo.find_by_citation_code(
+                    session,
+                    citation_code=citation_code,
+                )
+                if legacy_reg:
+                    legacy_regulation_id = legacy_reg.regulation_id
+                    logger.info(f"  ✅ Legacy 발견: regulation_id={legacy_regulation_id}")
+                else:
+                    logger.info(f"  ℹ️ citation_code '{citation_code}'에 해당하는 Legacy 없음")
+            except Exception as e:
+                logger.warning(f"  ⚠️ Legacy 조회 실패: {e}")
 
     # Step 2: 최신/이전 규제 ID 결정 (DB 기준)
     logger.info("\n[Step 2] 규제 ID 결정 (citation_code 기반)")

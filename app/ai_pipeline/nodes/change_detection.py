@@ -118,15 +118,16 @@ class ChangeDetectionNode:
                     "confidence_score": r.get("confidence_score"),
                     "change_type": r.get("change_type"),
                     "comparison": {
-                        "legacy_snippet": r.get("legacy_snippet", "")[:200],
-                        "new_snippet": r.get("new_snippet", "")[:200],
+                        "legacy_snippet": r.get("legacy_snippet", ""),
+                        "new_snippet": r.get("new_snippet", ""),
                     },
                     "reasoning": r.get("reasoning", {}),
                     "numerical_changes": r.get("numerical_changes", []),
                     "keywords": r.get("keywords", []),
+                    "new_ref_id": r.get("new_ref_id"),
+                    "legacy_ref_id": r.get("legacy_ref_id"),
                 }
                 for r in detection_results
-                if r.get("change_detected")
             ],
             "legacy_regulation": (
                 {"regulation_id": legacy_regulation_id}
@@ -784,10 +785,10 @@ class ChangeDetectionNode:
 - New: {new_ref_id}
 
 **Legacy Regulation (Section {section_ref}):**
-{legacy_text}
+{legacy_text[:3000]}
 
 **New Regulation (Section {section_ref}):**
-{new_text}
+{new_text[:3000]}
 
 **Task**: 
 1. Use Reference IDs to understand document context and hierarchy
@@ -795,6 +796,8 @@ class ChangeDetectionNode:
 3. Follow Chain of Thought (4 steps)
 4. Apply Adversarial Validation
 5. Extract numerical changes with full context
+
+**CRITICAL**: Return valid JSON only. If unsure, set change_detected=false.
 """
 
             # GPT-5: Chat Completions API (SDK 버전 호환성)
@@ -806,7 +809,22 @@ class ChangeDetectionNode:
                 ],
                 response_format={"type": "json_object"},
             )
-            result = json.loads(response.choices[0].message.content)
+            
+            # 유연한 JSON 파싱 (파싱 실패 시 fallback)
+            content = response.choices[0].message.content
+            try:
+                result = json.loads(content)
+            except json.JSONDecodeError as parse_err:
+                logger.warning(f"JSON 파싱 실패 (Section {section_ref}), fallback 사용: {parse_err}")
+                logger.debug(f"원본 응답: {content[:200]}...")
+                result = {
+                    "change_detected": False,
+                    "confidence_score": 0.0,
+                    "change_type": "parse_error",
+                    "reasoning": {"error": "LLM JSON 파싱 실패", "raw_response": content[:500]},
+                    "numerical_changes": [],
+                    "keywords": [],
+                }
             result["section_ref"] = section_ref
             result["new_ref_id"] = new_ref_id
             result["legacy_ref_id"] = legacy_ref_id
@@ -836,7 +854,13 @@ class ChangeDetectionNode:
                 "legacy_ref_id": legacy_ref_id,
                 "change_detected": False,
                 "confidence_score": 0.0,
-                "error": str(e),
+                "confidence_level": "UNCERTAIN",
+                "change_type": "llm_error",
+                "reasoning": {"error": str(e)},
+                "numerical_changes": [],
+                "keywords": [],
+                "new_snippet": new_text[:500],
+                "legacy_snippet": legacy_text[:500],
             }
 
     def _mark_execution_state(self, state: AppState) -> None:

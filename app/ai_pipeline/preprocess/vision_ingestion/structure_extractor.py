@@ -34,8 +34,8 @@ class ReferenceBlock(BaseModel):
     """Reference Block (비교 단위)."""
 
     section_ref: str
-    start_line: Optional[int] = None  # Deprecated: 사용 금지 (LLM counting 한계)
-    end_line: Optional[int] = None    # Deprecated: 사용 금지 (LLM counting 한계)
+    start_line: int
+    end_line: int
     keywords: List[str] = Field(default_factory=list)
 
 
@@ -129,12 +129,13 @@ Analyze the document image and extract structured data. Distinguish between **Fe
   ```
 
 ## 2. Reference Blocks (Index for Chunking)
-**CRITICAL: Do NOT provide start_line/end_line. They are unreliable due to LLM counting limitations.**
-**Purpose**: Provide section index and keywords ONLY.
+**Purpose**: Provide section index and keywords WITHOUT duplicating text.
 - `section_ref`: Section identifier (e.g., "§ 1141.1(a)", "Table 1")
+- `start_line`: Approximate line number in markdown
+- `end_line`: Approximate end line
 - `keywords`: Key terms for search (3-5 terms)
 
-**Note**: Text extraction will be done via regex parsing of markdown_content. Reference blocks are METADATA ONLY.
+**Note**: Full text is in markdown_content. Reference blocks are INDEX ONLY (no text field).
 
 ## 3. Metadata (Complete Document Information)
 **Extract ALL available fields:**
