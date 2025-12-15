@@ -72,24 +72,16 @@ def _route_after_report(state: AppState) -> str:
     """
     report 이후 분기.
 
-    - external_hitl_feedback 이 있고,
-      아직 hitl_target_node 가 없다면 → hitl (이번 ainvoke에서 첫 HITL 진입)
+    - external_hitl_feedback 이 있으면 → hitl (다중 HITL 지원)
     - 그 외에는 → END (그래프 종료)
-
-    효과:
-    - 1차 자동 실행: report → END (HITL 미사용)
-    - HITL 재실행 시:
-        ... → validator → report → hitl → validator → ... → report → END
-      한 번의 ainvoke 안에서 hitl은 딱 1회만 실행됨.
     """
     feedback = state.get("external_hitl_feedback")
-    hitl_target = state.get("hitl_target_node")
 
-    # 외부 HITL 피드백이 있고 아직 hitl이 해석하지 않은 상태라면 → hitl
-    if feedback and not hitl_target:
+    # 외부 HITL 피드백이 있으면 → hitl (다중 HITL 지원)
+    if feedback:
         return "hitl"
 
-    # 그 외(피드백 없음 / 이미 hitl 한 번 돌았음) → 종료
+    # 피드백 없으면 → 종료
     return "end"
 
 
@@ -110,7 +102,7 @@ def build_graph(start_node: str = "preprocess"):
     graph.add_node("score_impact", score_impact_node)
     graph.add_node("validator", validator_node)
     graph.add_node("report", report_node)
-    graph.add_node("translate", translate_report_node)
+    # graph.add_node("translate", translate_report_node)  # 번역 노드 비활성화
     graph.add_node("hitl", hitl_node)
 
     # -------------------------
@@ -139,7 +131,7 @@ def build_graph(start_node: str = "preprocess"):
     # [TEST] validator 비활성화
     # graph.add_edge("score_impact", "validator")
     graph.add_edge("score_impact", "report")  # validator 우회
-    graph.add_edge("report", "translate")  # 번역 노드 추가
+    # graph.add_edge("report", "translate")  # 번역 노드 비활성화
 
     # detect_changes → embedding or map_products
     graph.add_conditional_edges(
@@ -169,10 +161,10 @@ def build_graph(start_node: str = "preprocess"):
     # )
 
     # -------------------------
-    # 번역 후 HITL / 종료 분기
+    # 보고서 후 HITL / 종료 분기 (번역 건너뛰기)
     # -------------------------
     graph.add_conditional_edges(
-        "translate",
+        "report",
         _route_after_report,
         {
             "hitl": "hitl",
@@ -180,7 +172,17 @@ def build_graph(start_node: str = "preprocess"):
         },
     )
 
-    # HITL → validator (state 패치 → 검증 → 재실행)
-    # graph.add_edge("hitl", "validator")
+    # HITL → 조건부 분기 (target node 재실행 또는 report)
+    graph.add_conditional_edges(
+        "hitl",
+        lambda state: state.get("restarted_node", "report"),
+        {
+            "report": "report",
+            "score_impact": "score_impact",
+            "generate_strategy": "generate_strategy", 
+            "map_products": "map_products",
+            "change_detection": "detect_changes",
+        },
+    )
 
     return graph.compile()

@@ -64,21 +64,16 @@ async def score_impact_node(state: AppState) -> AppState:
 
     regulation = state.get("regulation", {})
     mapping: MappingResults | None = state.get("mapping")
-    strategy: StrategyResults | None = state.get("strategy")
-    strategies_list = state.get("strategies")
-
-    # 전략 형태 보정
-    if strategy is None and strategies_list:
-        strategy = {"items": [{"summary": s} for s in strategies_list]}
+    strategies_list = state.get("strategies", [])
 
     # 매핑/전략 없으면 스킵
-    if not mapping or not strategy:
-        logger.warning("[Impact] Skip: mapping or strategy missing")
+    if not mapping or not strategies_list:
+        logger.warning("[Impact] Skip: mapping or strategies missing")
         return state
 
     logger.info("[Impact] Starting impact scoring...")
     logger.debug("[Impact] Mapping items: %s", mapping.get("items"))
-    logger.debug("[Impact] Strategy items: %s", strategy.get("items"))
+    logger.debug("[Impact] Strategy items: %s", strategies_list)
 
     # -----------------------------
     # INPUT 전처리
@@ -104,9 +99,7 @@ async def score_impact_node(state: AppState) -> AppState:
             "gap": item.get("gap"),
         })
 
-    strategy_text = " ".join(
-        s.get("summary", "") for s in strategy.get("items", [])
-    ).strip()
+    strategy_text = " ".join(strategies_list).strip()
 
     # -----------------------------
     # 프롬프트 생성 + 로그
@@ -116,6 +109,7 @@ async def score_impact_node(state: AppState) -> AppState:
     if state.get("refined_score_impact_prompt"):
         prompt = state["refined_score_impact_prompt"]
         logger.info("[Impact] Using REFINED IMPACT PROMPT from validator")
+        logger.debug(f"[Impact] Refined prompt content: {prompt[:200]}...")  # 디버깅용
     else:
         prompt = IMPACT_PROMPT.format(
             regulation_text=regulation_text,
@@ -171,16 +165,19 @@ async def score_impact_node(state: AppState) -> AppState:
     
     # HITL refined prompt에서 강제 레벨 지정이 있는지 확인
     if state.get("refined_score_impact_prompt"):
-        refined_prompt = state["refined_score_impact_prompt"]
-        if "LOW impact level" in refined_prompt or "impact_level to 'Low'" in refined_prompt:
+        refined_prompt = state["refined_score_impact_prompt"].upper()  # 대소문자 무시
+        if "'LOW'" in refined_prompt or "LOW" in refined_prompt:
             impact_level = "Low"
-            weighted_score = min(weighted_score, 2.4)  # Low 레벨 보장
-        elif "HIGH impact level" in refined_prompt or "impact_level to 'High'" in refined_prompt:
+            weighted_score = 2.0  # HITL 요청 점수로 고정
+            logger.info("[Impact] HITL override: Force Low level (2.0)")
+        elif "'HIGH'" in refined_prompt or "HIGH" in refined_prompt:
             impact_level = "High"
-            weighted_score = max(weighted_score, 4.1)  # High 레벨 보장
-        elif "MEDIUM impact level" in refined_prompt or "impact_level to 'Medium'" in refined_prompt:
+            weighted_score = 4.5  # HITL 요청 점수로 고정
+            logger.info("[Impact] HITL override: Force High level (4.5)")
+        elif "'MEDIUM'" in refined_prompt or "MEDIUM" in refined_prompt:
             impact_level = "Medium"
-            weighted_score = max(2.5, min(weighted_score, 3.9))  # Medium 레벨 보장
+            weighted_score = 3.0  # HITL 요청 점수로 고정
+            logger.info("[Impact] HITL override: Force Medium level (3.0)")
         else:
             # 기본 로직
             impact_level = (
@@ -200,7 +197,7 @@ async def score_impact_node(state: AppState) -> AppState:
     # 결과 생성 (HITL 근거 처리)
     # -----------------------------
     # HITL에서 근거를 'Human in the loop'으로 대체
-    if state.get("refined_score_impact_prompt") and "reasoning to 'Human in the loop'" in state["refined_score_impact_prompt"]:
+    if state.get("refined_score_impact_prompt") and "HUMAN IN THE LOOP" in state["refined_score_impact_prompt"].upper():
         reasoning = "Human in the loop"
         logger.info("[Impact] HITL override: reasoning set to 'Human in the loop'")
     
@@ -216,9 +213,13 @@ async def score_impact_node(state: AppState) -> AppState:
 
     logger.info("[Impact] Final Impact Score: %s (Level: %s, Score: %.2f)", 
                 impact_item, impact_level, weighted_score)
-
-    # refined prompt 제거
+    
+    # HITL 적용 여부 로그
     if state.get("refined_score_impact_prompt"):
-        state["refined_score_impact_prompt"] = None
+        logger.info("[Impact] ✅ HITL refined prompt applied successfully")
+
+    # refined prompt 제거 (다음 HITL을 위해 유지)
+    # if state.get("refined_score_impact_prompt"):
+    #     state["refined_score_impact_prompt"] = None
 
     return state
