@@ -1,6 +1,5 @@
 <template>
   <div class="login-page">
-
     <div class="login-container">
         <div class="title-wrapper">
             <h1 class="title">R E M O N</h1>
@@ -142,25 +141,12 @@ const login = async () => {
   align-items: center;
 }
 
-/* --------------------
-   글로브 배경/컨테이너/타이틀
-   -------------------- */
-.globe-effect {
-    position: absolute !important;
-    left: 50% !important;
-    bottom: -400px !important;
-    transform: translateX(-50%) !important;
-    width: 1600px !important;
-    height: 1600px !important;
-    z-index: 1; 
-}
-
 .login-container {
     display: flex;
     flex-direction: column;
     align-items: center;
     position: relative;
-    z-index: 99; 
+    z-index: 10; 
 }
 
 .title-wrapper { margin-bottom: 40px; text-align: center; }
@@ -332,5 +318,4 @@ const login = async () => {
                 0 0 40px rgba(118, 118, 94, 0.4);
     transform: translateY(-2px);
 }
-
 </style>

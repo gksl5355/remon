@@ -296,7 +296,8 @@ const regulationOption = computed(() => {
 .summary-card {
   border-left: 4px solid #FDFF78;
 }
-:global(.light) .summary-card {
+
+html:not(.dark) .summary-card {
   border-left: 4px solid #2C2C54;
 }
 

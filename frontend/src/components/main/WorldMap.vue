@@ -9,7 +9,7 @@
 
     <!-- 상태 범례 -->
     <div
-      class="absolute left-4 top-1/2 -translate-y-1/2 
+      class="absolute left-4 top-6/7 -translate-y-1/2 
             w-40 rounded-lg backdrop-blur-md shadow p-3 text-[11px] space-y-3 transition-all"
       :class="isDark ? 'bg-black/40 border border-white/10 text-gray-200' 
                      : 'bg-white/70 border border-gray-300 text-gray-700'"
@@ -37,17 +37,17 @@
         <div class="flex items-center gap-2">
           <span class="flex items-center gap-1.5">
             <span class="w-2.5 h-2.5 rounded-full" :style="{ background: '#3A4F7A' }"></span>
-            <span>1</span>
+            <span>Low</span>
           </span>
 
           <span class="flex items-center gap-1.5">
             <span class="w-2.5 h-2.5 rounded-full" :style="{ background: '#FDFF78' }"></span>
-            <span>2</span>
+            <span>Medium</span>
           </span>
 
           <span class="flex items-center gap-1.5">
             <span class="w-2.5 h-2.5 rounded-full" :style="{ background: '#FF5C5C' }"></span>
-            <span>3</span>
+            <span>High</span>
           </span>
         </div>
       </div>

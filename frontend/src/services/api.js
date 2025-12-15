@@ -4,9 +4,6 @@ import axios from "axios";
 const api = axios.create({
   baseURL: "https://ingress.skala25a.project.skala-ai.com/skala2-4-17/api", // ✅ FastAPI 기본 엔드포인트
   timeout: 5000, // 5초 타임아웃
-  headers: {
-    "Content-Type": "application/json",
-  },
 });
 
 // Spring 인증용 api (조영우 작성)
