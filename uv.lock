@@ -1938,7 +1938,7 @@ wheels = [
 
 [[package]]
 name = "openai"
-version = "1.43.0"
+version = "1.45.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -1950,9 +1950,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/41/80/9390645de4e76bf8195073f23029a9b54cd13b4294e3a5bcb56e4df1aafc/openai-1.43.0.tar.gz", hash = "sha256:e607aff9fc3e28eade107e5edd8ca95a910a4b12589336d3cbb6bfe2ac306b3c", size = 292477, upload-time = "2024-08-29T18:01:14.135Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/70/cd/5ec65b9a56999370c032af7933433143f78239d44a8c03a5ba34159af945/openai-1.45.0.tar.gz", hash = "sha256:731207d10637335413aa3c0955f8f8df30d7636a4a0f9c381f2209d32cf8de97", size = 295638, upload-time = "2024-09-12T17:08:19.33Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5e/4d/affea11bd85ca69d9fdd15567495bb9088ac1c37498c95cb42d9ecd984ed/openai-1.43.0-py3-none-any.whl", hash = "sha256:1a748c2728edd3a738a72a0212ba866f4fdbe39c9ae03813508b267d45104abe", size = 365744, upload-time = "2024-08-29T18:01:12.134Z" },
+    { url = "https://files.pythonhosted.org/packages/d4/2a/97e80a4551346efc9cd937e11adb640207acc5045fdf4e06786eac55bfb1/openai-1.45.0-py3-none-any.whl", hash = "sha256:2f1f7b7cf90f038a9f1c24f0d26c0f1790c102ec5acd07ffd70a9b7feac1ff4e", size = 374133, upload-time = "2024-09-12T17:08:17.056Z" },
 ]
 
 [[package]]
@@ -3010,6 +3010,7 @@ dependencies = [
     { name = "chardet" },
     { name = "httpx" },
     { name = "langchain" },
+    { name = "lingua-language-detector" },
     { name = "loguru" },
     { name = "markdown" },
     { name = "openai" },
@@ -3055,7 +3056,6 @@ api = [
     { name = "lxml" },
     { name = "networkx" },
     { name = "numpy" },
-    { name = "openai" },
     { name = "pandas" },
     { name = "pdfplumber" },
     { name = "pillow" },
@@ -3128,6 +3128,7 @@ requires-dist = [
     { name = "langchain-text-splitters", marker = "extra == 'api'", specifier = ">=0.3.0" },
     { name = "langgraph", marker = "extra == 'ai'", specifier = ">=1.0.2" },
     { name = "langgraph", marker = "extra == 'api'", specifier = ">=1.0.2" },
+    { name = "lingua-language-detector", specifier = "==2.1.1" },
     { name = "loguru", specifier = "==0.7.2" },
     { name = "lxml", marker = "extra == 'api'", specifier = "==5.3.0" },
     { name = "lxml", marker = "extra == 'crawler'", specifier = "==5.3.0" },
@@ -3136,8 +3137,7 @@ requires-dist = [
     { name = "numpy", marker = "extra == 'ai'", specifier = "==2.1.2" },
     { name = "numpy", marker = "extra == 'api'", specifier = "==2.1.2" },
     { name = "openai", specifier = ">=1.43.0" },
-    { name = "openai", marker = "extra == 'ai'", specifier = "==1.43.0" },
-    { name = "openai", marker = "extra == 'api'", specifier = "==1.43.0" },
+    { name = "openai", marker = "extra == 'ai'", specifier = "==1.45.0" },
     { name = "pandas", marker = "extra == 'ai'", specifier = "==2.2.3" },
     { name = "pandas", marker = "extra == 'api'", specifier = "==2.2.3" },
     { name = "pdfplumber", marker = "extra == 'api'", specifier = ">=0.9.0" },
