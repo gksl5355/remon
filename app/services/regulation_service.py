@@ -74,6 +74,49 @@ class RegulationService:
                 "today_count": 0,
                 "regulations": []
             }
+    
+    async def get_regulations_by_country(self, db: AsyncSession, country: str) -> dict:
+        """
+        국가별 규제 목록 조회
+        
+        Args:
+            db: 데이터베이스 세션
+            country: 국가 코드 (US, ID, RU)
+            
+        Returns:
+            dict: {"collectedTime": str, "files": list}
+        """
+        try:
+            keynotes = await self.repo.get_recent_changes(db, country)
+            
+            if not keynotes:
+                return {"collectedTime": "", "files": []}
+            
+            # impact 문자열을 숫자로 변환
+            impact_map = {"Low": 1, "Medium": 2, "High": 3}
+            
+            files = [
+                {
+                    "id": k.keynote_id,
+                    "title": k.keynote_text.get("title", ""),
+                    "impactLevel": impact_map.get(k.keynote_text.get("impact", "Medium"), 1),
+                    "category": k.keynote_text.get("analysis_date", "")
+                }
+                for k in keynotes
+            ]
+            
+            # 최신 generated_at 사용
+            collected_time = keynotes[0].generated_at.strftime("%Y-%m-%d %H:%M:%S") if keynotes else ""
+            
+            logger.info(f"Found {len(files)} regulations for country={country}")
+            return {
+                "collectedTime": collected_time,
+                "files": files
+            }
+            
+        except Exception as e:
+            logger.error(f"Error fetching regulations by country: {e}", exc_info=True)
+            return {"collectedTime": "", "files": []}
 
 
 

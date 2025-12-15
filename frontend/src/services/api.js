@@ -2,20 +2,24 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:8000/api", // ✅ FastAPI 기본 엔드포인트
+  baseURL: "https://ingress.skala25a.project.skala-ai.com/skala2-4-17/api", // ✅ FastAPI 기본 엔드포인트
   timeout: 5000, // 5초 타임아웃
+});
+
+// Spring 인증용 api (조영우 작성)
+export const Spring_Api = axios.create({
+  baseURL: "https://ingress.skala25a.project.skala-ai.com/skala2-4-17/spring/api",
+  withCredentials: true, // 세션 쿠키
+  timeout: 5000,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// ✅ 요청 인터셉터 (예: JWT 토큰 자동 첨부)
+// ✅ 요청 인터셉터 (세션 기반이므로 토큰 불필요)
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("access_token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+    // 세션은 Cookie로 자동 전송됨
     return config;
   },
   (error) => Promise.reject(error)
