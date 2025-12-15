@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import regulation_api, report_api, ai_api, translation_api
-from app.api.admin import admin_regulation_api, admin_summary_api, admin_websearch_api
+from app.api.admin import s3_manager_api, admin_regulation_api, admin_summary_api, admin_websearch_api
 
 app = FastAPI(
     title="REMON Regulatory Monitoring API",
@@ -13,7 +13,10 @@ app = FastAPI(
 # CORS 설정 (프론트 연동)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -29,6 +32,7 @@ app.include_router(translation_api.router, prefix="/api")
 app.include_router(admin_regulation_api.router, prefix="/api")
 app.include_router(admin_summary_api.router, prefix="/api")
 app.include_router(admin_websearch_api.router, prefix="/api")
+app.include_router(s3_manager_api.router, prefix="/api/admin/s3", tags=["Admin-S3"])
 
 @app.get("/")
 def root():

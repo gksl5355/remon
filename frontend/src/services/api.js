@@ -4,9 +4,6 @@ import axios from "axios";
 const api = axios.create({
   baseURL: "http://localhost:8000/api", // ✅ FastAPI 기본 엔드포인트
   timeout: 5000, // 5초 타임아웃
-  headers: {
-    "Content-Type": "application/json",
-  },
 });
 
 // ✅ 요청 인터셉터 (예: JWT 토큰 자동 첨부)
