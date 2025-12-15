@@ -64,7 +64,7 @@ class MappingNode:
         self,
         llm_client,
         search_tool,
-        top_k: int = 10,
+        top_k: int = 3,
         alpha: float = 0.7,
         product_repository: Optional[ProductRepository] = None,
         max_candidates_per_doc: int = 2,
@@ -802,13 +802,30 @@ If no match, omit the feature. Return ONLY JSON."""
         import asyncio
 
         product_id = product["product_id"]
-        base_query = self._build_search_query(feature_name, feature_value, feature_unit)
-
-        # 개선: Change query를 별도 검색하지 않고 결합 (1회 검색)
-        if change_query:
-            combined_query = f"{base_query} {change_query}"
-        else:
-            combined_query = base_query
+        
+        # 🔥 LLM 기반 쿼리 생성 (변경 힌트 반영)
+        from app.ai_pipeline.tools.query_builder import QueryBuilder
+        
+        change_hints = None
+        if state and state.get("change_detection_results"):
+            # 해당 feature와 관련된 변경 힌트 추출
+            for result in state["change_detection_results"]:
+                if result.get("change_detected"):
+                    keywords = result.get("keywords", [])
+                    if any(feature_name.lower() in str(kw).lower() for kw in keywords):
+                        change_hints = {
+                            "keywords": keywords,
+                            "numerical_changes": result.get("numerical_changes", [])
+                        }
+                        break
+        
+        query_builder = QueryBuilder(llm_client=self.llm)
+        combined_query = await query_builder.build_query(
+            feature_name=feature_name,
+            feature_value=feature_value,
+            feature_unit=feature_unit,
+            change_hints=change_hints
+        )
 
         # 국가 + 신규 규제 필터
         filters = {}
@@ -1039,7 +1056,22 @@ If no match, omit the feature. Return ONLY JSON."""
         }
         feature_json = json.dumps(feature, ensure_ascii=False)
 
-        # 조항 번호 추출
+        # 🔑 변경 감지 증거를 PRIMARY SOURCE로 배치
+        primary_source = ""
+        if change_evidence:
+            primary_source = f"""\n[PRIMARY SOURCE - CHANGE DETECTION]
+**CRITICAL: Use this as the PRIMARY basis for your analysis**
+
+Change Type: {change_evidence.get('change_type', 'N/A')}
+Confidence: {change_evidence.get('confidence_score', 0)}
+Keywords: {', '.join(change_evidence.get('keywords', []))}
+Legacy Text: {change_evidence.get('legacy_snippet', '')[:200]}
+New Text: {change_evidence.get('new_snippet', '')[:200]}
+Numerical Changes: {change_evidence.get('numerical_changes', [])}
+Reasoning: {change_evidence.get('reasoning', {}).get('step4_final_judgment', 'N/A')}
+"""
+
+        # 조항 번호 (참조용)
         section_info = ""
         if chunk_metadata:
             section = self._extract_section_number(
@@ -1048,30 +1080,22 @@ If no match, omit the feature. Return ONLY JSON."""
             citation = chunk_metadata.get("citation_code")
 
             if section or citation:
-                section_info = "\n[REGULATION METADATA]\n"
+                section_info = "\n[REFERENCE - Regulation Metadata]\n"
                 if citation:
                     section_info += f"Citation: {citation}\n"
                 if section:
                     section_info += f"Section: {section}\n"
 
-        # 변경 감지 증거 포맷팅
-        if change_evidence:
-            evidence_text = f"""\n[CHANGE EVIDENCE]
-Change Type: {change_evidence.get('change_type', 'N/A')}
-Confidence: {change_evidence.get('confidence_score', 0)}
-Keywords: {', '.join(change_evidence.get('keywords', []))}
-Reasoning: {change_evidence.get('reasoning', {}).get('step4_final_judgment', 'N/A')}
-"""
-        else:
-            evidence_text = ""
+        # Qdrant 청크는 SUPPORTING REFERENCE로 배치
+        evidence_text = primary_source
 
-        # 🎯 Change Context 주입 (검색 실패 시 보정)
+        # 🎯 Change Context 추가 (변경 감지 직접 데이터)
         if change_context:
-            evidence_text += f"""\n[KNOWN CHANGE - Direct from Change Detection]
+            evidence_text += f"""\n[ADDITIONAL CHANGE CONTEXT]
 Section: {change_context.get('section_ref', 'N/A')}
-Legacy Text: {change_context.get('legacy_snippet', '')[:200]}
-New Text: {change_context.get('new_snippet', '')[:200]}
-Numerical Changes: {change_context.get('numerical_changes', [])}
+Legacy: {change_context.get('legacy_snippet', '')[:200]}
+New: {change_context.get('new_snippet', '')[:200]}
+Numerical: {change_context.get('numerical_changes', [])}
 """
         
         # 🔑 Feature-Change 의미적 일치성 검증 컨텍스트
@@ -1101,9 +1125,16 @@ Detected Changes:
 - If chunk discusses unrelated topics (e.g., "label" for "nicotine" feature) → applies=false, reasoning="semantic_mismatch"
 """
 
+        # Qdrant 청크를 SUPPORTING REFERENCE로 명시
+        supporting_ref = f"""\n[SUPPORTING REFERENCE - Qdrant Chunk]
+**Use this ONLY as supporting context, NOT as primary source**
+
+{chunk_text[:500]}
+"""
+
         return (
             MAPPING_PROMPT.replace("{feature}", feature_json)
-            .replace("{chunk}", chunk_text)
+            .replace("{chunk}", supporting_ref)
             .replace("{metadata}", section_info)
             .replace("{change_evidence}", evidence_text)
         )
@@ -1348,28 +1379,81 @@ Text: {text}
                     f"✅ {len(products)}개 제품 발견: {[p['product_name'] for p in products[:3]]}..."
                 )
 
-                # 🔑 Feature-Change 매칭 1회만 실행 (규제 기준, 모든 제품 공통)
-                if not state.get("feature_change_cache"):
-                    # 모든 제품의 feature 통합 (중복 제거)
-                    all_features = set()
+                # 🎯 피처별 규제 검색 (제품 독립적, 1회만)
+                if not state.get("feature_regulation_cache"):
+                    logger.info("🔍 피처별 규제 검색 시작 (제품 독립적)")
+                    
+                    # 1) 모든 제품의 피처 취합
+                    all_features_map = {}  # {feature_name: [(product_id, value, unit), ...]}
                     for p in products:
                         p_features = p.get("mapping", {}).get("present_state", {})
-                        all_features.update(p_features.keys())
+                        p_units = p.get("feature_units", {})
+                        p_id = p.get("product_id")
+                        
+                        for fname, fval in p_features.items():
+                            if fname == "feature_units":
+                                continue
+                            if fname not in all_features_map:
+                                all_features_map[fname] = []
+                            all_features_map[fname].append((p_id, fval, p_units.get(fname)))
                     
-                    # 통합 feature 리스트로 매칭 (규제당 1회)
-                    unified_features = {f: "placeholder" for f in all_features}
-                    feature_change_map = await self._match_features_to_changes(
-                        unified_features, change_results
+                    logger.info(f"📊 피처 취합 완료: {len(all_features_map)}개 피처 (제품 {len(products)}개)")
+                    
+                    # 2) 검색 필터 준비 (단일 제품 실행 시와 동일)
+                    temp_product = products[0]
+                    temp_extra_filters = {
+                        key: value
+                        for key, value in mapping_filters.items()
+                        if key not in {"product_id"}
+                    }
+                    
+                    # 🔑 임시 변수 초기화 (조건부 정의 방지)
+                    temp_present_features = temp_product.get("mapping", {}).get("present_state", {})
+                    temp_change_scope = self._extract_change_scope(change_results, temp_present_features)
+                    temp_change_hint = self._choose_change_hint(temp_change_scope)
+                    
+                    temp_change_filters = self._build_change_filters(temp_change_scope)
+                    temp_regulation_filters = self._build_regulation_filters(regulation_meta)
+                    temp_merged_filters = self._merge_filters(
+                        temp_extra_filters, temp_change_filters, temp_regulation_filters
                     )
-                    state["feature_change_cache"] = feature_change_map
-                    logger.info(f"💾 규제 기준 Feature-Change 캐시 생성: {len(feature_change_map)}개 (통합 {len(all_features)}개 feature)")
-
-                # 각 제품별로 매핑 실행 (캐시 공유)
+                    temp_change_query = self._build_change_query(temp_change_hint)
+                    
+                    # 3) 피처별 규제 검색 (1회씩만)
+                    feature_regulation_cache = {}
+                    for fname, values_list in all_features_map.items():
+                        # 대표값 선택 (첫 번째 제품의 값)
+                        representative_value = values_list[0][1]
+                        representative_unit = values_list[0][2]
+                        
+                        # 검색 실행
+                        retrieval = await self._run_search(
+                            product=temp_product,  # 국가 정보만 사용
+                            feature_name=fname,
+                            feature_value=representative_value,
+                            feature_unit=representative_unit,
+                            extra_filters=temp_merged_filters,
+                            change_query=temp_change_query,
+                            state=state,
+                        )
+                        
+                        # 캐시 저장
+                        feature_regulation_cache[fname] = {
+                            "candidates": retrieval["candidates"],
+                            "search_query": self._build_search_query(fname, representative_value, representative_unit)
+                        }
+                        
+                        logger.info(f"  ✅ {fname}: {len(retrieval['candidates'])}개 규제 청크")
+                    
+                    state["feature_regulation_cache"] = feature_regulation_cache
+                    logger.info(f"💾 피처별 규제 캐시 생성 완료: {len(feature_regulation_cache)}개")
+                
+                # 3) 각 제품별로 매핑 분석 (캐시된 규제 재사용)
                 all_mapping_results = []
                 for product in products:
-                    temp_state = dict(state)  # ✅ 복사 확인
+                    temp_state = dict(state)
                     temp_state["product_info"] = product
-                    temp_state["feature_change_cache"] = state["feature_change_cache"]  # ✅ 캐시 키 확인
+                    temp_state["feature_regulation_cache"] = state["feature_regulation_cache"]
                     temp_result = await self.run(temp_state)
                     all_mapping_results.append(temp_result.get("mapping"))
 
@@ -1389,10 +1473,15 @@ Text: {text}
         )
         units = product.get("feature_units", {})
 
+        # 🔑 변수 초기화 (조건부 정의 방지)
         change_scope = self._extract_change_scope(change_results, present_features)
         change_hint = self._choose_change_hint(change_scope)
         change_query = self._build_change_query(change_hint)
         recovered_hints: Set[str] = set()
+        
+        # 🔑 검색 필터 변수 초기화 (재사용 시 누락 방지)
+        change_search_filters = self._build_change_filters(change_scope)
+        regulation_filters = self._build_regulation_filters(regulation_meta)
 
         mapping_results: List[MappingItem] = []
         mapping_targets: Dict[str, Dict[str, Any]] = {}
@@ -1403,8 +1492,7 @@ Text: {text}
             for key, value in mapping_filters.items()
             if key not in {"product_id"}
         }
-        change_search_filters = self._build_change_filters(change_scope)
-        regulation_filters = self._build_regulation_filters(regulation_meta)
+        # 🔑 필터는 이미 위에서 초기화됨 (중복 제거)
         merged_search_filters = self._merge_filters(
             extra_search_filters, change_search_filters, regulation_filters
         )
@@ -1434,28 +1522,29 @@ Text: {text}
                 )
         
         # 🆕 LLM 기반 Feature 선택 (규제 기준 1회만, 제품 무관)
-        llm_selection_cache_key = "llm_selection_global"  # ✅ 제품 무관 글로벌 키
+        llm_selection_cache_key = "llm_selection_global"
+        llm_selection = {"selected_features": [], "reasoning": {}, "confidence": 0.0}  # 기본값 초기화
+        
         if llm_selection_cache_key not in state:
             if change_results or regulation_hints:
-                # 통합 feature 리스트 사용 (모든 제품 공통)
-                all_features_union = set(present_features.keys())
-                if state.get("feature_change_cache"):
-                    all_features_union.update(state["feature_change_cache"].keys())
+                unified_features = {f: "placeholder" for f in present_features.keys()}
                 
-                unified_features = {f: "placeholder" for f in all_features_union}
-                
-                llm_selection = await self._llm_select_features(
-                    unified_features,
-                    change_results,
-                    regulation_hints
-                )
-                state[llm_selection_cache_key] = llm_selection
-                logger.info(f"💾 LLM Feature 선택 (규제 기준 1회): {len(llm_selection.get('selected_features', []))}개")
+                try:
+                    llm_selection = await self._llm_select_features(
+                        unified_features,
+                        change_results,
+                        regulation_hints
+                    )
+                    state[llm_selection_cache_key] = llm_selection
+                    logger.info(f"💾 LLM Feature 선택 (규제 기준 1회): {len(llm_selection.get('selected_features', []))}개")
+                except Exception as e:
+                    logger.warning(f"LLM feature selection 실패: {e}")
+                    state[llm_selection_cache_key] = llm_selection  # 기본값 저장
             else:
-                state[llm_selection_cache_key] = {"selected_features": []}
+                state[llm_selection_cache_key] = llm_selection
         else:
             llm_selection = state[llm_selection_cache_key]
-            logger.info(f"♻️ LLM Feature 선택 캐시 재사용 (규제 기준): {len(llm_selection.get('selected_features', []))}개")
+            logger.info(f"♻️ LLM Feature 선택 캐시 재사용: {len(llm_selection.get('selected_features', []))}개")
         
         # LLM 선택 결과를 feature_hints에 병합
         llm_selected = set(llm_selection.get("selected_features", []))
@@ -1507,13 +1596,12 @@ Text: {text}
                 ]
             )
 
-        # 🆕 Feature-Change 매칭 캐시 사용 (규제당 1회 생성됨)
-        feature_change_map = state.get("feature_change_cache", {})
-        if not feature_change_map:
-            logger.warning("⚠️ Feature-Change 캐시 없음, 기본 검색으로 fallback")
-            # ✅ 빈 캐시 처리: 기본 검색 로직 사용 (change_query 활용)
+        # 💾 피처별 규제 캐시 확인
+        feature_reg_cache = state.get("feature_regulation_cache", {})
+        if feature_reg_cache:
+            logger.info(f"♻️ 피처별 규제 캐시 재사용: {len(feature_reg_cache)}개 (제품 독립적)")
         else:
-            logger.info(f"♻️ Feature-Change 캐시 재사용: {len(feature_change_map)}개 (규제 기준)")
+            logger.info("🔍 피처별 규제 캐시 없음, 개별 검색 실행")
 
         # 🔥 Change Detection 기반 직접 매핑 (검색 최소화)
         llm_semaphore = asyncio.Semaphore(10)
@@ -1522,59 +1610,45 @@ Text: {text}
             unit = units.get(feature_name)
             target_value = target_state.get(feature_name)
 
-            # 🆕 Change Detection에서 매칭된 Section 직접 사용
-            feature_context = feature_change_map.get(feature_name, {})
-            matched_section_refs = feature_context.get("matched_change_ids", [])
+            # 🔄 캐시된 규제 재사용 (피처별 검색 결과)
+            feature_reg_cache = state.get("feature_regulation_cache", {})
+            cached_data = feature_reg_cache.get(feature_name)
             
-            if self.debug_enabled:
-                logger.info(
-                    "🎯 Direct mapping feature=%s sections=%s",
-                    feature_name,
-                    matched_section_refs[:3] if matched_section_refs else "(none)",
-                )
-
-            # a) Change Detection 결과에서 직접 청크 가져오기 (검색 스킵)
-            candidates = []
-            if matched_section_refs:
-                # Section별로 Qdrant에서 정확히 검색
-                for section_ref in matched_section_refs[:5]:  # 최대 5개 섹션
-                    normalized_section = self._normalize_section_ref(section_ref)
-                    
-                    # Qdrant 검색 (Section + regulation_id 필터)
-                    section_filters = dict(merged_search_filters or {})
-                    section_filters["section_ref"] = normalized_section
-                    
-                    retrieval: RetrievalResult = await self._run_search(
-                        product,
+            if cached_data:
+                # 캐시된 규제 사용 (검색 스킵)
+                candidates = cached_data["candidates"]
+                if self.debug_enabled:
+                    logger.info(
+                        "♻️ 캐시 재사용: feature=%s candidates=%d",
                         feature_name,
-                        present_value,
-                        unit,
-                        section_filters,
-                        change_query=None,  # Section 필터로 충분
-                        state=state,
+                        len(candidates),
                     )
-                    candidates.extend(retrieval["candidates"])
             else:
-                # Fallback: 일반 검색 (Change Detection 결과 없을 때)
+                # Fallback: 캐시 없으면 검색
                 retrieval: RetrievalResult = await self._run_search(
                     product,
                     feature_name,
                     present_value,
                     unit,
                     merged_search_filters,
-                    change_query=None,
+                    change_query=change_query,
                     state=state,
                 )
                 candidates = retrieval["candidates"]
+                if self.debug_enabled:
+                    logger.info(
+                        "🔍 Fallback 검색: feature=%s candidates=%d",
+                        feature_name,
+                        len(candidates),
+                    )
             
             # 중복 제거
             candidates = self._prune_candidates(candidates)
             
             if self.debug_enabled:
                 logger.info(
-                    "   ↳ candidates=%d (from %d sections)",
+                    "   ↳ candidates=%d",
                     len(candidates),
-                    len(matched_section_refs) if matched_section_refs else 0,
                 )
 
             ranked_candidates = candidates
@@ -1797,6 +1871,7 @@ Text: {text}
         all_actionable = []
         all_pending = []
         all_unknown = []
+        product_names = []
 
         for result in results:
             all_items.extend(result["items"])
@@ -1804,15 +1879,26 @@ Text: {text}
             all_actionable.extend(result.get("actionable_changes", []))
             all_pending.extend(result.get("pending_changes", []))
             all_unknown.extend(result["unknown_requirements"])
+            
+            # 제품명 수집 (중복 제거)
+            pname = result.get("product_name")
+            if pname and pname not in product_names:
+                product_names.append(pname)
 
         # regulation_cache 병합 (개선)
         merged_cache = {}
         for result in results:
             merged_cache.update(result.get("regulation_cache", {}))
+        
+        # 제품명 포맷팅 (최대 3개)
+        if len(product_names) <= 3:
+            display_name = ", ".join(product_names)
+        else:
+            display_name = f"{', '.join(product_names[:3])} 외 {len(product_names)-3}개"
 
         return MappingResults(
             product_id="multi",
-            product_name="Multiple Products",
+            product_name=display_name,
             items=all_items,
             targets=all_targets,
             actionable_changes=all_actionable,

@@ -393,15 +393,49 @@ class ChangeDetectionNode:
             if result:
                 detection_results.append(result)
 
-        # 신뢰도 조정
+        # 중복 제거 (Section 기준)
+        seen_sections = {}
         for result in detection_results:
-            result["confidence_score"] = self.confidence_scorer.adjust_confidence(
-                result
-            )
+            section = self._normalize_section_ref(result.get("section_ref", ""))
+            if not section:
+                continue
+            
+            # 같은 Section이 있으면 신뢰도 높은 것만 유지
+            if section in seen_sections:
+                existing = seen_sections[section]
+                if result.get("confidence_score", 0) > existing.get("confidence_score", 0):
+                    seen_sections[section] = result
+            else:
+                seen_sections[section] = result
+        
+        detection_results = list(seen_sections.values())
+        logger.info(f"🔄 중복 제거 후: {len(detection_results)}개 유니크 섹션")
+        
+        # 신뢰도 조정 및 필터링
+        filtered_results = []
+        for result in detection_results:
+            result["confidence_score"] = self.confidence_scorer.adjust_confidence(result)
             result["confidence_level"] = self.confidence_scorer.get_confidence_level(
                 result["confidence_score"]
             )
-
+            
+            # LOW/UNCERTAIN 필터링 (변경 감지된 것만)
+            if result.get("change_detected"):
+                if result["confidence_score"] >= 0.65:  # MEDIUM 이상만
+                    filtered_results.append(result)
+                else:
+                    logger.debug(f"⚠️ 낮은 신뢰도로 제외: {result.get('section_ref')} ({result['confidence_score']:.2f})")
+            else:
+                # 변경 없음은 MEDIUM 이상만 유지
+                if result["confidence_score"] >= 0.7:
+                    filtered_results.append(result)
+        
+        # 필터링 전 전체 결과 백업 (Keynote 저장용)
+        all_detection_results = detection_results.copy()
+        
+        detection_results = filtered_results
+        logger.info(f"✅ 신뢰도 필터링 후: {len(detection_results)}개")
+        
         total_changes = sum(1 for r in detection_results if r.get("change_detected"))
         high_confidence = sum(
             1 for r in detection_results if r.get("confidence_level") == "HIGH"
@@ -463,7 +497,7 @@ class ChangeDetectionNode:
         # ========== Keynote 데이터 생성 ==========
         regulation_meta = state.get("regulation", {})
         keynote_data = self._build_keynote_data(
-            detection_results=detection_results,
+            detection_results=all_detection_results,
             change_summary=state["change_summary"],
             regulation_meta=regulation_meta,
             legacy_regulation_id=legacy_regulation_id,

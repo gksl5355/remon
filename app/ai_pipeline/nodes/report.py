@@ -49,8 +49,19 @@ async def get_llm_structured_summary(context: str) -> Dict[str, Any]:
 아래 데이터를 기반으로 JSON만 생성하세요.
 
 JSON 최상위 키는 다음 두 개여야 합니다:
-1. "major_analysis": 3개의 문자열 리스트
-2. "strategies": 3개의 문자열 리스트
+1. "major_analysis": 3개의 문자열 리스트 (각 항목은 완전한 한글 문장)
+2. "strategies": 3개의 문자열 리스트 (각 항목은 완전한 한글 문장)
+
+**CRITICAL - 한글 출력 규칙 (반드시 준수)**:
+- 모든 설명, 동사, 조사는 반드시 한글로 작성
+- 다음만 원문 유지:
+  * 고유명사 (제품명, 회사명, 기관명, 법령명)
+  * 수치와 단위 (20mg, $1,000, 30%, mAh)
+  * 법령 조항 (§1160.5, Article 3, CFR)
+  * 국가/지역 코드 (US, KR, EU, FDA)
+  * 영문 약어 (PMTA, TPD, ENDS)
+- 올바른 예시: "FDA의 §1160.5 조항에 따라 니코틴 함량을 20mg/mL 이하로 제한해야 합니다"
+- 잘못된 예시: "Nicotine concentration must be limited to 20mg/mL" (영어 사용 금지)
 
 마크다운 없이 순수 JSON만 출력하세요.
 
@@ -62,7 +73,11 @@ JSON 최상위 키는 다음 두 개여야 합니다:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": prompt},
+                {
+                    "role": "system",
+                    "content": "당신은 규제 분석 보고서를 한글로 작성하는 전문가입니다. CRITICAL: 모든 설명과 문장은 반드시 한글로 작성하세요. 고유명사, 수치, 법령 조항, 국가 코드, 영문 약어만 원문 유지하고 나머지는 절대 영어를 사용하지 마세요.",
+                },
+                {"role": "user", "content": prompt},
             ],
             temperature=0.0,
         )
@@ -97,9 +112,15 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
 
     # product_name은 mapping에서 가져오기
     product_name = mapping.get("product_name", "Unknown")
-    
+
     # country 정보 우선순위: product_info > regulation > mapping
-    country = meta.get('country') or regulation.get('country') or regulation.get('jurisdiction_code') or mapping.get('country') or ''
+    country = (
+        meta.get("country")
+        or regulation.get("country")
+        or regulation.get("jurisdiction_code")
+        or mapping.get("country")
+        or ""
+    )
 
     # ✅ 제품별로 그룹화
     from collections import defaultdict
@@ -236,13 +257,15 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
     # 1. 규제 변경 요약 (change_detection_results 활용)
     change_items = []
     change_results = state.get("change_detection_results", [])
-    
+
     logger.info(f"🔍 변경 감지 결과 처리: {len(change_results)}개")
-    
+
     for idx, result in enumerate(change_results):
         change_detected = result.get("change_detected")
-        logger.debug(f"  [{idx}] section={result.get('section_ref')}, detected={change_detected}")
-        
+        logger.debug(
+            f"  [{idx}] section={result.get('section_ref')}, detected={change_detected}"
+        )
+
         if not change_detected:
             continue
 
@@ -258,7 +281,7 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
         else:
             change_type = result.get("change_type", "변경")
             change_items.append(f"- {section}: {change_type}")
-    
+
     logger.info(f"✅ 변경 항목 생성: {len(change_items)}개")
 
     change_summary_section = {
@@ -279,11 +302,11 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
             }
         )
 
-    # ✅ 2. 제품 분석 (단일 섹션, 하위 테이블 포함)
+    # ✅ 3. 제품 분석 (단일 섹션, 하위 테이블 포함)
     products_section = {
         "id": "products_analysis",
         "type": "nested_tables",
-        "title": "2. 제품 분석",
+        "title": "3. 제품 분석",
         "tables": product_tables,
     }
 
@@ -292,24 +315,24 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
     return [
         overall_summary,
         change_summary_section,
-        products_section,
         {
             "id": "changes",
             "type": "list",
-            "title": "3. 주요 변경 사항 해석",
+            "title": "2. 주요 변경 사항 해석",
             "content": major_analysis,
+        },
+        products_section,
+        {
+            "id": "reasoning",
+            "type": "paragraph",
+            "title": "4. 영향 평가 근거",
+            "content": [impact_score.get("reasoning", "")],
         },
         {
             "id": "strategy",
             "type": "list",
-            "title": "4. 대응 전략 제안",
+            "title": "5. 대응 전략 제안",
             "content": strategy_steps,
-        },
-        {
-            "id": "reasoning",
-            "type": "paragraph",
-            "title": "5. 영향 평가 근거",
-            "content": [impact_score.get("reasoning", "")],
         },
         {
             "id": "references",
@@ -348,12 +371,13 @@ def send_slack_notification(message: str, webhook_url: Optional[str] = None) -> 
         logger.warning("SLACK_WEBHOOK_URL 미설정 - 슬랙 전송 스킵")
         return False
     try:
-        resp = requests.post(url, json={"text": message}, timeout=5)
+        resp = requests.post(url, json={"text": message}, timeout=10)
         if resp.status_code >= 300:
             logger.warning(
                 "Slack 전송 실패: status=%s body=%s", resp.status_code, resp.text
             )
             return False
+        logger.info("✅ Slack 알림 전송 완료")
         return True
     except Exception as exc:
         logger.warning("Slack 전송 예외: %s", exc)
@@ -405,19 +429,31 @@ async def report_node(state: AppState) -> Dict[str, Any]:
             # Change Detection Keynote 저장 (우선)
             change_keynote_data = state.get("change_keynote_data")
             if change_keynote_data:
-                logger.info(f"📝 Change Keynote 데이터 확인: {len(str(change_keynote_data))} bytes")
-                logger.info(f"   - regulation_id: {change_keynote_data.get('regulation_id')}")
-                logger.info(f"   - section_changes: {len(change_keynote_data.get('section_changes', []))}개")
-                
+                logger.info(
+                    f"📝 Change Keynote 데이터 확인: {len(str(change_keynote_data))} bytes"
+                )
+                logger.info(
+                    f"   - regulation_id: {change_keynote_data.get('regulation_id')}"
+                )
+                logger.info(
+                    f"   - section_changes: {len(change_keynote_data.get('section_changes', []))}개"
+                )
+
                 keynote = await keynote_repo.create_keynote(
                     db_session, change_keynote_data
                 )
-                logger.info(f"✅ Change Keynote 저장 완료: keynote_id={keynote.keynote_id}")
+                logger.info(
+                    f"✅ Change Keynote 저장 완료: keynote_id={keynote.keynote_id}"
+                )
             else:
                 # ⚠️ Fallback: change_keynote_data 없음 (문제 발생)
-                logger.warning("⚠️ change_keynote_data 없음 - Fallback 실행 (간소화된 데이터)")
-                logger.warning("   원인: change_detection 노드가 실행되지 않았거나 state 전달 실패")
-                
+                logger.warning(
+                    "⚠️ change_keynote_data 없음 - Fallback 실행 (간소화된 데이터)"
+                )
+                logger.warning(
+                    "   원인: change_detection 노드가 실행되지 않았거나 state 전달 실패"
+                )
+
                 keynote = await keynote_repo.create_keynote(
                     db_session,
                     {
@@ -435,9 +471,15 @@ async def report_node(state: AppState) -> Dict[str, Any]:
                         "impact": impact_score.get("impact_level", "N/A"),
                     },
                 )
-                logger.warning(f"⚠️ Fallback Keynote 저장: keynote_id={keynote.keynote_id}")
+                logger.warning(
+                    f"⚠️ Fallback Keynote 저장: keynote_id={keynote.keynote_id}"
+                )
 
             summary = await summary_repo.create_report_summary(db_session, sections)
+            await db_session.commit()  # 즉시 commit
+            report_json["report_id"] = summary.summary_id
+            logger.info(f"ReportSummary 저장 완료: {summary.summary_id}")
+            
             # 규제 trace 저장
             if regulation_trace:
                 pid = meta.get("product_id")
@@ -452,14 +494,48 @@ async def report_node(state: AppState) -> Dict[str, Any]:
                         ),
                         {"trace": json.dumps(regulation_trace), "pid": pid_int},
                     )
-            await db_session.commit()
-            report_json["report_id"] = summary.summary_id
-            logger.info(f"ReportSummary 저장 완료: {summary.summary_id}")
+                    await db_session.commit()
 
         except Exception as e:
             await db_session.rollback()
             logger.error(f"ReportNode DB Error: {e}")
 
-    # 4) ⭐ 반드시 state 업데이트 후 return
+    # 4) Slack 알림 전송
+    try:
+        mapping = state.get("mapping", {})
+        product_name = mapping.get("product_name", "Unknown")
+        regulation = state.get("regulation", {})
+        country = regulation.get("country", "Unknown")
+        regulation_title = regulation.get("title", "규제명 없음")
+        impact_level = impact_score.get("impact_level", "N/A")
+        
+        # 유효 카테고리 추출
+        valid_features_set = set()
+        for item in mapping_items:
+            if item.get("applies"):
+                valid_features_set.add(item.get("feature_name"))
+        
+        valid_features = sorted(list(valid_features_set))
+        valid_features_str = ", ".join(valid_features[:2]) if valid_features else "없음"
+        
+        # Key Change 추출
+        key_change = "No changes detected"
+        change_results = state.get("change_detection_results", [])
+        if change_results:
+            high_conf = [c for c in change_results if c.get("confidence_level") == "HIGH" and c.get("change_detected")]
+            if high_conf:
+                first = high_conf[0]
+                key_change = f"{first.get('section_ref', '')}: {first.get('change_type', 'updated')}"
+        
+        report_id = report_json.get('report_id', 'N/A')
+        report_url = "https://ingress.skala25a.project.skala-ai.com/skala2-4-17/"
+        
+        slack_message = f":bell: REMON 보고서 생성 완료 ({country})\n규제명칭: {regulation_title}\n영향도: {impact_level} | 매핑 항목: {len(valid_features)}개 유효 카테고리 ({valid_features_str})\n제품: {product_name}\nKey Change: {key_change}\nREMON-{report_id} | <{report_url}|Open in REMON>"
+        
+        send_slack_notification(slack_message)
+    except Exception as e:
+        logger.warning(f"Slack 알림 전송 실패 (무시): {e}")
+
+    # 5) ⭐ 반드시 state 업데이트 후 return
     state["report"] = report_json
     return state
