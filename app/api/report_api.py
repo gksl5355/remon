@@ -39,16 +39,16 @@ async def download_combined_report(
     )
 
 # 규제별 요약 리포트 조회
-@router.get("/reports/{regulation_id}")
+@router.get("/reports/{report_id}")
 async def get_report(
-    regulation_id: int,
+    report_id: int,
     db: AsyncSession = Depends(get_db)
 ):
     """
     규제별 요약 리포트를 조회한다.
     
     Args:
-        regulation_id (int): 규제 문서 ID.
+        report_id (int): 규제 문서 ID.
         
     Returns:
         dict: 리포트 상세 정보.
@@ -56,27 +56,27 @@ async def get_report(
     Raises:
         HTTPException: 리포트를 찾을 수 없는 경우 404.
     """
-    logger.info(f"GET /reports/{regulation_id}")
-    report = await service.get_report_detail(db, regulation_id)
+    logger.info(f"GET /reports/{report_id}")
+    report = await service.get_report_detail(db, report_id)
     
     if not report:
-        logger.warning(f"Report not found: regulation_id={regulation_id}")
+        logger.warning(f"Report not found: report_id={report_id}")
         raise HTTPException(status_code=404, detail="Report not found")
     
     return report
 
 
 # 리포트 다운로드 (PDF)
-@router.get("/reports/{regulation_id}/download")
+@router.get("/reports/{report_id}/download")
 async def download_report(
-    regulation_id: int,
+    report_id: int,
     db: AsyncSession = Depends(get_db)
 ):
     """
     리포트를 PDF 파일로 다운로드한다.
     
     Args:
-        regulation_id (int): 규제 문서 ID.
+        report_id (int): 규제 문서 ID.
         
     Returns:
         FileResponse: PDF 파일.
@@ -84,14 +84,14 @@ async def download_report(
     Raises:
         HTTPException: 리포트를 찾을 수 없는 경우 404.
     """
-    logger.info(f"GET /reports/{regulation_id}/download")
+    logger.info(f"GET /reports/{report_id}/download")
     
-    pdf_bytes = await service.download_report(db, regulation_id)
+    pdf_bytes = await service.download_report(db, report_id)
     
     if not pdf_bytes:
         raise HTTPException(status_code=404, detail="Report not found")
     
-    filename = f"report_{regulation_id}.pdf"
+    filename = f"report_{report_id}.pdf"
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
@@ -144,22 +144,3 @@ async def update_report(
         raise HTTPException(status_code=404, detail="Report not found")
     
     return updated
-
-@router.post("/reports", status_code=201)
-async def create_report(
-    regulation_id: int,
-    report_type: str = "summary",
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    (종합?)리포트 생성을 요청한다 (AI 파이프라인 트리거).
-
-    Args:
-        regulation_id (int): 규제 문서 ID.
-        report_type (str): 리포트 타입 (summary/comprehensive).
-
-    Returns:
-        dict: 생성된 리포트 ID 및 상태.
-    """
-    logger.info(f"POST /reports - regulation_id={regulation_id}, type={report_type}")
-    return await service.create_report(db, regulation_id, report_type)

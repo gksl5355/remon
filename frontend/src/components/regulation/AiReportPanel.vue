@@ -39,14 +39,9 @@
     <!-- CONTENT -->
     <div ref="scrollArea" class="flex-1 overflow-y-auto p-6 space-y-10 custom-scrollbar">
 
-      <!-- No selection -->
-      <div v-if="!selectedArticle" class="text-gray-500 text-center py-20">
-        좌측의 항목을 선택해주세요.
-      </div>
-
-      <!-- No Change -->
-      <div v-else-if="!selectedArticle.hasChange && !isStreaming" class="text-gray-500 text-center py-20">
-        선택한 조항은 변경 사항이 없습니다.
+      <!-- No data -->
+      <div v-if="!props.fileId" class="text-gray-500 text-center py-20">
+        리포트를 불러오는 중...
       </div>
 
       <!-- LOADING -->
@@ -59,7 +54,16 @@
       <!-- ============================= -->
       <!-- BASIC REPORT MODE (NOT STREAM) -->
       <!-- ============================= -->
-      <div v-else-if="!isStreaming && report">
+      <div v-else-if="!isStreaming && baseSection1">
+
+        <!-- SECTION 0 -->
+        <section>
+          <h3 class="sec-title">0. 종합 요약</h3>
+
+          <p class="text-gray-300 whitespace-pre-line">
+            {{ baseOverall }}
+          </p>
+        </section>
 
         <!-- SECTION 1 -->
         <section>
@@ -111,12 +115,27 @@
           <p class="text-gray-300 whitespace-pre-line">{{ baseImpactReason }}</p>
         </section>
 
+        <section class="mt-6">
+          <h3 class="sec-title">6. 참고 및 원문 링크</h3>
+          <p class="text-gray-300 whitespace-pre-line">{{ baseUrl }}</p>
+        </section>
+
       </div>
 
       <!-- ========================== -->
       <!-- STREAMING MODE (TYPEWRITER) -->
       <!-- ========================== -->
       <div v-else-if="isStreaming">
+
+        <!-- SECTION 0 (ONE TEXT STREAM) -->
+        <section v-if="showSection0">
+          <h3 class="sec-title">0. 종합 요약</h3>
+
+          <p class="text-gray-300 whitespace-pre-line leading-relaxed">
+            {{ streamedOverrall }}
+            <span v-if="cursorAt === 'Overrall'" class="cursor">|</span>
+          </p>
+        </section>
 
         <!-- SECTION 1 (ONE TEXT STREAM) -->
         <section v-if="showSection1">
@@ -184,6 +203,15 @@
           <p class="text-gray-300 whitespace-pre-line">
             {{ streamedImpactReason }}
             <span v-if="cursorAt === 'impactReason'" class="cursor">|</span>
+          </p>
+        </section>
+
+        <section v-if="showSection6" class="mt-6">
+          <h3 class="sec-title">6. 참고 및 원문 링크</h3>
+
+          <p class="text-gray-300 whitespace-pre-line">
+            {{ streamedReferences }}
+            <span v-if="cursorAt === 'references'" class="cursor">|</span>
           </p>
         </section>
 
@@ -283,6 +311,7 @@
 
 
 <script setup>
+import api from "@/services/api";
 import { computed, ref, watch } from "vue";
 
 /* AUTO SCROLL */
@@ -301,29 +330,33 @@ function autoScroll() {
 /* STREAM VARIABLES */
 const isStreaming = ref(false);
 
+const streamedOverrall = ref("");
 const streamedSection1 = ref("");
-
 const streamedProducts = ref([]);
 const streamedAnalysis = ref([]);
 const streamedStrategy = ref([]);
 const streamedImpactReason = ref("");
+const streamedReferences = ref("");
 
 const cursorAt = ref(null);
 
 /* SECTION FLAGS */
+const showSection0 = ref(false);
 const showSection1 = ref(false);
 const showSection2 = ref(false);
 const showSection3 = ref(false);
 const showSection4 = ref(false);
 const showSection5 = ref(false);
+const showSection6 = ref(false);
 
 /* BASE STATIC VALUES */
+const baseOverall = ref([]);
 const baseSection1 = ref("");
 const baseProducts = ref([]);
 const baseAnalysis = ref([]);
 const baseStrategy = ref([]);
 const baseImpactReason = ref("");
-
+const baseUrl = ref([]);
 /* MODAL */
 const showModal = ref(false);
 const hvInput = ref("");
@@ -331,13 +364,8 @@ const isLoading = ref(false);
 
 /* REPORT INPUT */
 const props = defineProps({
-  selectedArticle: Object,
-  aiReports: Object
+  fileId: Number
 });
-
-const report = computed(() =>
-  props.selectedArticle ? props.aiReports[props.selectedArticle.id] : null
-);
 
 /* TYPEWRITER BASED ON CHARACTER */
 async function typeText(targetRef, text, section, speed = 17) {
@@ -407,36 +435,59 @@ async function typeProducts(targetRef, products, section, speed = 17) {
   cursorAt.value = null;
 }
 
-/* LOAD BASE REPORT WHEN ARTICLE SELECTS */
+/* LOAD BASE REPORT WHEN FILE ID CHANGES */
 watch(
-  () => props.selectedArticle,
-  () => {
-    if (!report.value) return;
-    const r = report.value;
+  () => props.fileId,
+  async (id) => {
+    if (!id) return;
 
-    baseSection1.value =
-      `국가/지역: ${r.summary.country}\n` +
-      `카테고리: ${r.summary.category}\n` +
-      `영향도: ${r.summary.impact}\n` +
-      `규제 요약: ${r.summary.regulationSummary}`;
+    // 백엔드에서 리포트 데이터 가져오기
+    isLoading.value = true;
+    try {
+      const res = await api.get(`/reports/${id}`);
+      const data = res.data;
 
-    baseProducts.value = r.products.map(p => ({
-      item: p.item,
-      product: p.product,
-      action: `현재 ${p.current} / 필요 ${p.required}`
-    }));
+      // sections 배열을 파싱하여 각 섹션에 맞게 할당
+      if (data.sections && Array.isArray(data.sections)) {
+        data.sections.forEach(section => {
+          if (section.title.includes('종합 요약')){
+            baseOverall.value = section.content;
+          } else if (section.title.includes('규제 변경 요약')) {
+            baseSection1.value = section.content.join('\n');
+          } else if (section.title.includes('제품 분석')) {
+            baseProducts.value = section.tables.flatMap(table => 
+              table.rows.map(row => ({
+                item: row[0],      // 제품 속성
+                product: table.product_name,  // 제품명
+                action: row[1]
+            }))
+          );
+          } else if (section.title.includes('변경 사항')) {
+            baseAnalysis.value = section.content;
+          } else if (section.title.includes('대응 전략')) {
+            baseStrategy.value = section.content;
+          } else if (section.title.includes('영향 평가')) {
+            baseImpactReason.value = section.content.join('\n');
+          } else if (section.title.includes('참고 및 원문 링크')) {
+            baseUrl.value = section.content;
+          }
+        });
+      }
 
-    baseAnalysis.value = [...r.changeAnalysis];
-    baseStrategy.value = [...r.strategy];
-    baseImpactReason.value = r.impactReason;
+      streamedOverrall.value = "";
+      streamedSection1.value = "";
+      streamedProducts.value = [];
+      streamedAnalysis.value = [];
+      streamedStrategy.value = [];
+      streamedImpactReason.value = [];
+      streamedReferences.value = [];
 
-    streamedSection1.value = "";
-    streamedProducts.value = [];
-    streamedAnalysis.value = [];
-    streamedStrategy.value = [];
-    streamedImpactReason.value = [];
-
-    isStreaming.value = false;
+      isStreaming.value = false;
+    } catch (err) {
+      console.error('리포트 불러오기 실패:', err);
+    } finally {
+      isLoading.value = false;
+    }
   },
   { immediate: true }
 );
@@ -451,13 +502,16 @@ const runHV = async () => {
 
   isStreaming.value = true;
 
+  showSection0.value = false;
   showSection1.value = false;
   showSection2.value = false;
   showSection3.value = false;
   showSection4.value = false;
   showSection5.value = false;
+  showSection6.value = false;
 
-  const r = report.value;
+  showSection0.value = true;
+  await typeList(streamedOverrall, baseOverall.value, "Overrall");
 
   /* SECTION 1: ONE TEXT STREAM */
   showSection1.value = true;
@@ -479,25 +533,33 @@ const runHV = async () => {
   showSection5.value = true;
   await typeText(streamedImpactReason, baseImpactReason.value, "impactReason");
 
+  showSection6.value = true;
+  await typeList(streamedReferences, baseUrl.value, "references");
+
   isStreaming.value = false;
 };
 
 const openModal = () => (showModal.value = true);
 
 /* DOWNLOAD */
-const downloadReport = () => {
-  if (!report.value) return;
+const downloadReport = async () => {
+  if (!props.fileId) return;
 
-  const blob = new Blob([JSON.stringify(report.value, null, 2)], {
-    type: "application/json"
-  });
-
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "AI_Report.json";
-  a.click();
-  URL.revokeObjectURL(url);
+  try {
+    const res = await api.get(`/reports/${props.fileId}/download`, {
+      responseType: "blob"
+    });
+    const blob = new Blob([res.data], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `report_${props.fileId}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('리포트 다운로드 실패:', err);
+    alert('리포트 다운로드 중 오류가 발생했습니다.');
+  }
 };
 </script>
 

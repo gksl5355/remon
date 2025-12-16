@@ -120,6 +120,7 @@
 <script setup>
 import { computed, inject, onMounted, ref } from "vue";
 import VChart from "vue-echarts";
+import api from "@/services/api.js";
 
 const isDark = inject("isDark");
 
@@ -155,7 +156,7 @@ async function updateSummary() {
   await typeText(text, summaryList[summaryIndex.value].text);
 }
 
-onMounted(() => typeText(text, summaryList[0].text));
+onMounted(() => handleUpdateClick());
 
 const isUpdating = ref(false);
 const updateDone = ref(false);
@@ -165,7 +166,31 @@ async function handleUpdateClick() {
   isUpdating.value = true;
   updateDone.value = false;
 
-  await updateSummary();
+  try {
+    const response = await api.post('/main/report/summary');
+    // 응답이 문자열인 경우 바로 사용
+    let newSummary = '';
+    if (typeof response.data === 'string') {
+      newSummary = response.data;
+    } else if (response.data.text) {
+      newSummary = response.data.text;
+    } else if (response.data.summary) {
+      newSummary = response.data.summary;
+    } else if (Array.isArray(response.data) && response.data[0]?.text) {
+      newSummary = response.data[0].text;
+    }
+    
+    if (!newSummary) {
+      throw new Error('Invalid response format');
+    }
+    
+    lastUpdated.value = formatDate();
+    await typeText(text, newSummary);
+  } catch (error) {
+    console.error('Failed to fetch summary:', error);
+    // 에러 시 기존 더미 데이터 사용
+    await updateSummary();
+  }
 
   isUpdating.value = false;
   updateDone.value = true;
@@ -179,7 +204,7 @@ const countryList = ["US", "ID", "RU"];
 const selectedCountry = ref("US");
 
 const weeklyData = {
-  US: { dates: ["12/1","12/2","12/3","12/4","12/5","12/6","12/7"], changed: [5,7,6,10,8,9,7], impactLevel: [1,1,2,2,3,3,2], productCount: [2,3,2,4,3,5,4] },
+  US: { dates: ["11/30","12/1","12/2","12/4","12/5","12/6","12/7"], changed: [5,7,6,10,8,9,7], impactLevel: [2,2,1,3,2,3,2], productCount: [2,3,2,4,3,5,4] },
   ID: { dates: ["12/1","12/2","12/3","12/4","12/5","12/6","12/7"], changed: [8,6,9,11,12,10,9], impactLevel: [1,2,2,2,3,3,2], productCount: [3,2,3,5,4,4,3] },
   RU: { dates: ["12/1","12/2","12/3","12/4","12/5","12/6","12/7"], changed: [1,2,2,3,1,2,1], impactLevel: [1,1,1,1,2,1,2], productCount: [1,1,1,2,1,1,1] }
 };
@@ -271,7 +296,8 @@ const regulationOption = computed(() => {
 .summary-card {
   border-left: 4px solid #FDFF78;
 }
-:global(.light) .summary-card {
+
+html:not(.dark) .summary-card {
   border-left: 4px solid #2C2C54;
 }
 

@@ -46,7 +46,7 @@
           @click="goToDetail(file)"
         >
 
-          <div class="flex items-start gap-4">
+          <div class="flex items-start gap-4 ">
 
             <!-- FILE NUMBER -->
             <div
@@ -75,17 +75,10 @@
               </div>
 
               <div class="text-xs text-gray-400 flex gap-6 mt-2">
-                <span>공포일: <span class="text-gray-300">{{ file.documentInfo.promulgationDate }}</span></span>
-                <span>시행일: <span class="text-gray-300">{{ file.documentInfo.effectiveDate }}</span></span>
+                <!-- <span>공포일: <span class="text-gray-300">{{ file.documentInfo.promulgationDate }}</span></span>
+                <span>시행일: <span class="text-gray-300">{{ file.documentInfo.effectiveDate }}</span></span> -->
+                <span>수집일자: <span class="text-gray-300">{{ formatDate(file.category) }}</span></span>
               </div>
-<!-- 
-              <a
-                :href="file.documentInfo.originalUrl"
-                target="_blank"
-                class="text-xs underline text-blue-300/70 hover:text-blue-200 mt-1"
-              >
-                원문 바로가기
-              </a> -->
 
             </div>
 
@@ -105,6 +98,7 @@
 </template>
 
 <script setup>
+import api from "@/services/api.js";
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
@@ -121,9 +115,26 @@ const flagUrl = computed(() =>
 );
 
 async function loadFiles() {
-  const module = await import(`@/data/regulations/${countryCode}.json`);
-  files.value = module.default.files;
-  collectedTime.value = module.default.collectedTime || "";
+  try {
+    const response = await api.get(`/regulations/country/${countryCode}`);
+    files.value = response.data.files;
+    collectedTime.value = response.data.collectedTime || "";
+  } catch (error) {
+    console.error("Failed to load regulations:", error);
+    files.value = [];
+    collectedTime.value = "";
+  }
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hour = String(date.getHours()).padStart(2, '0');
+  const minute = String(date.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hour}:${minute}`;
 }
 
 /* impact style */
