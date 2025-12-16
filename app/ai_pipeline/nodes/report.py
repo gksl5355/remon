@@ -180,18 +180,17 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
         effective_date = reg_meta.get("effective_date")
         jurisdiction = reg_meta.get("jurisdiction_code") or reg_meta.get("country")
 
-        # URL 우선순위: 1) source_url 2) S3 경로 3) 로컬 파일명
+        # S3 하드코딩 경로
+        s3_base_url = "https://skala-s3-bucket.s3.ap-northeast-2.amazonaws.com/skala2/skala-2.4.17/remon/regulation"
+        
         if source_url:
             link = source_url
-        elif s3_key:
-            link = f"s3://remon-regulations/{s3_key}"
         elif file_path:
             from pathlib import Path
-
             filename = Path(file_path).name
-            link = f"파일: {filename}"
+            link = f"{s3_base_url}/{jurisdiction}/{filename}"
         else:
-            link = "원문 링크 없음"
+            link = f"{s3_base_url}/{jurisdiction}/regulation_{reg_id}.pdf"
 
         display_title = f"{citation} - {title}" if citation else title
         if label:
@@ -242,10 +241,10 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
         f"전략 권고: {strategies[0] if strategies else ''}",
     ]
 
-    # 0. 종합 요약 (기존 summary)
+    # 0. 종합 요약 (list 형식으로 변경)
     overall_summary = {
         "id": "overall_summary",
-        "type": "paragraph",
+        "type": "list",
         "title": "0. 종합 요약",
         "content": summary_content,
     }
