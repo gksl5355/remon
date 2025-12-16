@@ -3,7 +3,7 @@ module: translate_report.py
 description: LangGraph 번역 노드 - 보고서 sections를 한글로 번역
 author: AI Agent
 created: 2025-01-18
-updated: 2025-01-21 (번역 노드 활성화)
+updated: 2025-01-21 (번역 프롬프트 강화 - 고유명사 제외 전체 번역)
 dependencies:
     - openai
     - app.core.database
@@ -102,13 +102,40 @@ async def translate_report_node(state: AppState) -> AppState:
             messages=[
                 {
                     "role": "system",
-                    "content": """You are a JSON translator. Translate any text to Korean while preserving JSON structure.
+                    "content": """You are a professional JSON translator specializing in regulatory documents. Translate ALL non-Korean text to Korean while preserving JSON structure.
 
-RULES:
-- Keep JSON structure EXACTLY as is
-- Keep: numbers, units (mg, %), citations (§1160.5), country codes, URLs, null values
-- Translate: English text in "title", "content" arrays, "reasoning" fields
-- Output MUST be valid JSON (no markdown, no explanations)""",
+CRITICAL TRANSLATION RULES:
+1. JSON Structure: Keep EXACTLY as is (keys, arrays, nesting, order)
+2. TRANSLATE EVERYTHING except:
+   - Numbers: 150, 4.5, 35, 23, 33%, 70%
+   - Units: mg, mg/g, mg/kg, mg/mL, mm, mAh, %
+   - Legal citations: §1160.5, §1160.7, §1160.15, §1160.18, §1160.25, §Unknown, 21 CFR Part 1160
+   - Country/region codes: US, KR, EU, FDA, PMTA, USPS, FedEx, UPS, TPD, ENDS
+   - Product names: This, lil, VAPE-X Pro (if proper nouns)
+   - Technical IDs: PMTA-Pending-2025, PMTA-2020-005
+   - URLs and file paths
+   - null, true, false values
+
+3. MUST TRANSLATE (even if mixed with proper nouns):
+   - ALL English sentences and phrases
+   - ALL descriptive text in "reasoning", "content", "title" fields
+   - ALL table headers and labels
+   - ALL explanations, even if they contain proper nouns
+   - Examples:
+     * "N/A (unrelated): §1160.5 addresses nicotine level standards" 
+       → "해당 없음 (무관): §1160.5는 니코틴 수준 기준을 다룹니다"
+     * "Warning Label Requirements apply to package" 
+       → "경고 라벨 요구사항이 패키지에 적용됩니다"
+     * "Current package string does not show compliance" 
+       → "현재 패키지 문자열은 준수를 보여주지 않습니다"
+     * "Adult signature mandatory" 
+       → "성인 서명 필수"
+
+4. Output: ONLY valid JSON (no markdown blocks, no explanations)
+
+EXAMPLE:
+Before: "N/A (unrelated): §Unknown addresses validation of testing methods and recordkeeping, not flavor"
+After: "해당 없음 (무관): §Unknown은 테스트 방법 검증 및 기록 보관을 다루며, 향미는 다루지 않습니다"""",
                 },
                 {"role": "user", "content": sections_json},
             ],
