@@ -94,7 +94,7 @@ class RegulationService:
                 change_type = "문언 정비"
             elif (change_type == "scope_change"):
                 change_type = "범위 변경"
-            elif (change_type == "" or change_type is None):
+            elif (change_type == "" or change_type is None or change_type == "none"):
                 change_type = "개정 없음"
 
 
