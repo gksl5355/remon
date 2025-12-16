@@ -91,6 +91,28 @@ class RegulationKeynoteRepository(BaseRepository[RegulationChangeKeynote]):
         )
         return result.scalar_one_or_none()
     
+    async def get_keynote_by_country(
+        self,
+        db: AsyncSession,
+        country: str
+    ) -> List[RegulationChangeKeynote]:
+        """
+        country로 keynote 조회
+        
+        Args:
+            db: 데이터베이스 세션
+            country: 국가 코드
+        
+        Returns:
+            RegulationChangeKeynote 리스트
+        """
+        result = await db.execute(
+            select(RegulationChangeKeynote).where(
+                RegulationChangeKeynote.keynote_text['country'].astext == country
+            )
+        )
+        return list(result.scalars().all())
+    
     async def get_recent_changes(
         self,
         db: AsyncSession,
@@ -109,7 +131,7 @@ class RegulationKeynoteRepository(BaseRepository[RegulationChangeKeynote]):
             RegulationChangeKeynote 리스트
         """
         query = select(RegulationChangeKeynote).order_by(
-            RegulationChangeKeynote.created_at.desc()
+            RegulationChangeKeynote.generated_at.desc()
         )
         
         if country:

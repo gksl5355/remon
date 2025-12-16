@@ -45,6 +45,10 @@ dependencies {
     implementation platform('software.amazon.awssdk:bom:2.29.0')
     implementation 'software.amazon.awssdk:s3'
 
+    // [추가] AWS S3 SDK (CrawlService에서 중복 검사/목록 조회를 위해 필요)
+    implementation 'com.amazonaws:aws-java-sdk-s3:1.12.772'
+    
+
     // 5. HTTP Client (Tavily 요청용)
     implementation 'org.apache.httpcomponents.client5:httpclient5'
     // HTML 파싱 및 텍스트 추출용 (Java의 BeautifulSoup)
