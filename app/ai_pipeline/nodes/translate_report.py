@@ -155,6 +155,10 @@ After: "해당 없음 (무관): §Unknown은 테스트 방법 검증 및 기록 
             start = translated_json.find("```") + 3
             end = translated_json.find("```", start)
             translated_json = translated_json[start:end].strip()
+        
+        # 🔧 제어 문자 제거 (JSON 파싱 오류 방지)
+        import re
+        translated_json = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', translated_json)
 
         # ✅ Dict로 래핑 (DB 스키마 호환)
         translation_data = {"sections": json.loads(translated_json)}
