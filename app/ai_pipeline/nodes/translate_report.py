@@ -159,6 +159,10 @@ After: "해당 없음 (무관): §Unknown은 테스트 방법 검증 및 기록 
         # 🔧 제어 문자 제거 (JSON 파싱 오류 방지)
         import re
         translated_json = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', translated_json)
+        
+        # 🔧 과도한 공백 정규화 (LLM 출력 오류 방지)
+        translated_json = re.sub(r'\s+', ' ', translated_json)  # 연속 공백 → 단일 공백
+        translated_json = re.sub(r'\s*([{}\[\]:,])\s*', r'\1', translated_json)  # 구조 문자 주변 공백 제거
 
         # ✅ Dict로 래핑 (DB 스키마 호환)
         translation_data = {"sections": json.loads(translated_json)}

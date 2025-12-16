@@ -149,6 +149,12 @@ async def score_impact_node(state: AppState) -> AppState:
 
     logger.debug("[Impact] Raw score dict: %s", raw_scores)
 
+    # 🔧 LLM이 dict로 반환한 경우 숫자 추출
+    for key, value in raw_scores.items():
+        if isinstance(value, dict):
+            raw_scores[key] = value.get('score') or value.get('value') or 0
+            logger.warning(f"[Impact] {key} was dict, extracted: {raw_scores[key]}")
+
     # -----------------------------
     # 가중합 계산 및 HITL 강제 레벨 적용
     # -----------------------------
