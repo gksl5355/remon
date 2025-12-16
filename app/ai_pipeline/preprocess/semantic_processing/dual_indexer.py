@@ -163,7 +163,8 @@ class DualIndexer:
         doc_metadata = {}
         if vision_results:
             first_page = vision_results[0]
-            doc_metadata = first_page.get("structure", {}).get("metadata", {})
+            structure = first_page.get("structure", {})
+            doc_metadata = structure.get("metadata") or {}
         
         for page_result in vision_results:
             page_num = page_result.get("page_num")

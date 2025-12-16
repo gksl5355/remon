@@ -60,9 +60,10 @@
         <section>
           <h3 class="sec-title">0. 종합 요약</h3>
 
-          <p class="text-gray-300 whitespace-pre-line">
-            {{ baseOverall }}
-          </p>
+          <ul class="list-disc pl-5 space-y-1 text-gray-300">
+            <li v-for="(v,i) in baseOverall" :key="i">{{ v }}</li>
+          </ul>
+          <br></br>
         </section>
 
         <!-- SECTION 1 -->
@@ -78,19 +79,19 @@
         <section class="mt-6">
           <h3 class="sec-title">2. 영향받는 제품 목록</h3>
 
-          <table class="w-full text-left text-[13px] text-gray-300 border-collapse">
-            <thead class="text-gray-400 border-b border-gray-600/40">
-              <tr><th class="py-2">항목</th><th class="py-2">제품명</th><th class="py-2">조치</th></tr>
-            </thead>
-
-            <tbody>
-              <tr v-for="(row, idx) in baseProducts" :key="idx" class="border-b border-gray-700/20">
-                <td class="py-2">{{ row.item }}</td>
-                <td class="py-2">{{ row.product }}</td>
-                <td class="py-2">{{ row.action }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <div v-for="(table, idx) in baseProducts" :key="idx" class="mb-6">
+            <h4 class="text-gray-200 font-semibold mb-3">제품: {{ table.product_name }}</h4>
+            <table class="w-full text-left text-[13px] text-gray-300 border-collapse">
+              <thead class="text-gray-400 border-b border-gray-600/40">
+                <tr><th v-for="h in table.headers" :key="h" class="py-2">{{ h }}</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, ridx) in table.rows" :key="ridx" class="border-b border-gray-700/20">
+                  <td v-for="(cell, cidx) in row" :key="cidx" class="py-2">{{ cell }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <!-- SECTION 3 -->
@@ -117,7 +118,14 @@
 
         <section class="mt-6">
           <h3 class="sec-title">6. 참고 및 원문 링크</h3>
-          <p class="text-gray-300 whitespace-pre-line">{{ baseUrl }}</p>
+          <div class="space-y-2">
+            <a v-for="(link, idx) in baseUrl" :key="idx" 
+               :href="link.url" 
+               target="_blank"
+               class="block text-blue-400 hover:text-blue-300 underline">
+              {{'원문링크' }}
+            </a>
+          </div>
         </section>
 
       </div>
@@ -131,10 +139,13 @@
         <section v-if="showSection0">
           <h3 class="sec-title">0. 종합 요약</h3>
 
-          <p class="text-gray-300 whitespace-pre-line leading-relaxed">
-            {{ streamedOverrall }}
-            <span v-if="cursorAt === 'Overrall'" class="cursor">|</span>
-          </p>
+          <ul class="list-disc pl-5 space-y-1 text-gray-300">
+            <li v-for="(v,i) in streamedOverrall" :key="i">
+              {{ v }}
+              <span v-if="cursorAt === 'Overrall' && i === streamedAnalysis.length - 1"
+                    class="cursor">|</span>
+            </li>
+          </ul>
         </section>
 
         <!-- SECTION 1 (ONE TEXT STREAM) -->
@@ -151,23 +162,19 @@
         <section v-if="showSection2" class="mt-6">
           <h3 class="sec-title">2. 영향받는 제품 목록</h3>
 
-          <table class="w-full text-left text-[13px] text-gray-300 border-collapse">
-            <thead class="text-gray-400 border-b border-gray-600/40">
-              <tr><th class="py-2">항목</th><th class="py-2">제품명</th><th class="py-2">조치</th></tr>
-            </thead>
-
-            <tbody>
-              <tr v-for="(row, idx) in streamedProducts" :key="idx" class="border-b border-gray-700/20">
-                <td class="py-2">{{ row.item }}</td>
-                <td class="py-2">{{ row.product }}</td>
-                <td class="py-2">
-                  {{ row.action }}
-                  <span v-if="cursorAt === 'products' && idx === streamedProducts.length - 1"
-                        class="cursor">|</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div v-for="(table, idx) in streamedProducts" :key="idx" class="mb-6">
+            <h4 class="text-gray-200 font-semibold mb-3">{{ table.product_name }}</h4>
+            <table class="w-full text-left text-[13px] text-gray-300 border-collapse">
+              <thead class="text-gray-400 border-b border-gray-600/40">
+                <tr><th v-for="h in table.headers" :key="h" class="py-2">{{ h }}</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, ridx) in table.rows" :key="ridx" class="border-b border-gray-700/20">
+                  <td v-for="(cell, cidx) in row" :key="cidx" class="py-2">{{ cell }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <!-- SECTION 3 -->
@@ -209,10 +216,14 @@
         <section v-if="showSection6" class="mt-6">
           <h3 class="sec-title">6. 참고 및 원문 링크</h3>
 
-          <p class="text-gray-300 whitespace-pre-line">
-            {{ streamedReferences }}
-            <span v-if="cursorAt === 'references'" class="cursor">|</span>
-          </p>
+          <div class="space-y-2">
+            <a v-for="(link, idx) in streamedReferences" :key="idx" 
+               :href="link.url" 
+               target="_blank"
+               class="block text-blue-400 hover:text-blue-300 underline">
+              {{ '원문링크' }}
+            </a>
+          </div>
         </section>
 
       </div>
@@ -330,7 +341,7 @@ function autoScroll() {
 /* STREAM VARIABLES */
 const isStreaming = ref(false);
 
-const streamedOverrall = ref("");
+const streamedOverrall = ref([]);
 const streamedSection1 = ref("");
 const streamedProducts = ref([]);
 const streamedAnalysis = ref([]);
@@ -408,30 +419,7 @@ async function typeList(targetRef, list, section, speed = 17) {
 /* PRODUCT STREAM */
 async function typeProducts(targetRef, products, section, speed = 17) {
   cursorAt.value = section;
-  targetRef.value = [];
-
-  for (let p of products) {
-    let full = p.action;
-    let typed = "";
-
-    for (let i = 0; i < full.length; i++) {
-      typed += full[i];
-
-      targetRef.value[targetRef.value.length - 1] = {
-        item: p.item,
-        product: p.product,
-        action: typed
-      };
-
-      targetRef.value = [...targetRef.value];
-      autoScroll();
-      await new Promise(r => setTimeout(r, speed));
-    }
-
-    targetRef.value.push({});
-    await new Promise(r => setTimeout(r, 120));
-  }
-
+  targetRef.value = JSON.parse(JSON.stringify(products));
   cursorAt.value = null;
 }
 
@@ -455,13 +443,7 @@ watch(
           } else if (section.title.includes('규제 변경 요약')) {
             baseSection1.value = section.content.join('\n');
           } else if (section.title.includes('제품 분석')) {
-            baseProducts.value = section.tables.flatMap(table => 
-              table.rows.map(row => ({
-                item: row[0],      // 제품 속성
-                product: table.product_name,  // 제품명
-                action: row[1]
-            }))
-          );
+            baseProducts.value = section.tables;
           } else if (section.title.includes('변경 사항')) {
             baseAnalysis.value = section.content;
           } else if (section.title.includes('대응 전략')) {
@@ -474,7 +456,7 @@ watch(
         });
       }
 
-      streamedOverrall.value = "";
+      streamedOverrall.value = [];
       streamedSection1.value = "";
       streamedProducts.value = [];
       streamedAnalysis.value = [];

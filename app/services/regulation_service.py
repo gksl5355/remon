@@ -88,13 +88,13 @@ class RegulationService:
             change_type = section.get("change_type")
             if (change_type == "removed"):
                 change_type = "삭제"
-            elif (change_type == "new_caluse"):
+            elif (change_type == "new_clause"):
                 change_type = "조항 신설"
             elif (change_type == "wording_only"):
                 change_type = "문언 정비"
             elif (change_type == "scope_change"):
                 change_type = "범위 변경"
-            elif (change_type == "" or change_type == None):
+            elif (change_type == "" or change_type is None or change_type == "none"):
                 change_type = "개정 없음"
 
 
