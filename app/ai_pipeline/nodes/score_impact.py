@@ -166,6 +166,13 @@ async def score_impact_node(state: AppState) -> AppState:
     # 🔥 HITL 명시적 메타데이터 우선 처리
     hitl_desired_level = state.get("hitl_desired_impact_level")
     
+    # 🔍 디버깅 로그
+    print("\n" + "="*80)
+    print("📊 [score_impact_node 실행 디버깅]")
+    print("="*80)
+    print(f"1️⃣ hitl_desired_level 확인: {hitl_desired_level}")
+    print(f"2️⃣ LLM 계산 weighted_score: {weighted_score:.2f}")
+    
     if hitl_desired_level:
         # 🎯 HITL 강제 레벨 적용
         impact_level = hitl_desired_level
@@ -178,6 +185,7 @@ async def score_impact_node(state: AppState) -> AppState:
         }
         weighted_score = level_score_map.get(impact_level, weighted_score)
         
+        print(f"3️⃣ ✅ HITL 강제 적용: {impact_level} (score={weighted_score})")
         logger.info(f"[Impact] 🎯 HITL 강제 적용: {impact_level} (score={weighted_score})")
         
         # 사용 후 제거 (다음 실행 시 간섭 방지)
@@ -189,7 +197,10 @@ async def score_impact_node(state: AppState) -> AppState:
             "Medium" if weighted_score >= 2.5 else
             "Low"
         )
+        print(f"3️⃣ ⚪ 기본 로직 적용: {impact_level} (score={weighted_score:.2f})")
         logger.debug(f"[Impact] 기본 로직 적용: {impact_level} (score={weighted_score:.2f})")
+    
+    print("="*80 + "\n")
 
     # -----------------------------
     # 결과 생성 (HITL 근거 처리)

@@ -493,6 +493,18 @@ async def apply_hitl_patch(state: AppState, target_node: str, cleaned_feedback: 
             desired_level = cleaned_feedback
             # 🔥 명시적 메타데이터 전달 (refined_prompt 대신)
             state["hitl_desired_impact_level"] = desired_level
+            
+            # 🔍 디버깅 로그 추가
+            print("\n" + "="*80)
+            print("🎯 [HITL 영향도 조정 디버깅]")
+            print("="*80)
+            print(f"1️⃣ 사용자 입력 (원본): {state.get('_hitl_original_message', 'N/A')}")
+            print(f"2️⃣ LLM 분석 결과 (cleaned_feedback): {cleaned_feedback}")
+            print(f"3️⃣ State 저장 값: state['hitl_desired_impact_level'] = {desired_level}")
+            print(f"4️⃣ 재시작 노드: {target_node}")
+            print(f"5️⃣ 기존 영향도: {state.get('impact_scores', [])}")
+            print("="*80 + "\n")
+            
             logger.info(f"[HITL] 🎯 영향도 강제 레벨 설정: {desired_level}")
             
             error_summary = f"CRITICAL INSTRUCTION: Force impact_level to '{desired_level}' and reasoning to 'Human in the loop'.\n" + \
@@ -628,6 +640,9 @@ async def hitl_node(state: AppState) -> AppState:
         
         # (2) 피드백 정제
         cleaned = refine_hitl_feedback(user_msg, target)
+        
+        # 🔍 원본 메시지 저장 (디버깅용)
+        state["_hitl_original_message"] = user_msg
         
         # (3) state 패치 (독립적 처리 + DB 로드)
         new_state = await apply_hitl_patch(state, target, cleaned)
