@@ -1,5 +1,4 @@
 # app/ai_pipeline/nodes/validator.py
-
 import logging
 import json
 import re
@@ -8,7 +7,6 @@ from openai import OpenAI
 logger = logging.getLogger(__name__)
 client = OpenAI()
 
-
 # ------------------------------------------------------------
 # 1) Node별 원본 프롬프트 및 스키마 로드
 # ------------------------------------------------------------
@@ -16,9 +14,13 @@ from app.ai_pipeline.prompts.mapping_prompt import MAPPING_PROMPT, MAPPING_SCHEM
 from app.ai_pipeline.prompts.strategy_prompt import STRATEGY_PROMPT, STRATEGY_SCHEMA
 from app.ai_pipeline.prompts.impact_prompt import IMPACT_PROMPT, IMPACT_SCHEMA
 
-# Global validator prompt 
+# Global validator prompt
 from app.ai_pipeline.prompts.validator_prompt import VALIDATOR_PROMPT
 from app.ai_pipeline.prompts.refined_prompt import REFINED_PROMPT
+
+# HITL(hitl_target_node, hitl_feedback / hitl_feedback_text)
+from app.ai_pipeline.state import AppState
+
 
 # ------------------------------------------------------------
 # Refined Prompt Generator
@@ -50,7 +52,10 @@ def generate_refined_prompt(node_name: str, pipeline_state: dict, error_summary:
         resp = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You rewrite prompts to be strict and error-proof."},
+                {
+                    "role": "system",
+                    "content": "You rewrite prompts to be strict and error-proof.",
+                },
                 {"role": "user", "content": refine_request},
             ],
             temperature=0,
@@ -66,29 +71,45 @@ def generate_refined_prompt(node_name: str, pipeline_state: dict, error_summary:
 # ------------------------------------------------------------
 # Main Validator Node
 # ------------------------------------------------------------
-def validator_node(state):
+def validator_node(state: AppState):
     logger.info("[Validator] Running Global Validation…")
 
+    # 자동 검증용 retry 카운터
     retry_count = state.get("validation_retry_count", 0) or 0
     state["validation_retry_count"] = retry_count + 1
 
-    # Retry 제한: 1회
-    if retry_count >= 1:
-        logger.warning("[Validator] Retry limit reached → accepting result.")
-        return {
-            "validation_result": {"is_valid": True, "restart_node": None},
-            "restarted_node": None,
-        }
-
-    # -----------------------------
-    # 검증 입력 데이터 준비
-    # -----------------------------
     compiled_input = {
         "mapping": state.get("mapping"),
         "strategy": state.get("strategies"),
         "impact": state.get("impact_scores"),
         "regulation": state.get("regulation"),
     }
+
+    # HITL 로직은 hitl.py에서 독립적으로 처리됨
+
+    # ------------------------------------------------
+    # [자동 검증] (그래프 내에서만 사용)
+    # ------------------------------------------------
+
+    # HITL 이후 첫 번째 validator 호출이면 자동 검증 스킵
+    if state.get("restarted_node"):
+        logger.info("[Validator] HITL restart detected → skip validation and proceed")
+        # HITL 플래그 제거
+        state["restarted_node"] = None
+        return {
+            **state,
+            "validation_result": {"is_valid": True, "restart_node": None, "source": "hitl_skip"},
+        }
+    
+    # Retry 제한: 1회 (자동 Validator 경로에만 적용)
+    #  - retry_count: 이 validator_node가 호출된 횟수-1 이라고 생각하면 됨
+    if retry_count >= 1:
+        logger.warning("[Validator] Retry limit reached → accepting result.")
+        return {
+            **state,  # ✅ 기존 state 보존
+            "validation_result": {"is_valid": True, "restart_node": None},
+            "restarted_node": None,
+        }
 
     payload = json.dumps(compiled_input, ensure_ascii=False, indent=2)
 
@@ -114,6 +135,7 @@ def validator_node(state):
     except Exception as e:
         logger.error(f"[Validator] Parsing error → fallback accept: {e}")
         return {
+            **state,  # ✅ 기존 state 보존
             "validation_result": {"is_valid": True, "restart_node": None},
             "restarted_node": None,
         }
@@ -126,6 +148,7 @@ def validator_node(state):
     # -----------------------------
     if not restart_node:
         return {
+            **state,  # ✅ 기존 state 보존
             "validation_result": decision,
             "restarted_node": None,
         }
@@ -143,17 +166,19 @@ def validator_node(state):
 
     if refined_prompt:
         state[f"refined_{restart_node}_prompt"] = refined_prompt
-        logger.info(f"[Validator] Refined prompt saved to state['refined_{restart_node}_prompt']")
+        logger.info(
+            f"[Validator] Refined prompt saved to state['refined_{restart_node}_prompt']"
+        )
 
     # -----------------------------
-    # 문제 발생 노드 초기화
+    # 문제 발생 노드만 초기화 (의존성 체인 제거)
     # -----------------------------
     if restart_node == "map_products":
         state["mapping"] = None
+        state["product_info"] = None  # ⭐ 재시도 시 제품 재선택 허용
 
     elif restart_node == "generate_strategy":
         state["strategies"] = None
-
     elif restart_node == "score_impact":
         state["impact_scores"] = None
 

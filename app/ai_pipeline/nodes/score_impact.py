@@ -64,21 +64,16 @@ async def score_impact_node(state: AppState) -> AppState:
 
     regulation = state.get("regulation", {})
     mapping: MappingResults | None = state.get("mapping")
-    strategy: StrategyResults | None = state.get("strategy")
-    strategies_list = state.get("strategies")
-
-    # 전략 형태 보정
-    if strategy is None and strategies_list:
-        strategy = {"items": [{"summary": s} for s in strategies_list]}
+    strategies_list = state.get("strategies", [])
 
     # 매핑/전략 없으면 스킵
-    if not mapping or not strategy:
-        logger.warning("[Impact] Skip: mapping or strategy missing")
+    if not mapping or not strategies_list:
+        logger.warning("[Impact] Skip: mapping or strategies missing")
         return state
 
     logger.info("[Impact] Starting impact scoring...")
     logger.debug("[Impact] Mapping items: %s", mapping.get("items"))
-    logger.debug("[Impact] Strategy items: %s", strategy.get("items"))
+    logger.debug("[Impact] Strategy items: %s", strategies_list)
 
     # -----------------------------
     # INPUT 전처리
@@ -104,9 +99,7 @@ async def score_impact_node(state: AppState) -> AppState:
             "gap": item.get("gap"),
         })
 
-    strategy_text = " ".join(
-        s.get("summary", "") for s in strategy.get("items", [])
-    ).strip()
+    strategy_text = " ".join(strategies_list).strip()
 
     # -----------------------------
     # 프롬프트 생성 + 로그
@@ -116,6 +109,7 @@ async def score_impact_node(state: AppState) -> AppState:
     if state.get("refined_score_impact_prompt"):
         prompt = state["refined_score_impact_prompt"]
         logger.info("[Impact] Using REFINED IMPACT PROMPT from validator")
+        logger.debug(f"[Impact] Refined prompt content: {prompt[:200]}...")  # 디버깅용
     else:
         prompt = IMPACT_PROMPT.format(
             regulation_text=regulation_text,
@@ -155,8 +149,19 @@ async def score_impact_node(state: AppState) -> AppState:
 
     logger.debug("[Impact] Raw score dict: %s", raw_scores)
 
+    # 🔧 LLM이 dict로 반환한 경우 숫자 추출
+    for key, value in list(raw_scores.items()):
+        if isinstance(value, dict):
+            # 스키마 반환 감지 (type/description 필드)
+            if 'type' in value and 'description' in value:
+                logger.error(f"[Impact] {key} is schema, not score! Skipping...")
+                raw_scores[key] = 0
+            else:
+                raw_scores[key] = value.get('score') or value.get('value') or 0
+                logger.warning(f"[Impact] {key} was dict, extracted: {raw_scores[key]}")
+
     # -----------------------------
-    # 가중합 계산
+    # 가중합 계산 및 HITL 강제 레벨 적용
     # -----------------------------
     weights = {
         "directness": 0.20,
@@ -168,15 +173,49 @@ async def score_impact_node(state: AppState) -> AppState:
     }
 
     weighted_score = sum(raw_scores.get(k, 0) * w for k, w in weights.items())
-    impact_level = (
-        "High" if weighted_score >= 4 else
-        "Medium" if weighted_score >= 2.5 else
-        "Low"
-    )
+    
+    # HITL refined prompt에서 강제 레벨 지정이 있는지 확인
+    if state.get("refined_score_impact_prompt"):
+        refined_prompt = state["refined_score_impact_prompt"].upper()  # 대소문자 무시
+        if "'LOW'" in refined_prompt or "LOW" in refined_prompt:
+            impact_level = "Low"
+            weighted_score = 2.0  # HITL 요청 점수로 고정
+            logger.info("[Impact] HITL override: Force Low level (2.0)")
+        elif "'HIGH'" in refined_prompt or "HIGH" in refined_prompt:
+            impact_level = "High"
+            weighted_score = 4.5  # HITL 요청 점수로 고정
+            logger.info("[Impact] HITL override: Force High level (4.5)")
+        elif "'MEDIUM'" in refined_prompt or "MEDIUM" in refined_prompt:
+            impact_level = "Medium"
+            weighted_score = 3.0  # HITL 요청 점수로 고정
+            logger.info("[Impact] HITL override: Force Medium level (3.0)")
+        else:
+            # 기본 로직
+            impact_level = (
+                "High" if weighted_score >= 4 else
+                "Medium" if weighted_score >= 2.5 else
+                "Low"
+            )
+    else:
+        # 기본 로직
+        impact_level = (
+            "High" if weighted_score >= 4 else
+            "Medium" if weighted_score >= 2.5 else
+            "Low"
+        )
 
     # -----------------------------
-    # 결과 생성
+    # 결과 생성 (HITL 근거 처리)
     # -----------------------------
+    # HITL에서 근거를 'Human in the loop'으로 대체
+    if state.get("refined_score_impact_prompt") and "HUMAN IN THE LOOP" in state["refined_score_impact_prompt"].upper():
+        reasoning = "Human in the loop"
+        logger.info("[Impact] HITL override: reasoning set to 'Human in the loop'")
+    elif isinstance(reasoning, dict):
+        # 스키마 반환 감지
+        logger.error(f"[Impact] reasoning is schema: {reasoning}")
+        reasoning = "LLM returned schema instead of reasoning"
+    
     impact_item: ImpactScoreItem = {
         "raw_scores": raw_scores,
         "weighted_score": round(weighted_score, 2),
@@ -184,15 +223,55 @@ async def score_impact_node(state: AppState) -> AppState:
         "reasoning": reasoning,
     }
 
-    if state.get("impact_scores") is None:
-        state["impact_scores"] = []
+    # HITL 재실행 시 기존 결과 교체
+    state["impact_scores"] = [impact_item]
 
-    state["impact_scores"].append(impact_item)
-
-    logger.info("[Impact] Final Impact Score: %s", impact_item)
-
-    # refined prompt 제거
+    logger.info("[Impact] Final Impact Score: %s (Level: %s, Score: %.2f)", 
+                impact_item, impact_level, weighted_score)
+    
+    # HITL 적용 여부 로그
     if state.get("refined_score_impact_prompt"):
-        state["refined_score_impact_prompt"] = None
+        logger.info("[Impact] ✅ HITL refined prompt applied successfully")
+
+    # 🆕 중간 결과물 저장 (HITL용)
+    regulation_id = None
+    regulation = state.get("regulation", {})
+    if regulation:
+        regulation_id = regulation.get("regulation_id")
+    
+    if not regulation_id:
+        preprocess_results = state.get("preprocess_results", [])
+        if preprocess_results:
+            regulation_id = preprocess_results[0].get("regulation_id")
+    
+    if regulation_id and state.get("impact_scores"):
+        from app.core.repositories.intermediate_output_repository import IntermediateOutputRepository
+        from app.core.database import AsyncSessionLocal
+        
+        logger.info(f"💾 영향도 중간 결과물 저장 시작: regulation_id={regulation_id}")
+        
+        async with AsyncSessionLocal() as session:
+            intermediate_repo = IntermediateOutputRepository()
+            try:
+                intermediate_data = {
+                    "impact_scores": state["impact_scores"],
+                    "raw_scores": impact_item.get("raw_scores"),
+                    "weighted_score": impact_item.get("weighted_score"),
+                    "impact_level": impact_item.get("impact_level"),
+                    "reasoning": impact_item.get("reasoning"),
+                }
+                await intermediate_repo.save_intermediate(
+                    session,
+                    regulation_id=regulation_id,
+                    node_name="score_impact",
+                    data=intermediate_data
+                )
+                await session.commit()
+                logger.info(f"✅ 영향도 중간 결과물 저장 완료: regulation_id={regulation_id}")
+            except Exception as db_err:
+                await session.rollback()
+                logger.error(f"❌ 영향도 중간 결과물 저장 실패: {db_err}")
+    else:
+        logger.warning(f"⚠️ 영향도 중간 결과물 저장 스킵: regulation_id={regulation_id}")
 
     return state

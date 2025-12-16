@@ -1,3 +1,4 @@
+#app/vectorstore/vector_client.py
 """
 module: vector_client.py
 description: Qdrant VectorDB 클라이언트 (삽입 전용 - 검색은 HybridRetriever 사용)
