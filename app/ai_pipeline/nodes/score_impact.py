@@ -150,10 +150,15 @@ async def score_impact_node(state: AppState) -> AppState:
     logger.debug("[Impact] Raw score dict: %s", raw_scores)
 
     # 🔧 LLM이 dict로 반환한 경우 숫자 추출
-    for key, value in raw_scores.items():
+    for key, value in list(raw_scores.items()):
         if isinstance(value, dict):
-            raw_scores[key] = value.get('score') or value.get('value') or 0
-            logger.warning(f"[Impact] {key} was dict, extracted: {raw_scores[key]}")
+            # 스키마 반환 감지 (type/description 필드)
+            if 'type' in value and 'description' in value:
+                logger.error(f"[Impact] {key} is schema, not score! Skipping...")
+                raw_scores[key] = 0
+            else:
+                raw_scores[key] = value.get('score') or value.get('value') or 0
+                logger.warning(f"[Impact] {key} was dict, extracted: {raw_scores[key]}")
 
     # -----------------------------
     # 가중합 계산 및 HITL 강제 레벨 적용
@@ -169,33 +174,28 @@ async def score_impact_node(state: AppState) -> AppState:
 
     weighted_score = sum(raw_scores.get(k, 0) * w for k, w in weights.items())
     
-    # 🔥 HITL 명시적 메타데이터 우선 처리
-    hitl_desired_level = state.get("hitl_desired_impact_level")
-    
-    # 🔍 디버깅 로그
-    print("\n" + "="*80)
-    print("📊 [score_impact_node 실행 디버깅]")
-    print("="*80)
-    print(f"1️⃣ hitl_desired_level 확인: {hitl_desired_level}")
-    print(f"2️⃣ LLM 계산 weighted_score: {weighted_score:.2f}")
-    
-    if hitl_desired_level:
-        # 🎯 HITL 강제 레벨 적용
-        impact_level = hitl_desired_level
-        
-        # 점수 매핑
-        level_score_map = {
-            "Low": 2.0,
-            "Medium": 3.0,
-            "High": 4.5
-        }
-        weighted_score = level_score_map.get(impact_level, weighted_score)
-        
-        print(f"3️⃣ ✅ HITL 강제 적용: {impact_level} (score={weighted_score})")
-        logger.info(f"[Impact] 🎯 HITL 강제 적용: {impact_level} (score={weighted_score})")
-        
-        # 사용 후 제거 (다음 실행 시 간섭 방지)
-        state["hitl_desired_impact_level"] = None
+    # HITL refined prompt에서 강제 레벨 지정이 있는지 확인
+    if state.get("refined_score_impact_prompt"):
+        refined_prompt = state["refined_score_impact_prompt"].upper()  # 대소문자 무시
+        if "'LOW'" in refined_prompt or "LOW" in refined_prompt:
+            impact_level = "Low"
+            weighted_score = 2.0  # HITL 요청 점수로 고정
+            logger.info("[Impact] HITL override: Force Low level (2.0)")
+        elif "'HIGH'" in refined_prompt or "HIGH" in refined_prompt:
+            impact_level = "High"
+            weighted_score = 4.5  # HITL 요청 점수로 고정
+            logger.info("[Impact] HITL override: Force High level (4.5)")
+        elif "'MEDIUM'" in refined_prompt or "MEDIUM" in refined_prompt:
+            impact_level = "Medium"
+            weighted_score = 3.0  # HITL 요청 점수로 고정
+            logger.info("[Impact] HITL override: Force Medium level (3.0)")
+        else:
+            # 기본 로직
+            impact_level = (
+                "High" if weighted_score >= 4 else
+                "Medium" if weighted_score >= 2.5 else
+                "Low"
+            )
     else:
         # 기본 로직
         impact_level = (
@@ -203,18 +203,18 @@ async def score_impact_node(state: AppState) -> AppState:
             "Medium" if weighted_score >= 2.5 else
             "Low"
         )
-        print(f"3️⃣ ⚪ 기본 로직 적용: {impact_level} (score={weighted_score:.2f})")
-        logger.debug(f"[Impact] 기본 로직 적용: {impact_level} (score={weighted_score:.2f})")
-    
-    print("="*80 + "\n")
 
     # -----------------------------
     # 결과 생성 (HITL 근거 처리)
     # -----------------------------
     # HITL에서 근거를 'Human in the loop'으로 대체
-    if hitl_desired_level:
+    if state.get("refined_score_impact_prompt") and "HUMAN IN THE LOOP" in state["refined_score_impact_prompt"].upper():
         reasoning = "Human in the loop"
         logger.info("[Impact] HITL override: reasoning set to 'Human in the loop'")
+    elif isinstance(reasoning, dict):
+        # 스키마 반환 감지
+        logger.error(f"[Impact] reasoning is schema: {reasoning}")
+        reasoning = "LLM returned schema instead of reasoning"
     
     impact_item: ImpactScoreItem = {
         "raw_scores": raw_scores,

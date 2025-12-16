@@ -491,22 +491,6 @@ async def apply_hitl_patch(state: AppState, target_node: str, cleaned_feedback: 
         # 모든 노드에 대해 refined prompt 생성
         if target_node == "score_impact":
             desired_level = cleaned_feedback
-            # 🔥 명시적 메타데이터 전달 (refined_prompt 대신)
-            state["hitl_desired_impact_level"] = desired_level
-            
-            # 🔍 디버깅 로그 추가
-            print("\n" + "="*80)
-            print("🎯 [HITL 영향도 조정 디버깅]")
-            print("="*80)
-            print(f"1️⃣ 사용자 입력 (원본): {state.get('_hitl_original_message', 'N/A')}")
-            print(f"2️⃣ LLM 분석 결과 (cleaned_feedback): {cleaned_feedback}")
-            print(f"3️⃣ State 저장 값: state['hitl_desired_impact_level'] = {desired_level}")
-            print(f"4️⃣ 재시작 노드: {target_node}")
-            print(f"5️⃣ 기존 영향도: {state.get('impact_scores', [])}")
-            print("="*80 + "\n")
-            
-            logger.info(f"[HITL] 🎯 영향도 강제 레벨 설정: {desired_level}")
-            
             error_summary = f"CRITICAL INSTRUCTION: Force impact_level to '{desired_level}' and reasoning to 'Human in the loop'.\n" + \
                            "CRITICAL: All raw_scores values must be plain numbers (1-5), not objects. Example: 'directness': 3"
             logger.info(f"[HITL] Processing score_impact feedback: {desired_level}")
