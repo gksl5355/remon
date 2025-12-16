@@ -4,11 +4,13 @@ import { computed, ref, onMounted } from "vue";
 import axios from 'axios';
 
 /* API 설정 */
-const API_BASE_URL = `http://localhost:8081/api/crawl`;
+const API_BASE_URL =
+  `${import.meta.env.VITE_SPRING_BASE_URL || "https://ingress.skala25a.project.skala-ai.com/skala2-4-17/spring/api"}/crawl`;
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
 });
 
 const localApi = {
