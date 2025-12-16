@@ -422,44 +422,12 @@ async def report_node(state: AppState) -> Dict[str, Any]:
     }
 
     async with AsyncSessionLocal() as db_session:
-        from app.core.repositories.regulation_keynote_repository import (
-            RegulationKeynoteRepository,
-        )
         from app.core.repositories.report_repository import ReportSummaryRepository
 
-        keynote_repo = RegulationKeynoteRepository()
         summary_repo = ReportSummaryRepository()
 
         try:
-            # Change Detection Keynote 저장 (우선)
-            change_keynote_data = state.get("change_keynote_data")
-            if change_keynote_data:
-                logger.info(
-                    f"📝 Change Keynote 데이터 확인: {len(str(change_keynote_data))} bytes"
-                )
-                logger.info(
-                    f"   - regulation_id: {change_keynote_data.get('regulation_id')}"
-                )
-                logger.info(
-                    f"   - section_changes: {len(change_keynote_data.get('section_changes', []))}개"
-                )
-
-                keynote = await keynote_repo.create_keynote(
-                    db_session, change_keynote_data
-                )
-                logger.info(
-                    f"✅ Change Keynote 저장 완료: keynote_id={keynote.keynote_id}"
-                )
-            else:
-                # ⚠️ Fallback: change_keynote_data 없음 (DB 저장 스킵)
-                logger.warning(
-                    "⚠️ change_keynote_data 없음 - Keynote DB 저장 스킵"
-                )
-                logger.warning(
-                    "   원인: change_detection 노드가 실행되지 않았거나 state 전달 실패"
-                )
-                logger.info("   → Slack 알림에 간소화된 정보 포함 예정")
-
+            # Change Detection Keynote는 change_detection 노드에서 이미 저장됨 (중복 제거)
             summary = await summary_repo.create_report_summary(db_session, sections)
             await db_session.commit()  # 즉시 commit
             report_json["report_id"] = summary.summary_id

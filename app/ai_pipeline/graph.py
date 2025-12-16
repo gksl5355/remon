@@ -1,14 +1,18 @@
 # app/ai_pipeline/graph.py
 """
-LangGraph 파이프라인 구성 (HITL 통합 버전)
+module: graph.py
+description: LangGraph 파이프라인 구성 (HITL 통합 + 번역 노드 활성화)
+author: AI Agent
+created: 2025-01-18
+updated: 2025-01-21 (번역 노드 활성화)
 
 흐름:
     preprocess → detect_changes → [embedding] → map_products
-    → generate_strategy → score_impact → validator → report
+    → generate_strategy → score_impact → report → translate
     → (조건부) hitl → validator → ...
 
 HITL 구조:
-    - report 이후, external_hitl_feedback 이 있을 때만 hitl 노드를 호출
+    - translate 이후, external_hitl_feedback 이 있을 때만 hitl 노드를 호출
     - hitl_node에서 사용자 피드백을 분석하여 state를 수정
     - validator 재실행하여 어떤 노드가 다시 실행될지 결정
 """
@@ -102,7 +106,7 @@ def build_graph(start_node: str = "preprocess"):
     graph.add_node("score_impact", score_impact_node)
     graph.add_node("validator", validator_node)
     graph.add_node("report", report_node)
-    # graph.add_node("translate", translate_report_node)  # 번역 노드 비활성화
+    graph.add_node("translate", translate_report_node)  # 번역 노드 활성화
     graph.add_node("hitl", hitl_node)
 
     # -------------------------
@@ -131,7 +135,7 @@ def build_graph(start_node: str = "preprocess"):
     # [TEST] validator 비활성화
     # graph.add_edge("score_impact", "validator")
     graph.add_edge("score_impact", "report")  # validator 우회
-    # graph.add_edge("report", "translate")  # 번역 노드 비활성화
+    graph.add_edge("report", "translate")  # 번역 노드 활성화
 
     # detect_changes → embedding or map_products
     graph.add_conditional_edges(
@@ -161,10 +165,10 @@ def build_graph(start_node: str = "preprocess"):
     # )
 
     # -------------------------
-    # 보고서 후 HITL / 종료 분기 (번역 건너뛰기)
+    # 번역 후 HITL / 종료 분기
     # -------------------------
     graph.add_conditional_edges(
-        "report",
+        "translate",
         _route_after_report,
         {
             "hitl": "hitl",

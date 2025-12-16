@@ -1,4 +1,14 @@
-"""LangGraph node: translate_report"""
+"""
+module: translate_report.py
+description: LangGraph 번역 노드 - 보고서 sections를 한글로 번역
+author: AI Agent
+created: 2025-01-18
+updated: 2025-01-21 (번역 노드 활성화)
+dependencies:
+    - openai
+    - app.core.database
+    - app.ai_pipeline.state
+"""
 
 from __future__ import annotations
 
@@ -126,7 +136,7 @@ RULES:
         async with AsyncSessionLocal() as db_session:
             await db_session.execute(
                 text(
-                    "UPDATE report_summaries SET translation = :trans::jsonb WHERE summary_id = :id"
+                    "UPDATE report_summaries SET translation = CAST(:trans AS jsonb) WHERE summary_id = :id"
                 ),
                 {
                     "trans": json.dumps(translation_data, ensure_ascii=False),
