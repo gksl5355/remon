@@ -3,12 +3,11 @@
 HITL(Human-In-The-Loop) 통합 노드
 
 기능:
-1) intent(hitl/general) 분류
-2) target_node 식별
-3) 피드백 정제
-4) state 패치(hitl_target_node, hitl_feedback_text)
-5) validator_node 호출 → 재시작 노드 결정
-6) LangGraph 내 report 이후에 위치하는 hitl 노드
+1) intent 분류 (question/modification)
+2) question: 답변만 제공 (파이프라인 재실행 없음)
+3) modification: target_node 식별 + 피드백 정제 + 파이프라인 재실행
+4) DB 중간 결과물 활용
+5) LangGraph 내 report 이후에 위치하는 hitl 노드
 """
 
 import os
@@ -16,6 +15,7 @@ import json
 import logging
 import re
 from typing import Dict, Any
+from datetime import datetime
 
 from openai import OpenAI
 from app.ai_pipeline.state import AppState
@@ -32,7 +32,163 @@ client = OpenAI()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 # ============================================================
-# 1) Intent Detection
+# 1) Intent Classification (Question vs Modification)
+# ============================================================
+
+INTENT_CLASSIFICATION_PROMPT = """
+당신은 REMON의 Intent 분류기입니다.
+
+사용자 입력을 2가지로 분류하십시오:
+
+1. **question**: 결과에 대한 질문/설명 요청
+   - 예시: "이 결과가 뭐야?", "왜 이렇게 나왔어?", "영향도가 뭔데?"
+   - 예시: "이 매핑은 어떻게 된 거야?", "전략이 이해가 안 돼"
+   - 예시: "변경 감지가 뭐야?", "이 점수는 어떻게 계산된 거야?"
+
+2. **modification**: 파이프라인 수정 요청
+   - 예시: "매핑을 고쳐줘", "영향도를 낮춰줘", "전략을 다시 만들어줘"
+   - 예시: "변경 감지를 다시 해줘", "제품을 바꿔줘", "다시 분석해줘"
+
+출력(JSON):
+{
+  "intent": "question" | "modification",
+  "confidence": 0.0~1.0,
+  "reasoning": "분류 이유 (한글)"
+}
+"""
+
+def classify_intent(message: str) -> Dict[str, Any]:
+    """사용자 메시지 → intent 분류 (question/modification)"""
+    try:
+        resp = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=[
+                {"role": "system", "content": INTENT_CLASSIFICATION_PROMPT},
+                {"role": "user", "content": message},
+            ],
+            temperature=0,
+        )
+        raw = resp.choices[0].message.content.strip()
+        
+        result = json.loads(raw)
+        return {
+            "intent": result.get("intent", "question"),
+            "confidence": result.get("confidence", 0.5),
+            "reasoning": result.get("reasoning", "")
+        }
+    except Exception as e:
+        logger.warning(f"Intent 분류 실패: {e}, 기본값 question 사용")
+        return {"intent": "question", "confidence": 0.0, "reasoning": "parsing_error"}
+
+
+# ============================================================
+# 2) Question Answering (파이프라인 재실행 없음)
+# ============================================================
+
+async def answer_question(state: AppState, question: str) -> str:
+    """
+    사용자 질문에 대한 답변 생성 (파이프라인 재실행 없음)
+    
+    DB와 state에서 컨텍스트를 수집하여 LLM으로 답변 생성
+    """
+    context_parts = []
+    
+    # 1) 규제 정보
+    regulation = state.get("regulation", {})
+    if regulation:
+        context_parts.append(f"규제명: {regulation.get('title', 'N/A')}")
+        context_parts.append(f"국가: {regulation.get('country', 'N/A')}")
+        context_parts.append(f"인용 코드: {regulation.get('citation_code', 'N/A')}")
+    
+    # 2) 변경 감지 결과
+    change_summary = state.get("change_summary", {})
+    if change_summary:
+        total = change_summary.get("total_changes", 0)
+        high_conf = change_summary.get("high_confidence_changes", 0)
+        context_parts.append(f"변경 감지: 총 {total}개 변경 (고신뢰도 {high_conf}개)")
+    
+    change_results = state.get("change_detection_results", [])
+    if change_results:
+        context_parts.append("\n주요 변경 사항:")
+        for idx, result in enumerate(change_results[:3], 1):
+            if result.get("change_detected"):
+                section = result.get("section_ref", 'Unknown')
+                change_type = result.get("change_type", 'N/A')
+                context_parts.append(f"  {idx}. {section}: {change_type}")
+    
+    # 3) 매핑 결과
+    mapping = state.get("mapping", {})
+    if mapping:
+        items = mapping.get("items", [])
+        product_name = mapping.get("product_name", "Unknown")
+        context_parts.append(f"\n매핑 결과 ({product_name}): {len(items)}개 항목")
+        
+        # 주요 매핑 항목 (applies=True만, 최대 5개)
+        applies_items = [item for item in items if item.get("applies")]
+        for idx, item in enumerate(applies_items[:5], 1):
+            feature = item.get("feature_name", 'N/A')
+            current = item.get("current_value", '-')
+            required = item.get("required_value", '-')
+            context_parts.append(f"  {idx}. {feature}: {current} → {required}")
+    
+    # 4) 영향도
+    impact_scores = state.get("impact_scores", [])
+    if impact_scores:
+        impact = impact_scores[0]
+        level = impact.get("impact_level", 'N/A')
+        score = impact.get("weighted_score", 0.0)
+        reasoning = impact.get("reasoning", '')[:200]
+        context_parts.append(f"\n영향도: {level} (점수: {score:.2f})")
+        if reasoning:
+            context_parts.append(f"근거: {reasoning}...")
+    
+    # 5) 전략
+    strategies = state.get("strategies", [])
+    if strategies:
+        context_parts.append(f"\n대응 전략:")
+        for idx, strategy in enumerate(strategies[:3], 1):
+            context_parts.append(f"  {idx}. {strategy[:150]}...")
+    
+    context = "\n".join(context_parts)
+    
+    # LLM 답변 생성
+    prompt = f"""당신은 REMON 규제 분석 시스템의 설명 전문가입니다.
+
+사용자 질문에 대해 아래 컨텍스트를 기반으로 명확하고 간결하게 답변하세요.
+
+**컨텍스트**:
+{context}
+
+**사용자 질문**:
+{question}
+
+**답변 규칙**:
+1. 한글로 답변 (고유명사, 수치, 법령 조항, 국가 코드는 원문 유지)
+2. 3-5문장으로 간결하게
+3. 컨텍스트에 없는 내용은 "해당 정보가 분석 결과에 포함되지 않았습니다"라고 명시
+4. 전문 용어는 쉽게 풀어서 설명
+5. 구체적인 수치와 예시를 포함
+"""
+    
+    try:
+        resp = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=[
+                {"role": "system", "content": "당신은 규제 분석 결과를 쉽게 설명하는 전문가입니다."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+        )
+        answer = resp.choices[0].message.content.strip()
+        logger.info(f"✅ 질문 답변 생성 완료: {len(answer)} chars")
+        return answer
+    except Exception as e:
+        logger.error(f"❌ 질문 답변 생성 실패: {e}")
+        return "죄송합니다. 답변 생성 중 오류가 발생했습니다. 다시 시도해주세요."
+
+
+# ============================================================
+# 3) Target Node Detection (Modification용)
 # ============================================================
 
 TARGET_NODE_PROMPT = """
@@ -199,6 +355,23 @@ def generate_refined_prompt(node_name: str, pipeline_state: dict, error_summary:
         logger.error(f"[HITL] Unknown node for refinement: {node_name}")
         return None
 
+    # 🆕 중간 결과물 추가 컨텍스트
+    intermediate_context = ""
+    intermediate_data = pipeline_state.get("intermediate_data")
+    if intermediate_data:
+        if node_name == "change_detection" and "change_detection" in intermediate_data:
+            prev_data = intermediate_data["change_detection"]
+            intermediate_context = f"\n\n[PREVIOUS CHANGE DETECTION RESULTS]\n"
+            intermediate_context += f"Total changes detected: {len(prev_data.get('change_detection_results', []))}\n"
+            intermediate_context += f"Summary: {prev_data.get('change_summary', {})}\n"
+        elif node_name == "map_products" and "map_products" in intermediate_data:
+            prev_data = intermediate_data["map_products"]
+            intermediate_context = f"\n\n[PREVIOUS MAPPING RESULTS]\n"
+            intermediate_context += f"Total items: {len(prev_data.get('mapping', {}).get('items', []))}\n"
+            intermediate_context += f"Product: {prev_data.get('product_info', {}).get('product_name', 'Unknown')}\n"
+    
+    error_summary += intermediate_context
+
     refine_request = REFINED_PROMPT.format(
         original_prompt=original_prompt.strip(),
         error_summary=error_summary,
@@ -226,18 +399,42 @@ def generate_refined_prompt(node_name: str, pipeline_state: dict, error_summary:
         return None
 
 
-def apply_hitl_patch(state: AppState, target_node: str, cleaned_feedback: str) -> AppState:
+async def apply_hitl_patch(state: AppState, target_node: str, cleaned_feedback: str) -> AppState:
     """
     HITL 피드백을 독립적으로 처리 (validator 의존성 제거)
+    + DB에서 중간 결과물 로드 및 재활용
     """
     
     logger.info(f"[HITL] Processing feedback for {target_node}: {cleaned_feedback}")
     
+    # 🆕 DB에서 중간 결과물 로드
+    regulation_id = state.get("regulation", {}).get("regulation_id")
+    intermediate_data = None
+    
+    if regulation_id:
+        from app.core.repositories.intermediate_output_repository import IntermediateOutputRepository
+        from app.core.database import AsyncSessionLocal
+        
+        async with AsyncSessionLocal() as session:
+            intermediate_repo = IntermediateOutputRepository()
+            try:
+                intermediate_data = await intermediate_repo.get_intermediate(
+                    session,
+                    regulation_id=regulation_id
+                )
+                if intermediate_data:
+                    logger.info(f"✅ 중간 결과물 로드 성공: regulation_id={regulation_id}")
+                    logger.info(f"   노드: {list(intermediate_data.keys())}")
+            except Exception as db_err:
+                logger.error(f"❌ 중간 결과물 로드 실패: {db_err}")
+    
+    # compiled_input에 DB 데이터 병합
     compiled_input = {
         "mapping": state.get("mapping"),
-        "strategies": state.get("strategies"),  # List[str] 형태 유지
+        "strategies": state.get("strategies"),
         "impact": state.get("impact_scores"),
         "regulation": state.get("regulation"),
+        "intermediate_data": intermediate_data,  # 🆕 DB 데이터 추가
     }
     
     # ===============================
@@ -340,6 +537,19 @@ def apply_hitl_patch(state: AppState, target_node: str, cleaned_feedback: str) -
         state["restarted_node"] = target_node
         logger.info(f"[HITL] Set restart node to: {target_node}")
     
+    # 🆕 중간 결과물을 state에 복원 (재실행 시 활용)
+    if intermediate_data and target_node in ["change_detection", "map_products"]:
+        node_data = intermediate_data.get(target_node)
+        if node_data:
+            if target_node == "change_detection":
+                # 변경 감지 결과 복원 (참고용)
+                state["_hitl_previous_change_detection"] = node_data
+                logger.info("✅ 이전 변경 감지 결과 복원 (참고용)")
+            elif target_node == "map_products":
+                # 매핑 결과 복원 (참고용)
+                state["_hitl_previous_mapping"] = node_data
+                logger.info("✅ 이전 매핑 결과 복원 (참고용)")
+    
     # HITL 메타데이터 초기화
     state["hitl_target_node"] = None
     state["hitl_feedback_text"] = None
@@ -352,37 +562,77 @@ def apply_hitl_patch(state: AppState, target_node: str, cleaned_feedback: str) -
 # 4) LangGraph HITL 노드 (report 이후)
 # ============================================================
 
-def hitl_node(state: AppState) -> AppState:
+async def hitl_node(state: AppState) -> AppState:
     """
     LangGraph에서 report 이후 호출되는 HITL 노드.
-
-    - 외부에서 사용자 피드백을 state["external_hitl_feedback"]에 넣어 준다고 가정
-    - 모든 입력을 HITL 피드백으로 처리 (general 분류 제거)
-    - target_node 식별 + 피드백 정제 + state 패치까지 수행
-    - 이후 validator_node가 HITL 모드로 실행되며 restarted_node를 결정
+    
+    Intent 분류:
+    - question: 답변만 제공 (파이프라인 재실행 없음)
+    - modification: 파이프라인 재실행
+    
+    DB에서 중간 결과물 로드 및 재활용
     """
-
+    
     user_msg = state.get("external_hitl_feedback")
-
+    
     if not user_msg:
-        logger.info("[HITL Node] external_hitl_feedback 없음 → 아무 것도 하지 않고 종료")
+        logger.info("[HITL Node] external_hitl_feedback 없음 → 종료")
         return state
-
-    logger.info(f"[HITL Node] 사용자 피드백 수신: {user_msg}")
-
-    # 🔹 피드백 처리 후 즉시 제거 (무한 루프 방지)
+    
+    logger.info(f"[HITL Node] 사용자 입력 수신: {user_msg}")
+    
+    # 피드백 제거 (무한 루프 방지)
     state["external_hitl_feedback"] = None
-    logger.debug(f"[HITL] Cleared external_hitl_feedback after processing: {user_msg}")
-
-    # (1) target_node 식별
-    target = detect_target_node(user_msg)
-    logger.info(f"[HITL Target] target_node = {target}")
-
-    # (2) 피드백 정제
-    cleaned = refine_hitl_feedback(user_msg, target)
-
-    # (3) state 패치 (독립적 처리)
-    new_state = apply_hitl_patch(state, target, cleaned)
-
-    logger.info(f"[HITL Node] 처리 완료 → restarted_node={new_state.get('restarted_node')}")
-    return new_state
+    
+    # 🆕 Intent 분류
+    intent_result = classify_intent(user_msg)
+    intent = intent_result["intent"]
+    confidence = intent_result["confidence"]
+    reasoning = intent_result["reasoning"]
+    
+    logger.info(
+        f"[HITL Intent] {intent} (confidence: {confidence:.2f}) - {reasoning}"
+    )
+    
+    # 🔹 Intent별 처리
+    if intent == "question":
+        # 질문 처리: 답변만 생성 (파이프라인 재실행 없음)
+        logger.info("[HITL Question] 답변 생성 시작...")
+        answer = await answer_question(state, user_msg)
+        
+        # 답변을 state에 저장 (프론트엔드에서 표시)
+        state["hitl_answer"] = {
+            "question": user_msg,
+            "answer": answer,
+            "intent": "question",
+            "confidence": confidence,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+        logger.info(f"[HITL Question] 답변 생성 완료: {answer[:100]}...")
+        
+        # 재실행 없음
+        state["restarted_node"] = None
+        
+    elif intent == "modification":
+        # 수정 처리: 기존 로직 (파이프라인 재실행)
+        logger.info("[HITL Modification] 파이프라인 수정 시작...")
+        
+        # (1) target_node 식별
+        target = detect_target_node(user_msg)
+        logger.info(f"[HITL Target] target_node = {target}")
+        
+        # (2) 피드백 정제
+        cleaned = refine_hitl_feedback(user_msg, target)
+        
+        # (3) state 패치 (독립적 처리 + DB 로드)
+        new_state = await apply_hitl_patch(state, target, cleaned)
+        
+        logger.info(
+            f"[HITL Modification] 처리 완료 → "
+            f"restarted_node={new_state.get('restarted_node')}"
+        )
+        
+        return new_state
+    
+    return state

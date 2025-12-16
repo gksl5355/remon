@@ -218,8 +218,45 @@ async def score_impact_node(state: AppState) -> AppState:
     if state.get("refined_score_impact_prompt"):
         logger.info("[Impact] ✅ HITL refined prompt applied successfully")
 
-    # refined prompt 제거 (다음 HITL을 위해 유지)
-    # if state.get("refined_score_impact_prompt"):
-    #     state["refined_score_impact_prompt"] = None
+    # 🆕 중간 결과물 저장 (HITL용)
+    regulation_id = None
+    regulation = state.get("regulation", {})
+    if regulation:
+        regulation_id = regulation.get("regulation_id")
+    
+    if not regulation_id:
+        preprocess_results = state.get("preprocess_results", [])
+        if preprocess_results:
+            regulation_id = preprocess_results[0].get("regulation_id")
+    
+    if regulation_id and state.get("impact_scores"):
+        from app.core.repositories.intermediate_output_repository import IntermediateOutputRepository
+        from app.core.database import AsyncSessionLocal
+        
+        logger.info(f"💾 영향도 중간 결과물 저장 시작: regulation_id={regulation_id}")
+        
+        async with AsyncSessionLocal() as session:
+            intermediate_repo = IntermediateOutputRepository()
+            try:
+                intermediate_data = {
+                    "impact_scores": state["impact_scores"],
+                    "raw_scores": impact_item.get("raw_scores"),
+                    "weighted_score": impact_item.get("weighted_score"),
+                    "impact_level": impact_item.get("impact_level"),
+                    "reasoning": impact_item.get("reasoning"),
+                }
+                await intermediate_repo.save_intermediate(
+                    session,
+                    regulation_id=regulation_id,
+                    node_name="score_impact",
+                    data=intermediate_data
+                )
+                await session.commit()
+                logger.info(f"✅ 영향도 중간 결과물 저장 완료: regulation_id={regulation_id}")
+            except Exception as db_err:
+                await session.rollback()
+                logger.error(f"❌ 영향도 중간 결과물 저장 실패: {db_err}")
+    else:
+        logger.warning(f"⚠️ 영향도 중간 결과물 저장 스킵: regulation_id={regulation_id}")
 
     return state

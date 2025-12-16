@@ -212,8 +212,8 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
     add_regulation_reference(new_reg_meta, "New")
 
     # 2) Legacy 규제 추가 (change_context에서)
-    change_summary = state.get("change_summary", {})
-    legacy_regulation_id = change_summary.get("legacy_regulation_id")
+    change_summary = state.get("change_summary") or {}
+    legacy_regulation_id = change_summary.get("legacy_regulation_id") if change_summary else None
 
     if legacy_regulation_id:
         change_context = state.get("change_context", {})
@@ -252,7 +252,7 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
 
     # 1. 규제 변경 요약 (change_detection_results 활용)
     change_items = []
-    change_results = state.get("change_detection_results", [])
+    change_results = state.get("change_detection_results") or []  # ✅ None 방지
 
     logger.info(f"🔍 변경 감지 결과 처리: {len(change_results)}개")
 

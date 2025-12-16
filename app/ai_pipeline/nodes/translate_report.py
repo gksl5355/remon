@@ -135,7 +135,7 @@ CRITICAL TRANSLATION RULES:
 
 EXAMPLE:
 Before: "N/A (unrelated): §Unknown addresses validation of testing methods and recordkeeping, not flavor"
-After: "해당 없음 (무관): §Unknown은 테스트 방법 검증 및 기록 보관을 다루며, 향미는 다루지 않습니다"""",
+After: "해당 없음 (무관): §Unknown은 테스트 방법 검증 및 기록 보관을 다루며, 향미는 다루지 않습니다""""",
                 },
                 {"role": "user", "content": sections_json},
             ],

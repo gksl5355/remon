@@ -53,11 +53,11 @@ class ConfidenceScorer:
     def get_confidence_level(
         confidence: float,
     ) -> Literal["HIGH", "MEDIUM", "LOW", "UNCERTAIN"]:
-        if confidence >= 0.9:
+        if confidence >= 0.8:  # 완화: 0.9 → 0.8
             return "HIGH"
-        elif confidence >= 0.7:
+        elif confidence >= 0.5:  # 완화: 0.7 → 0.5
             return "MEDIUM"
-        elif confidence >= 0.5:
+        elif confidence >= 0.4:  # 완화: 0.5 → 0.4
             return "LOW"
         else:
             return "UNCERTAIN"
@@ -419,15 +419,15 @@ class ChangeDetectionNode:
                 result["confidence_score"]
             )
             
-            # LOW/UNCERTAIN 필터링 (변경 감지된 것만)
+            # LOW/UNCERTAIN 필터링 (완화된 조건)
             if result.get("change_detected"):
-                if result["confidence_score"] >= 0.65:  # MEDIUM 이상만
+                if result["confidence_score"] >= 0.5:  # 완화: 0.65 → 0.5
                     filtered_results.append(result)
                 else:
                     logger.debug(f"⚠️ 낮은 신뢰도로 제외: {result.get('section_ref')} ({result['confidence_score']:.2f})")
             else:
-                # 변경 없음은 MEDIUM 이상만 유지
-                if result["confidence_score"] >= 0.7:
+                # 변경 없음도 완화
+                if result["confidence_score"] >= 0.55:  # 완화: 0.7 → 0.55
                     filtered_results.append(result)
         
         # 필터링 전 전체 결과 백업 (Keynote 저장용)
@@ -512,10 +512,13 @@ class ChangeDetectionNode:
 
         # ========== DB 저장 (regulation_change_keynotes 테이블) ==========
         from app.core.repositories.regulation_keynote_repository import RegulationKeynoteRepository
+        from app.core.repositories.intermediate_output_repository import IntermediateOutputRepository
         from app.core.database import AsyncSessionLocal
 
         async with AsyncSessionLocal() as session:
             keynote_repo = RegulationKeynoteRepository()
+            intermediate_repo = IntermediateOutputRepository()
+            
             try:
                 saved_keynote = await keynote_repo.create_keynote(session, keynote_data)
                 await session.commit()
@@ -523,6 +526,28 @@ class ChangeDetectionNode:
             except Exception as db_err:
                 await session.rollback()
                 logger.error(f"❌ Keynote DB 저장 실패: {db_err}")
+                import traceback
+                traceback.print_exc()
+            
+            # 🆕 중간 결과물 저장 (HITL용)
+            try:
+                intermediate_data = {
+                    "change_detection_results": detection_results,
+                    "change_summary": state["change_summary"],
+                    "change_detection_index": change_index,
+                    "regulation_analysis_hints": state.get("regulation_analysis_hints", {})
+                }
+                await intermediate_repo.save_intermediate(
+                    session,
+                    regulation_id=new_regulation_id,
+                    node_name="change_detection",
+                    data=intermediate_data
+                )
+                await session.commit()
+                logger.info(f"✅ 변경 감지 중간 결과물 저장 완료: regulation_id={new_regulation_id}")
+            except Exception as db_err:
+                await session.rollback()
+                logger.error(f"❌ 중간 결과물 저장 실패: {db_err}")
                 import traceback
                 traceback.print_exc()
 

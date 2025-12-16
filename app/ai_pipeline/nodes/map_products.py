@@ -4,11 +4,25 @@ module: map_products.py
 description: 검색 TOOL + LLM 매핑 Node
 author: AI Agent
 created: 2025-01-18
-updated: 2025-12-09
+updated: 2025-01-23
 dependencies:
     - openai
     - app.ai_pipeline.tools.retrieval_tool
     - app.core.repositories.product_repository
+
+changelog:
+    2025-01-20: Phase 1 정리 - 미사용 메서드 삭제 (150줄 감소)
+        - build_product_filters import 제거
+        - _match_features_to_changes() 삭제 (통합 프롬프트로 대체)
+        - _rule_rank_candidates() 삭제 (미사용)
+        - _build_rerank_prompt() 삭제 (통합 프롬프트로 대체)
+        - _rerank_candidates() 삭제 (통합 프롬프트로 대체)
+    2025-01-20: 버그 수정
+        - _is_semantically_related() None 체크 추가
+        - regulation_id 소스 통일 및 로깅 강화
+    2025-01-23: Section 기반 매칭 강화
+        - _match_change_results_to_candidate()에 Section 우선 매칭 추가
+        - Change Detection의 section_ref를 1순위로 활용
 """
 
 import asyncio
@@ -39,7 +53,6 @@ from app.ai_pipeline.state import (
 
 from app.ai_pipeline.prompts.mapping_prompt import MAPPING_PROMPT
 from app.ai_pipeline.prompts.feature_selection_prompt import FEATURE_SELECTION_PROMPT
-from app.ai_pipeline.tools.retrieval_utils import build_product_filters
 from app.ai_pipeline.tools.retrieval_tool import (
     RetrievalOutput,
     get_retrieval_tool,
@@ -484,16 +497,30 @@ Analyze the above and return JSON with selected_features, reasoning, and confide
         change_scope: Dict[str, Any],
         candidate: RetrievedChunk,
     ) -> List[Dict[str, Any]]:
-        """검색된 청크와 연관된 변경 감지 결과를 찾아 regulation_meta에 담는다."""
+        """검색된 청크와 연관된 변경 감지 결과를 찾아 regulation_meta에 담는다 (Section 우선 매칭)."""
         matches: List[Dict[str, Any]] = []
         meta = candidate.get("metadata") or {}
         doc_id = meta.get("meta_doc_id") or meta.get("doc_id")
         chunk_id = candidate.get("chunk_id")
+        
+        # ✅ Section 추출 (정규화)
+        chunk_section = self._extract_section_from_chunk(meta, candidate.get("chunk_text", ""))
+        
         for result in (change_scope.get("actionable_results") or []) + (
             change_scope.get("pending_results") or []
         ):
+            # 🔥 1순위: Section 매칭 (가장 정확)
+            result_section = self._normalize_section_ref(result.get("section_ref", ""))
+            if chunk_section and result_section and chunk_section == result_section:
+                matches.append(result)
+                logger.debug(f"✅ Section 매칭 성공: {chunk_section} == {result_section}")
+                continue
+            
+            # 2순위: chunk_id/doc_id 매칭 (기존 로직)
             if self._candidate_matches_change(result, doc_id, chunk_id):
                 matches.append(result)
+                logger.debug(f"✅ ID 매칭 성공: chunk_id={chunk_id}")
+        
         return matches
 
     def _build_regulation_filters(
@@ -537,70 +564,6 @@ Analyze the above and return JSON with selected_features, reasoning, and confide
                     parts.append(val.strip())
         # 최대 5개 토큰으로 제한 (과도한 쿼리 방지)
         return " ".join(parts[:5]) if parts else None
-    
-    async def _match_features_to_changes(
-        self,
-        present_features: Dict[str, Any],
-        change_results: List[Dict[str, Any]]
-    ) -> Dict[str, Dict[str, Any]]:
-        """LLM을 사용하여 각 feature와 관련된 변경 감지 결과 매칭."""
-        if not change_results or not present_features:
-            return {}
-        
-        # Feature 리스트 생성
-        features_list = [
-            {"name": name, "value": str(value)}
-            for name, value in present_features.items()
-            if name != "feature_units"
-        ]
-        
-        # Change 요약 생성 (최대 10개)
-        changes_summary = []
-        for idx, change in enumerate(change_results[:10]):
-            if not change.get("change_detected"):
-                continue
-            changes_summary.append({
-                "id": change.get("section_ref", f"change_{idx}"),
-                "keywords": change.get("keywords", [])[:5],
-                "numerical_changes": change.get("numerical_changes", []),
-                "snippet": change.get("new_snippet", "")[:100]
-            })
-        
-        if not changes_summary:
-            return {}
-        
-        # LLM 프롬프트
-        prompt = f"""Match product features to regulatory changes.
-
-Features: {json.dumps(features_list, ensure_ascii=False)}
-
-Changes: {json.dumps(changes_summary, ensure_ascii=False)}
-
-Return JSON mapping each feature to relevant changes:
-{{
-  "feature_name": {{
-    "matched_change_ids": ["§1160.5"],
-    "keywords": ["keyword1", "keyword2"],
-    "search_query": "concise search query"
-  }}
-}}
-
-If no match, omit the feature. Return ONLY JSON."""
-        
-        try:
-            res = await self.llm.chat.completions.create(
-                model="gpt-5-nano",
-                messages=[
-                    {"role": "system", "content": "You are a feature-change matcher. Return JSON only."},
-                    {"role": "user", "content": prompt}
-                ]
-            )
-            result = json.loads(res.choices[0].message.content)
-            logger.info(f"🎯 Feature-Change 매칭 완료: {len(result)}개 feature")
-            return result
-        except Exception as e:
-            logger.warning(f"Feature-Change 매칭 실패: {e}")
-            return {}
 
     def _merge_candidate_lists(
         self,
@@ -678,116 +641,6 @@ If no match, omit the feature. Return ONLY JSON."""
                 }
             )
         return entries
-
-    def _rule_rank_candidates(
-        self,
-        candidates: List[RetrievedChunk],
-        change_hint: Optional[Dict[str, Any]],
-        top_n: int = 3,
-    ) -> List[RetrievedChunk]:
-        """
-        규칙 기반 스코어로 상위 후보 추림.
-        - semantic_score 우선
-        - change keywords, numerical_change 텍스트 매칭에 가점
-        """
-        if not candidates:
-            return []
-
-        keywords = set()
-        numbers = set()
-        if change_hint:
-            for kw in change_hint.get("keywords", []) or []:
-                if isinstance(kw, str):
-                    keywords.add(self._normalize_token(kw))
-            for num_entry in change_hint.get("numerical_changes", []) or []:
-                for key in ("legacy_value", "new_value"):
-                    val = num_entry.get(key)
-                    if isinstance(val, str):
-                        numbers.add(val.lower())
-
-        def score(cand: RetrievedChunk) -> float:
-            base = cand.get("semantic_score") or 0.0
-            text = (cand.get("chunk_text") or "").lower()
-            bonus = 0.0
-            for kw in keywords:
-                if kw in text:
-                    bonus += 0.05
-            for num in numbers:
-                if num and num in text:
-                    bonus += 0.05
-            return base + bonus
-
-        ranked = sorted(candidates, key=score, reverse=True)
-        return ranked[:top_n]
-
-    def _build_rerank_prompt(
-        self,
-        change_hint: Dict[str, Any],
-        candidates: List[RetrievedChunk],
-    ) -> str:
-        """
-        rerank + 변경 요약 + 요구사항 추출을 한 번에 수행하도록 LLM 프롬프트 구성.
-        """
-        evidence = {
-            "change_type": change_hint.get("change_type"),
-            "confidence_score": change_hint.get("confidence_score"),
-            "new_snippet": change_hint.get("new_snippet")
-            or change_hint.get("new_text")
-            or change_hint.get("new_ref_text"),
-            "legacy_snippet": change_hint.get("legacy_snippet")
-            or change_hint.get("legacy_text")
-            or change_hint.get("legacy_ref_text"),
-            "keywords": change_hint.get("keywords", []),
-            "numerical_changes": change_hint.get("numerical_changes", []),
-        }
-        cand_payload = []
-        for idx, cand in enumerate(candidates):
-            cand_payload.append(
-                {
-                    "id": cand.get("chunk_id"),
-                    "text": cand.get("chunk_text"),
-                    "metadata": cand.get("metadata", {}),
-                    "semantic_score": cand.get("semantic_score"),
-                }
-            )
-
-        prompt = {
-            "task": "select_best_point_and_summarize_change",
-            "change_evidence": evidence,
-            "candidates": cand_payload,
-            "instructions": (
-                "1) 후보 중 변화와 가장 잘 맞는 point_id를 1개 선택.\n"
-                "2) 무엇이 어떻게 바뀌었는지 한 줄로 요약.\n"
-                "3) 조항 내 요구사항을 bullet로 나열.\n"
-                "4) 최종 신뢰도 0~1 산출. 0.7 미만이면 pending=true."
-            ),
-            "output_schema": {
-                "selected_point_id": "string",
-                "reason": "string",
-                "change_summary": "string",
-                "requirements": ["string"],
-                "final_confidence": "float",
-                "pending": "boolean",
-            },
-        }
-        return json.dumps(prompt, ensure_ascii=False)
-
-    async def _rerank_candidates(
-        self,
-        change_hint: Dict[str, Any],
-        candidates: List[RetrievedChunk],
-    ) -> Optional[Dict[str, Any]]:
-        if not candidates:
-            return None
-        prompt = self._build_rerank_prompt(change_hint, candidates)
-        try:
-            res = await self.llm.chat.completions.create(
-                model="gpt-5-nano",
-                messages=[{"role": "user", "content": prompt}]
-            )
-            return json.loads(res.choices[0].message.content)
-        except Exception:
-            return None
 
     async def _run_search(
         self,
@@ -1003,8 +856,15 @@ If no match, omit the feature. Return ONLY JSON."""
 
     def _is_semantically_related(self, feature_name: str, change: Dict) -> bool:
         """Feature와 Change의 의미적 연관성 판단."""
+        if not change or not isinstance(change, dict):
+            return False
+        
         feature_lower = feature_name.lower()
-        keywords = [k.lower() for k in change.get("keywords", [])]
+        keywords_raw = change.get("keywords", [])
+        if not keywords_raw:
+            return False
+        
+        keywords = [k.lower() for k in keywords_raw if k]
         
         if feature_lower in " ".join(keywords):
             return True
@@ -1859,6 +1719,54 @@ Text: {text}
                     "snapshot_path": snapshot_path,
                     "total_items": len(mapping_results),
                 }
+
+        # 🆕 중간 결과물 저장 (HITL용)
+        # regulation_id 소스 우선순위: 1) regulation 2) preprocess_results
+        regulation_id = None
+        regulation = state.get("regulation", {})
+        if regulation:
+            regulation_id = regulation.get("regulation_id")
+        
+        if not regulation_id:
+            # Fallback: preprocess_results에서 추출
+            preprocess_results = state.get("preprocess_results", [])
+            if preprocess_results:
+                regulation_id = preprocess_results[0].get("regulation_id")
+        
+        if regulation_id and state.get("mapping"):
+            from app.core.repositories.intermediate_output_repository import IntermediateOutputRepository
+            
+            logger.info(f"💾 중간 결과물 저장 시작: regulation_id={regulation_id} (소스: {regulation.get('title', 'N/A')[:50]})")
+            
+            async with AsyncSessionLocal() as session:
+                intermediate_repo = IntermediateOutputRepository()
+                try:
+                    intermediate_data = {
+                        "mapping": state["mapping"],
+                        "product_info": state.get("product_info"),
+                        "mapping_debug": state.get("mapping_debug"),
+                        "regulation_meta": {  # 디버깅용 메타데이터 추가
+                            "regulation_id": regulation_id,
+                            "title": regulation.get("title"),
+                            "country": regulation.get("country"),
+                            "citation_code": regulation.get("citation_code")
+                        }
+                    }
+                    await intermediate_repo.save_intermediate(
+                        session,
+                        regulation_id=regulation_id,
+                        node_name="map_products",
+                        data=intermediate_data
+                    )
+                    await session.commit()
+                    logger.info(f"✅ 매핑 중간 결과물 저장 완료: regulation_id={regulation_id}")
+                except Exception as db_err:
+                    await session.rollback()
+                    logger.error(f"❌ 중간 결과물 저장 실패: regulation_id={regulation_id}, error={db_err}")
+                    import traceback
+                    traceback.print_exc()
+        else:
+            logger.warning(f"⚠️ 중간 결과물 저장 스킵: regulation_id={regulation_id}, mapping_exists={bool(state.get('mapping'))}")
 
         return state
 
