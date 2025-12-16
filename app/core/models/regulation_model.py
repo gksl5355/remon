@@ -21,6 +21,8 @@ class Regulation(Base):
     # country = relationship("Country", back_populates="regulations")
     version = relationship("RegulationVersion", back_populates="regulations", cascade="all, delete-orphan")
 
+    # 추가
+    intermediate_outputs = relationship("IntermediateOutput", back_populates="regulation", cascade="all, delete-orphan")
 
 class RegulationVersion(Base):
     __tablename__ = "regulation_versions"

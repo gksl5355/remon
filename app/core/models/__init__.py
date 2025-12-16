@@ -21,6 +21,7 @@ from .regulation_model import (
 from .impact_model import ImpactScore
 from .report_model import Report, ReportItem, ReportSummary
 from .glossary_model import GlossaryTerm
+from .intermediate_model import IntermediateOutput
 
 __all__ = [
     "Base",
@@ -41,6 +42,7 @@ __all__ = [
     "ReportItem",
     "ReportSummary",
     "GlossaryTerm",
+    "IntermediateOutput", # [추가]
 ]
 
 
