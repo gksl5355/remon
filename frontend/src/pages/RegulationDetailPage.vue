@@ -113,7 +113,7 @@
                 <div class="text-xs text-gray-400 flex gap-6 mt-1">
                     <!-- <span>공포일: <span class="text-gray-300">{{ file.documentInfo.promulgationDate }}</span></span>
                     <span>시행일: <span class="text-gray-300">{{ file.documentInfo.effectiveDate }}</span></span> -->
-                    <span>카테고리: <span class="text-gray-300">{{ file.category }}</span></span>
+                    <span>수집일자: <span class="text-gray-300">{{ documentInfo.collectionTime }}</span></span>
                 </div>
                 </div>
             </div>
@@ -196,7 +196,7 @@
 
                 <!-- 제목 -->
                 <h4 class="text-[14px] font-semibold text-gray-100 leading-tight">
-                    {{ item.title }}
+                    {{ item.title }} : {{ item.summary }}
                 </h4>
 
                 <!-- 신뢰도 텍스트 -->

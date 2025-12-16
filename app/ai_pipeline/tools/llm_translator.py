@@ -154,24 +154,23 @@ class LLMTranslator:
         }
 
     async def _call_llm(self, prompt: str) -> str:
-        """OpenAI Responses API 호출"""
+        """
+        OpenAI Chat Completions API 호출 (AsyncOpenAI + openai==2.8.0)
+        """
         try:
-            response = await self.client.responses.create(
+            response = await self.client.chat.completions.create(
                 model=self.model,
-                input=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "input_text", "text": prompt},
-                        ],
-                    }
+                messages=[
+                    {"role": "user", "content": prompt}
                 ],
-                stream=False,
             )
-            return response.output_text
+
+            return response.choices[0].message.content
+
         except Exception as e:  # noqa: BLE001
             logger.error("LLM call failed: %s", e, exc_info=True)
             raise
+
 
     def _safe_parse_json(self, text: str) -> Optional[dict]:
         """LLM 응답을 JSON으로 파싱, 실패 시 None"""

@@ -30,7 +30,7 @@
         class="text-2xl font-bold tracking-[0.35em] select-none cursor-pointer transition-all"
         :style="isDark
           ? 'color:#FDFF78; text-shadow:0 0 12px rgba(253,255,120,0.7);'
-          : 'color:rgb(173 167 9); text-shadow:none;'
+          : 'color:rgb(40 53 88); text-shadow:none;'
         "
       >
         REMON

@@ -1,17 +1,21 @@
 // 📁 src/services/api.js
 import axios from "axios";
 
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL ||
+  "https://ingress.skala25a.project.skala-ai.com/skala2-4-17/api";
+const SPRING_BASE =
+  import.meta.env.VITE_SPRING_BASE_URL ||
+  "https://ingress.skala25a.project.skala-ai.com/skala2-4-17/spring/api";
+
 const api = axios.create({
-  baseURL: "http://localhost:8000/api", // ✅ FastAPI 기본 엔드포인트
+  baseURL: API_BASE, // ✅ FastAPI 기본 엔드포인트
   timeout: 5000, // 5초 타임아웃
-  headers: {
-    "Content-Type": "application/json",
-  },
 });
 
 // Spring 인증용 api (조영우 작성)
 export const Spring_Api = axios.create({
-  baseURL: "http://localhost:8081/api",
+  baseURL: SPRING_BASE,
   withCredentials: true, // 세션 쿠키
   timeout: 5000,
   headers: {
