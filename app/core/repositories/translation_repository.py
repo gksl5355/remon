@@ -1,69 +1,73 @@
+"""
+module: translation_repository.py
+description: Report 번역 저장 Repository (report_summaries.translation 컬럼 사용)
+author: AI Agent
+created: 2025-01-22
+updated: 2025-01-22
+dependencies:
+    - sqlalchemy.ext.asyncio
+    - app.core.models.report_model
+"""
+
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, update
 
-from app.core.repositories.base_repository import BaseRepository
-from app.core.models.regulation_model import RegulationTranslation
+from app.core.models.report_model import ReportSummary
 
 
-class TranslationRepository(BaseRepository[RegulationTranslation]):
-    """regulation_translations 테이블용 Repository"""
-
-    def __init__(self):
-        super().__init__(RegulationTranslation)
-
-    async def get_by_version_and_language(
-        self, db: AsyncSession, version_id: int, language_code: str
-    ) -> Optional[RegulationTranslation]:
-        result = await db.execute(
-            select(RegulationTranslation).where(
-                RegulationTranslation.regulation_version_id == version_id,
-                RegulationTranslation.language_code == language_code,
-            )
-        )
-        return result.scalar_one_or_none()
-
-    async def get_by_id(
-        self, db: AsyncSession, translation_id: int
-    ) -> Optional[RegulationTranslation]:
-        result = await db.execute(
-            select(RegulationTranslation).where(
-                RegulationTranslation.translation_id == translation_id
-            )
-        )
-        return result.scalar_one_or_none()
-
-    async def upsert_translation(
+class ReportTranslationRepository:
+    """Report 번역 저장 Repository"""
+    
+    async def save_translation(
         self,
         db: AsyncSession,
-        *,
-        version_id: int,
-        language_code: str,
-        translated_text: Optional[str] = None,
-        glossary_term_id: Optional[str] = None,
-        translation_status: str = "queued",
-        s3_key: Optional[str] = None,
-    ) -> RegulationTranslation:
+        summary_id: int,
+        translated_sections: dict
+    ) -> ReportSummary:
         """
-        존재하면 업데이트, 없으면 생성.
+        번역된 보고서를 report_summaries.translation에 저장.
+        
+        Args:
+            db: 데이터베이스 세션
+            summary_id: ReportSummary ID
+            translated_sections: 번역된 sections JSON
+        
+        Returns:
+            업데이트된 ReportSummary
         """
-        existing = await self.get_by_version_and_language(db, version_id, language_code)
-        if existing:
-            return await self.update(
-                db,
-                existing.translation_id,
-                translated_text=translated_text,
-                glossary_term_id=glossary_term_id or existing.glossary_term_id,
-                translation_status=translation_status,
-                s3_key=s3_key or existing.s3_key,
-            )
-
-        return await self.create(
-            db,
-            regulation_version_id=version_id,
-            language_code=language_code,
-            translated_text=translated_text,
-            glossary_term_id=glossary_term_id,
-            translation_status=translation_status,
-            s3_key=s3_key,
+        await db.execute(
+            update(ReportSummary)
+            .where(ReportSummary.summary_id == summary_id)
+            .values(translation=translated_sections)
         )
+        await db.flush()
+        
+        result = await db.execute(
+            select(ReportSummary).where(ReportSummary.summary_id == summary_id)
+        )
+        return result.scalar_one()
+    
+    async def get_translation(
+        self,
+        db: AsyncSession,
+        summary_id: int
+    ) -> Optional[dict]:
+        """
+        저장된 번역 조회.
+        
+        Args:
+            db: 데이터베이스 세션
+            summary_id: ReportSummary ID
+        
+        Returns:
+            번역 JSON 또는 None
+        """
+        result = await db.execute(
+            select(ReportSummary.translation)
+            .where(ReportSummary.summary_id == summary_id)
+        )
+        return result.scalar_one_or_none()
+
+
+__all__ = ["ReportTranslationRepository"]

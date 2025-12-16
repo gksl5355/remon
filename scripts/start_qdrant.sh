@@ -1,5 +1,15 @@
 #!/bin/bash
 # Qdrant 도커 컨테이너 실행
+# Qdrant 컬렉션 내 전체포인트 삭제: curl -X DELETE "http://localhost:6333/collections/{collection_name}/points" -H "accept: application/json" -H "Content-Type: application/json" -d "{\"points\": [1, 2, 3]}"
+# Qdrant 컬랙션 내 전체포인트 삭제:(/skala-2.4.17-regulation 컬렉션 예시)
+# curl -k -X POST "https://qdrant.skala25a.project.skala-ai.com/collections/skala-2.4.17-regulation/points/delete" \
+#   -H "api-key: Skala25a!23$" \
+#   -H "Content-Type: application/json" \
+#   -d '{
+#     "filter": {}
+#   }'
+
+
 
 echo "🚀 Qdrant 서버 시작 중..."
 
