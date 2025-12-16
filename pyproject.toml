@@ -42,7 +42,8 @@ api = [
   "torch>=2.6,<3.0", # 변경: 최소 2.6 이상 (CVE 대응)
   "numpy==2.1.2",
   "pandas==2.2.3",
-  "alembic>=1.17.2",
+  "openai==1.45.0",
+  "alembic>=1.17.2"
   "python-dotenv>=1.2.1",
   # --- Crawler ---
   "beautifulsoup4==4.12.3",
