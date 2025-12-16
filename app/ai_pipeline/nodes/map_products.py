@@ -4,7 +4,7 @@ module: map_products.py
 description: 검색 TOOL + LLM 매핑 Node
 author: AI Agent
 created: 2025-01-18
-updated: 2025-01-23
+updated: 2025-01-23 (HITL 기능 추가)
 dependencies:
     - openai
     - app.ai_pipeline.tools.retrieval_tool
@@ -20,9 +20,10 @@ changelog:
     2025-01-20: 버그 수정
         - _is_semantically_related() None 체크 추가
         - regulation_id 소스 통일 및 로깅 강화
-    2025-01-23: Section 기반 매칭 강화
+    2025-01-23: Section 기반 매칭 강화 + HITL 기능 추가
         - _match_change_results_to_candidate()에 Section 우선 매칭 추가
         - Change Detection의 section_ref를 1순위로 활용
+        - refined_map_products_prompt 지원 (DB 기존 결과 + 전문가 프롬프트)
 """
 
 import asyncio
@@ -897,7 +898,7 @@ Analyze the above and return JSON with selected_features, reasoning, and confide
         }
         return keyword_map.get(feature_name.lower(), [feature_name.lower()])
 
-    def _build_prompt(
+    async def _build_prompt(
         self,
         feature_name,
         present_value,
@@ -907,6 +908,7 @@ Analyze the above and return JSON with selected_features, reasoning, and confide
         chunk_metadata: Optional[Dict[str, Any]] = None,
         change_evidence: Optional[Dict[str, Any]] = None,
         change_context: Optional[Dict[str, Any]] = None,
+        state: Optional[AppState] = None,
     ):
         feature = {
             "name": feature_name,
@@ -915,6 +917,44 @@ Analyze the above and return JSON with selected_features, reasoning, and confide
             "unit": feature_unit,
         }
         feature_json = json.dumps(feature, ensure_ascii=False)
+
+        # 🆕 HITL: DB에서 기존 매핑 결과 로드 + 전문가 프롬프트 조합
+        hitl_context = ""
+        if state and state.get("refined_map_products_prompt"):
+            from app.core.repositories.intermediate_output_repository import IntermediateOutputRepository
+            from app.core.database import AsyncSessionLocal
+            
+            regulation_id = state.get("regulation", {}).get("regulation_id")
+            if regulation_id:
+                try:
+                    async with AsyncSessionLocal() as session:
+                        intermediate_repo = IntermediateOutputRepository()
+                        existing_data = await intermediate_repo.get_intermediate(
+                            session, regulation_id, "map_products"
+                        )
+                        
+                        if existing_data and existing_data.get("mapping", {}).get("items"):
+                            # 해당 feature의 기존 매핑 결과 찾기
+                            existing_items = existing_data["mapping"]["items"]
+                            feature_item = next(
+                                (item for item in existing_items if item.get("feature_name") == feature_name),
+                                None
+                            )
+                            
+                            if feature_item:
+                                hitl_context = f"""\n\n[EXISTING MAPPING - For Reference]
+Previous Applies: {feature_item.get('applies')}
+Previous Required: {feature_item.get('required_value')}
+Previous Reasoning: {feature_item.get('reasoning')}
+
+[EXPERT GUIDANCE]
+{state['refined_map_products_prompt']}
+
+**CRITICAL**: Re-evaluate based on expert guidance above.
+"""
+                                logger.info(f"✅ HITL: Feature {feature_name} - 기존 결과 + 전문가 프롬프트 적용")
+                except Exception as e:
+                    logger.warning(f"⚠️ HITL 컨텍스트 로드 실패: {e}")
 
         # 🔑 변경 감지 증거를 PRIMARY SOURCE로 배치
         primary_source = ""
@@ -996,7 +1036,7 @@ Detected Changes:
             MAPPING_PROMPT.replace("{feature}", feature_json)
             .replace("{chunk}", supporting_ref)
             .replace("{metadata}", section_info)
-            .replace("{change_evidence}", evidence_text)
+            .replace("{change_evidence}", evidence_text + hitl_context)
         )
 
     def _build_search_query(self, feature_name, feature_value, feature_unit):
@@ -1031,22 +1071,58 @@ Detected Changes:
 
         return pruned
 
-    def _build_unified_prompt(
+    async def _build_unified_prompt(
         self,
         feature_name: str,
         present_value: Any,
         target_value: Any,
         feature_unit: str,
         chunks_context: List[Dict[str, Any]],
-        change_context: Dict[str, Any]
+        change_context: Dict[str, Any],
+        state: Optional[AppState] = None
     ) -> str:
-        """피처별 모든 청크를 한 번에 판단하는 통합 프롬프트 생성."""
+        """피처별 모든 청크를 한 번에 판단하는 통합 프롬프트 생성 (HITL 지원)."""
         feature_json = json.dumps({
             "name": feature_name,
             "present_value": present_value,
             "target_value": target_value,
             "unit": feature_unit,
         }, ensure_ascii=False)
+        
+        # 🆕 HITL: DB에서 기존 매핑 결과 로드
+        hitl_context = ""
+        if state and state.get("refined_map_products_prompt"):
+            from app.core.repositories.intermediate_output_repository import IntermediateOutputRepository
+            from app.core.database import AsyncSessionLocal
+            
+            regulation_id = state.get("regulation", {}).get("regulation_id")
+            if regulation_id:
+                try:
+                    async with AsyncSessionLocal() as session:
+                        intermediate_repo = IntermediateOutputRepository()
+                        existing_data = await intermediate_repo.get_intermediate(
+                            session, regulation_id, "map_products"
+                        )
+                        
+                        if existing_data and existing_data.get("mapping", {}).get("items"):
+                            existing_items = existing_data["mapping"]["items"]
+                            feature_item = next(
+                                (item for item in existing_items if item.get("feature_name") == feature_name),
+                                None
+                            )
+                            
+                            if feature_item:
+                                hitl_context = f"""\n\n[EXISTING MAPPING - For Reference]
+Previous Applies: {feature_item.get('applies')}
+Previous Required: {feature_item.get('required_value')}
+Previous Reasoning: {feature_item.get('reasoning')}
+
+[EXPERT GUIDANCE]
+{state['refined_map_products_prompt']}
+"""
+                                logger.info(f"✅ HITL: Feature {feature_name} - 기존 결과 + 전문가 프롬프트 적용")
+                except Exception as e:
+                    logger.warning(f"⚠️ HITL 컨텍스트 로드 실패: {e}")
         
         # Change Context 요약
         change_summary = ""
@@ -1115,7 +1191,7 @@ Text: {text}
   ]
 }}
 
-**CRITICAL**: If chunk discusses different topic than feature, set applies=false with reasoning="N/A (unrelated): §XXX addresses [topic], not {feature_name}"
+**CRITICAL**: If chunk discusses different topic than feature, set applies=false with reasoning="N/A (unrelated): §XXX addresses [topic], not {feature_name}"{hitl_context}
 """
         return prompt
     
@@ -1554,13 +1630,14 @@ Text: {text}
             # 통합 프롬프트 생성 (모든 청크 포함)
             merged_change_context = {**change_context_global} if change_context_global else {}
             
-            unified_prompt = self._build_unified_prompt(
+            unified_prompt = await self._build_unified_prompt(
                 feature_name=feature_name,
                 present_value=present_value,
                 target_value=target_value,
                 feature_unit=unit,
                 chunks_context=chunks_context,
-                change_context=merged_change_context
+                change_context=merged_change_context,
+                state=state
             )
             
             # 단일 LLM 호출 (모든 청크 종합 판단)

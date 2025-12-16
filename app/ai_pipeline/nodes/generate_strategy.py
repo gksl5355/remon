@@ -312,9 +312,19 @@ async def generate_strategy_node(state: AppState) -> Dict[str, Any]:
 
     new_strategies = _parse_strategies(raw_output_text)
 
+    # 🔍 전략 생성 결과 출력
+    print("\n" + "="*80)
+    print("📋 [전략 생성 완료]")
+    print("="*80)
+    for idx, strategy in enumerate(new_strategies, 1):
+        print(f"\n전략 {idx}:")
+        print(f"  {strategy}")
+    print("\n" + "="*80 + "\n")
+
     # refined prompt 성공 후 제거
     if state.get("refined_generate_strategy_prompt"):
         state["refined_generate_strategy_prompt"] = None
+        print("✅ HITL refined prompt 적용 완료 (제거됨)")
 
     # 4) Qdrant history 저장 (실패해도 파이프라인은 계속 진행)
     try:

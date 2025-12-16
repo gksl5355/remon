@@ -4,7 +4,7 @@ module: change_detection.py
 description: 규제 변경 감지 노드 (Reference ID 기반, 전처리 후 임베딩 전)
 author: AI Agent
 created: 2025-01-18
-updated: 2025-01-22 (DB 저장 로직 추가 - regulation_change_keynotes 테이블)
+updated: 2025-01-23 (HITL 기능 추가 - refined_change_detection_prompt 지원)
 dependencies:
     - openai
     - app.vectorstore.vector_client
@@ -373,7 +373,7 @@ class ChangeDetectionNode:
         async def detect_single_pair(pair):
             async with semaphore:
                 return await self._detect_change_by_ref_id(
-                    pair, new_regulation_id, legacy_regulation_id
+                    pair, new_regulation_id, legacy_regulation_id, state
                 )
 
         logger.info(
@@ -920,9 +920,9 @@ class ChangeDetectionNode:
         return matched_pairs
 
     async def _detect_change_by_ref_id(
-        self, pair: Dict[str, Any], new_regulation_id: str, legacy_regulation_id: str
+        self, pair: Dict[str, Any], new_regulation_id: str, legacy_regulation_id: str, state: Optional[AppState] = None
     ) -> Optional[Dict[str, Any]]:
-        """CoT Step 2-4: Reference ID 기반 정밀 변경 감지 (Agentic)."""
+        """CoT Step 2-4: Reference ID 기반 정밀 변경 감지 (Agentic + HITL)."""
         new_block = pair["new_block"]
         legacy_block = pair["legacy_block"]
 
@@ -940,7 +940,47 @@ class ChangeDetectionNode:
             f"{legacy_regulation_id}-{section_ref}-P{legacy_block.get('page_num', 0)}"
         )
 
-        # LLM 호출 (ref_id 기반 정밀 비교)
+        # 🆕 HITL: DB에서 기존 결과 로드 + 전문가 프롬프트 조합
+        hitl_context = ""
+        if state and state.get("refined_change_detection_prompt"):
+            # DB에서 기존 변경 감지 결과 로드
+            from app.core.repositories.intermediate_output_repository import IntermediateOutputRepository
+            from app.core.database import AsyncSessionLocal
+            
+            regulation_id = state.get("regulation", {}).get("regulation_id")
+            if regulation_id:
+                try:
+                    async with AsyncSessionLocal() as session:
+                        intermediate_repo = IntermediateOutputRepository()
+                        existing_data = await intermediate_repo.get_intermediate(
+                            session, regulation_id, "change_detection"
+                        )
+                        
+                        if existing_data and existing_data.get("change_detection_results"):
+                            # 해당 섹션의 기존 결과 찾기
+                            existing_results = existing_data["change_detection_results"]
+                            section_result = next(
+                                (r for r in existing_results if r.get("section_ref") == section_ref),
+                                None
+                            )
+                            
+                            if section_result:
+                                hitl_context = f"""\n\n[EXISTING ANALYSIS - For Reference]
+Previous Detection: {section_result.get('change_detected')}
+Previous Confidence: {section_result.get('confidence_score')}
+Previous Type: {section_result.get('change_type')}
+Previous Reasoning: {section_result.get('reasoning', {})}
+
+[EXPERT GUIDANCE]
+{state['refined_change_detection_prompt']}
+
+**CRITICAL**: Re-evaluate based on expert guidance above.
+"""
+                                logger.info(f"✅ HITL: Section {section_ref} - 기존 결과 + 전문가 프롬프트 적용")
+                except Exception as e:
+                    logger.warning(f"⚠️ HITL 컨텍스트 로드 실패: {e}")
+
+        # LLM 호출 (ref_id 기반 정밀 비교 + HITL)
         try:
             prompt = f"""Perform PRECISE comparison using Reference IDs for context-aware analysis.
 
@@ -952,7 +992,7 @@ class ChangeDetectionNode:
 {legacy_text[:3000]}
 
 **New Regulation (Section {section_ref}):**
-{new_text[:3000]}
+{new_text[:3000]}{hitl_context}
 
 **Task**: 
 1. Use Reference IDs to understand document context and hierarchy
