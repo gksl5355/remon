@@ -277,6 +277,8 @@ class RegulationService:
                 "collectedTime": collected_time,  # 프론트 타이포 호환
             }
 
+            reg_id = keynote_data.get("regulation_id")
+
             return {
                 "id": keynote.keynote_id,
                 "fileName": keynote_data.get("citation_code") or keynote_data.get("title") or f"regulation_{keynote.keynote_id}",
@@ -286,6 +288,7 @@ class RegulationService:
                 "articles": articles,
                 "aiReports": keynote_data.get("change_summary") or {},
                 "cocollected_time": collected_time,
+                "regulation_id": reg_id,
             }
         except Exception as e:
             logger.error(f"Error fetching regulation detail: {e}", exc_info=True)

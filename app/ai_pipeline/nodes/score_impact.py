@@ -176,19 +176,21 @@ async def score_impact_node(state: AppState) -> AppState:
     
     # HITL refined prompt에서 강제 레벨 지정이 있는지 확인
     if state.get("refined_score_impact_prompt"):
-        refined_prompt = state["refined_score_impact_prompt"].upper()  # 대소문자 무시
-        if "'LOW'" in refined_prompt or "LOW" in refined_prompt:
-            impact_level = "Low"
-            weighted_score = 2.0  # HITL 요청 점수로 고정
-            logger.info("[Impact] HITL override: Force Low level (2.0)")
-        elif "'HIGH'" in refined_prompt or "HIGH" in refined_prompt:
+        refined_prompt = state["refined_score_impact_prompt"]
+        
+        # 정확한 매칭을 위해 순서 변경 (HIGH → MEDIUM → LOW)
+        if "Force impact_level to 'High'" in refined_prompt or "FORCE IMPACT_LEVEL TO 'HIGH'" in refined_prompt.upper():
             impact_level = "High"
-            weighted_score = 4.5  # HITL 요청 점수로 고정
-            logger.info("[Impact] HITL override: Force High level (4.5)")
-        elif "'MEDIUM'" in refined_prompt or "MEDIUM" in refined_prompt:
+            weighted_score = 4.5
+            logger.info("[Impact] ✅ HITL override: Force High level (4.5)")
+        elif "Force impact_level to 'Medium'" in refined_prompt or "FORCE IMPACT_LEVEL TO 'MEDIUM'" in refined_prompt.upper():
             impact_level = "Medium"
-            weighted_score = 3.0  # HITL 요청 점수로 고정
-            logger.info("[Impact] HITL override: Force Medium level (3.0)")
+            weighted_score = 3.0
+            logger.info("[Impact] ✅ HITL override: Force Medium level (3.0)")
+        elif "Force impact_level to 'Low'" in refined_prompt or "FORCE IMPACT_LEVEL TO 'LOW'" in refined_prompt.upper():
+            impact_level = "Low"
+            weighted_score = 2.0
+            logger.info("[Impact] ✅ HITL override: Force Low level (2.0)")
         else:
             # 기본 로직
             impact_level = (
@@ -196,6 +198,7 @@ async def score_impact_node(state: AppState) -> AppState:
                 "Medium" if weighted_score >= 2.5 else
                 "Low"
             )
+            logger.warning(f"[Impact] ⚠️ HITL prompt 감지 실패, 기본 로직 사용: {refined_prompt[:100]}...")
     else:
         # 기본 로직
         impact_level = (
@@ -208,9 +211,10 @@ async def score_impact_node(state: AppState) -> AppState:
     # 결과 생성 (HITL 근거 처리)
     # -----------------------------
     # HITL에서 근거를 'Human in the loop'으로 대체
-    if state.get("refined_score_impact_prompt") and "HUMAN IN THE LOOP" in state["refined_score_impact_prompt"].upper():
-        reasoning = "Human in the loop"
-        logger.info("[Impact] HITL override: reasoning set to 'Human in the loop'")
+    if state.get("refined_score_impact_prompt"):
+        if "reasoning to 'Human in the loop'" in state["refined_score_impact_prompt"]:
+            reasoning = "Human in the loop"
+            logger.info("[Impact] ✅ HITL override: reasoning set to 'Human in the loop'")
     elif isinstance(reasoning, dict):
         # 스키마 반환 감지
         logger.error(f"[Impact] reasoning is schema: {reasoning}")
@@ -229,9 +233,10 @@ async def score_impact_node(state: AppState) -> AppState:
     logger.info("[Impact] Final Impact Score: %s (Level: %s, Score: %.2f)", 
                 impact_item, impact_level, weighted_score)
     
-    # HITL 적용 여부 로그
+    # refined prompt 제거 (재실행 방지)
     if state.get("refined_score_impact_prompt"):
-        logger.info("[Impact] ✅ HITL refined prompt applied successfully")
+        state["refined_score_impact_prompt"] = None
+        logger.info("[Impact] ✅ HITL refined prompt 적용 완료 (제거됨)")
 
     # 🆕 중간 결과물 저장 (HITL용)
     regulation_id = None

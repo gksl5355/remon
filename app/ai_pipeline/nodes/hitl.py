@@ -372,12 +372,26 @@ def generate_refined_prompt(node_name: str, pipeline_state: dict, error_summary:
     
     error_summary += intermediate_context
 
-    refine_request = REFINED_PROMPT.format(
-        original_prompt=original_prompt.strip(),
-        error_summary=error_summary,
-        pipeline_state=json.dumps(pipeline_state, ensure_ascii=False, indent=2),
-        schema=json.dumps(schema, ensure_ascii=False, indent=2),
-    )
+    # score_impact는 간단한 override 프롬프트 사용
+    if node_name == "score_impact" and "Force impact_level to" in error_summary:
+        # 직접 override 프롬프트 생성 (REFINED_PROMPT 우회)
+        refine_request = f"""{error_summary}
+
+Original Prompt:
+{original_prompt.strip()}
+
+You MUST include the exact phrase "Force impact_level to 'High'" (or Low/Medium) in your rewritten prompt.
+This phrase is used for automated detection.
+
+Rewrite the prompt to enforce the human override while maintaining the original structure.
+"""
+    else:
+        refine_request = REFINED_PROMPT.format(
+            original_prompt=original_prompt.strip(),
+            error_summary=error_summary,
+            pipeline_state=json.dumps(pipeline_state, ensure_ascii=False, indent=2),
+            schema=json.dumps(schema, ensure_ascii=False, indent=2),
+        )
 
     try:
         resp = client.chat.completions.create(
@@ -488,35 +502,41 @@ async def apply_hitl_patch(state: AppState, target_node: str, cleaned_feedback: 
     # 나머지 노드들 HITL
     # ===============================
     else:
-        # 모든 노드에 대해 refined prompt 생성
+        # 모든 노드에 대해 error_summary 생성
         if target_node == "score_impact":
             desired_level = cleaned_feedback
-            error_summary = f"CRITICAL INSTRUCTION: Force impact_level to '{desired_level}' and reasoning to 'Human in the loop'.\n" + \
-                           "CRITICAL: All raw_scores values must be plain numbers (1-5), not objects. Example: 'directness': 3"
+            error_summary = (
+                f"**CRITICAL OVERRIDE INSTRUCTION**\n\n"
+                f"MANDATORY: Force impact_level to '{desired_level}' and reasoning to 'Human in the loop'.\n\n"
+                f"This is a HUMAN-IN-THE-LOOP correction. You MUST:\n"
+                f"1. Set impact_level = '{desired_level}' (ignore calculated scores)\n"
+                f"2. Set reasoning = 'Human in the loop'\n"
+                f"3. All raw_scores must be plain numbers (1-5), NOT objects\n\n"
+                f"Example CORRECT output:\n"
+                f"{{\n"
+                f"  \"directness\": 3,\n"
+                f"  \"legal_severity\": 4,\n"
+                f"  \"reasoning\": \"Human in the loop\"\n"
+                f"}}\n"
+            )
             logger.info(f"[HITL] Processing score_impact feedback: {desired_level}")
         else:
-            # map_products, generate_strategy는 자연어 그대로
             error_summary = f"HUMAN FEEDBACK: {cleaned_feedback}. INSTRUCTION: Adjust the analysis according to this feedback."
 
-        # 이전 refined prompt 완전 제거 (새 HITL 피드백 반영을 위해)
-        refined_key = f"refined_{target_node}_prompt"
-        if refined_key in state:
-            del state[refined_key]
-            logger.info(f"[HITL] Removed previous refined prompt for {target_node}")
-        
         # 노드별 관련 state 초기화 (누적 방지)
         if target_node == "generate_strategy":
-            state["strategies"] = None  # 기존 전략 초기화
+            state["strategies"] = None
             logger.info(f"[HITL] Cleared existing strategies for regeneration")
         elif target_node == "map_products":
-            state["mapping"] = None  # 기존 매핑 초기화
-            state["product_info"] = None  # ⭐ 재시도 시 제품 재선택 허용
+            state["mapping"] = None
+            state["product_info"] = None
             logger.info(f"[HITL] Cleared existing mapping and product_info for regeneration")
         elif target_node == "score_impact":
-            state["impact_scores"] = None  # 기존 영향도 초기화
+            state["impact_scores"] = None
             logger.info(f"[HITL] Cleared existing impact scores for regeneration")
         
-        # refined prompt 생성 (fallback 처리 추가)
+        # refined prompt 생성
+        refined_key = f"refined_{target_node}_prompt"
         try:
             refined_prompt = generate_refined_prompt(
                 node_name=target_node,
@@ -526,12 +546,12 @@ async def apply_hitl_patch(state: AppState, target_node: str, cleaned_feedback: 
 
             if refined_prompt:
                 state[refined_key] = refined_prompt
-                logger.info(f"[HITL] NEW refined prompt saved to state['{refined_key}']")
-                logger.debug(f"[HITL] New refined prompt content: {refined_prompt[:200]}...")
+                logger.info(f"[HITL] ✅ Refined prompt 생성 성공: {refined_key}")
+                logger.info(f"[HITL] 프롬프트 내용: {refined_prompt[:300]}...")
             else:
-                logger.error(f"[HITL] Failed to generate refined prompt for {target_node} → fallback accept")
+                logger.error(f"[HITL] ❌ Refined prompt 생성 실패: {target_node}")
         except Exception as e:
-            logger.error(f"[HITL] Refined prompt generation error for {target_node}: {e} → fallback accept")
+            logger.error(f"[HITL] ❌ Refined prompt 생성 예외: {target_node}: {e}")
 
         # 재시작 노드 설정
         state["restarted_node"] = target_node

@@ -74,16 +74,49 @@ def _parse_strategies(raw_text: str) -> List[str]:
     LLM이 생성한 텍스트에서 대응 전략 문장 리스트만 추출하는 파서.
 
     처리 규칙:
+    - 0차: JSON 응답 감지 및 파싱 (HITL refined prompt 대응)
     - 1차: '1.', '2)', '-', '•' 등으로 시작하는 라인의 번호/불릿만 제거하고 문장만 수집
-      - 번호 리스트: 한 자리 또는 두 자리 숫자 + ('.' 또는 ')') + 공백 (예: "1. xxx", "2) xxx")
-      - 불릿: "- xxx", "• xxx", "* xxx"
-      - 날짜("2025-11-19")처럼 숫자+'-' 패턴은 건드리지 않음
-    - 2차: 1차 파싱 결과가 비어 있으면,
-      - 전체 출력에서 공백이 아닌 각 줄을 그대로 전략 한 줄로 간주하여 보존
-      - 즉, 형식이 깨져도 내용 자체는 버리지 않고 최대한 살림
+    - 2차: 1차 파싱 결과가 비어 있으면 전체 출력에서 공백이 아닌 각 줄을 그대로 전략 한 줄로 간주
     """
+    import json
+    
     strategies: List[str] = []
-
+    
+    # -------------------------------
+    # 0차: JSON 응답 감지 (HITL refined prompt)
+    # -------------------------------
+    raw_stripped = raw_text.strip()
+    if raw_stripped.startswith('{') or raw_stripped.startswith('[') or '```json' in raw_stripped:
+        try:
+            # 마크다운 코드 블록 제거
+            json_text = raw_stripped
+            if '```json' in json_text:
+                # ```json과 ``` 사이의 내용만 추출
+                start = json_text.find('```json') + 7
+                end = json_text.find('```', start)
+                if end > start:
+                    json_text = json_text[start:end].strip()
+            elif '```' in json_text:
+                # 일반 코드 블록
+                start = json_text.find('```') + 3
+                end = json_text.find('```', start)
+                if end > start:
+                    json_text = json_text[start:end].strip()
+            
+            parsed = json.loads(json_text)
+            
+            # items 배열에서 summary 추출
+            if isinstance(parsed, dict) and 'items' in parsed:
+                for item in parsed['items']:
+                    if isinstance(item, dict) and 'summary' in item:
+                        strategies.append(item['summary'])
+                if strategies:
+                    print(f"✅ JSON 파싱 성공: {len(strategies)}개 전략 추출")
+                    return strategies
+        except (json.JSONDecodeError, KeyError, TypeError) as e:
+            print(f"⚠️ JSON 파싱 실패, 기존 로직 사용: {e}")
+            pass  # JSON 파싱 실패 시 기존 로직으로 fallback
+    
     # 번호 리스트 패턴: "1. 내용", "2) 내용"
     numbered_list_pattern = re.compile(r"^[0-9]{1,2}[.)]\s+")
 
@@ -260,19 +293,20 @@ async def generate_strategy_node(state: AppState) -> Dict[str, Any]:
     product_name = product_info.get("product_name") if isinstance(product_info, dict) else None
     mapped_products = [product_name] if product_name else []
 
-    # 2) history 검색 (HybridRetriever)
+    # 2) history 검색 (HybridRetriever) - SSL 오류 시 graceful fallback
     query_text = _build_query_text(regulation_summary, mapped_products)
+    history_results = []
 
-    # 히스토리 컬렉션이 없을 경우 자동 생성 (검색·저장 모두 동일 컬렉션 사용)
     try:
         history_tool.ensure_collection()
+        history_results = retriever.search(
+            query=query_text,
+            limit=HISTORY_TOP_K,
+        )
+        print(f"✅ History 검색 성공: {len(history_results)}개 결과")
     except Exception as exc:
-        print(f"[generate_strategy_node] history 컬렉션 준비 중 예외 발생: {exc}")
-
-    history_results = retriever.search(
-        query=query_text,
-        limit=HISTORY_TOP_K,
-    )
+        print(f"⚠️ History 검색 실패 (무시하고 계속): {exc}")
+        history_results = []
     # history_results 예:
     # [
     #   {
@@ -294,7 +328,24 @@ async def generate_strategy_node(state: AppState) -> Dict[str, Any]:
 
     if refined_prompt:
         print("[Strategy] Using REFINED STRATEGY PROMPT from validator")
-        prompt = refined_prompt
+        
+        # ✅ Refined prompt에 placeholder가 있으면 채우기
+        products_block = (
+            "\n".join(f"- {p}" for p in mapped_products) 
+            if mapped_products else "- (no mapped products)"
+        )
+        history_block = (
+            "\n".join(f"- {s}" for s in history_strategies)
+            if history_strategies
+            else "- (no relevant historical strategies)"
+        )
+        
+        prompt = refined_prompt.format(
+            regulation_summary=regulation_summary,
+            products_block=products_block,
+            history_block=history_block,
+        )
+        print(f"[Strategy] ✅ Placeholder 채우기 완료: {len(prompt)} chars")
     else:
         prompt = _build_llm_prompt(
             regulation_summary=regulation_summary,

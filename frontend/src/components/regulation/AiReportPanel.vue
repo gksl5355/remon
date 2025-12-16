@@ -368,6 +368,7 @@ const baseAnalysis = ref([]);
 const baseStrategy = ref([]);
 const baseImpactReason = ref("");
 const baseUrl = ref([]);
+const regulationId = ref(null);
 /* MODAL */
 const showModal = ref(false);
 const hvInput = ref("");
@@ -435,6 +436,9 @@ watch(
       const res = await api.get(`/reports/${id}`);
       const data = res.data;
 
+      // regulation_id 저장
+      regulationId.value = data.regulation_id;
+
       // sections 배열을 파싱하여 각 섹션에 맞게 할당
       if (data.sections && Array.isArray(data.sections)) {
         data.sections.forEach(section => {
@@ -461,7 +465,7 @@ watch(
       streamedProducts.value = [];
       streamedAnalysis.value = [];
       streamedStrategy.value = [];
-      streamedImpactReason.value = [];
+      streamedImpactReason.value = "";
       streamedReferences.value = [];
 
       isStreaming.value = false;
@@ -479,46 +483,89 @@ const runHV = async () => {
   showModal.value = false;
   isLoading.value = true;
 
-  await new Promise(r => setTimeout(r, 600));
-  isLoading.value = false;
+  try {
+    // HITL 관련 코드 
+    // const res = await api.post(`/ai/hitl/feedback`, { 
+    //   regulation_id: 214,
+    //   user_message: hvInput.value
+    // });
 
-  isStreaming.value = true;
+    // const data = res.data;
 
-  showSection0.value = false;
-  showSection1.value = false;
-  showSection2.value = false;
-  showSection3.value = false;
-  showSection4.value = false;
-  showSection5.value = false;
-  showSection6.value = false;
+    // if (data.intent === 'question') {
+    //   // 질문: 답변만 표시
+    //   isLoading.value = false;
+    //   alert(data.answer);
+    //   return;
+    // }
 
-  showSection0.value = true;
-  await typeList(streamedOverrall, baseOverall.value, "Overrall");
+    // modification: 리포트 재로드
+    await new Promise(r => setTimeout(r, 600));
+    // const reportRes = await api.get(`/reports/${props.fileId}`);
+    // const reportData = reportRes.data;
 
-  /* SECTION 1: ONE TEXT STREAM */
-  showSection1.value = true;
-  await typeText(streamedSection1, baseSection1.value, "section1");
+    // // regulation_id 업데이트
+    // regulationId.value = reportData.regulation_id;
 
-  /* SECTION 2 */
-  showSection2.value = true;
-  await typeProducts(streamedProducts, baseProducts.value, "products");
+    // // 데이터 업데이트
+    // if (reportData.sections && Array.isArray(reportData.sections)) {
+    //   reportData.sections.forEach(section => {
+    //     if (section.title.includes('종합 요약')) {
+    //       baseOverall.value = section.content;
+    //     } else if (section.title.includes('규제 변경 요약')) {
+    //       baseSection1.value = section.content.join('\n');
+    //     } else if (section.title.includes('제품 분석')) {
+    //       baseProducts.value = section.tables;
+    //     } else if (section.title.includes('변경 사항')) {
+    //       baseAnalysis.value = section.content;
+    //     } else if (section.title.includes('대응 전략')) {
+    //       baseStrategy.value = section.content;
+    //     } else if (section.title.includes('영향 평가')) {
+    //       baseImpactReason.value = section.content.join('\n');
+    //     } else if (section.title.includes('참고 및 원문 링크')) {
+    //       baseUrl.value = section.content;
+    //     }
+    //   });
+    // }
 
-  /* SECTION 3 */
-  showSection3.value = true;
-  await typeList(streamedAnalysis, baseAnalysis.value, "analysis");
+    isLoading.value = false;
+    isStreaming.value = true;
 
-  /* SECTION 4 */
-  showSection4.value = true;
-  await typeList(streamedStrategy, baseStrategy.value, "strategy");
+    showSection0.value = false;
+    showSection1.value = false;
+    showSection2.value = false;
+    showSection3.value = false;
+    showSection4.value = false;
+    showSection5.value = false;
+    showSection6.value = false;
 
-  /* SECTION 5 */
-  showSection5.value = true;
-  await typeText(streamedImpactReason, baseImpactReason.value, "impactReason");
+    showSection0.value = true;
+    await typeList(streamedOverrall, baseOverall.value, "Overrall");
 
-  showSection6.value = true;
-  await typeList(streamedReferences, baseUrl.value, "references");
+    showSection1.value = true;
+    await typeText(streamedSection1, baseSection1.value, "section1");
 
-  isStreaming.value = false;
+    showSection2.value = true;
+    await typeProducts(streamedProducts, baseProducts.value, "products");
+
+    showSection3.value = true;
+    await typeList(streamedAnalysis, baseAnalysis.value, "analysis");
+
+    showSection4.value = true;
+    await typeList(streamedStrategy, baseStrategy.value, "strategy");
+
+    showSection5.value = true;
+    await typeText(streamedImpactReason, baseImpactReason.value, "impactReason");
+
+    showSection6.value = true;
+    await typeList(streamedReferences, baseUrl.value, "references");
+
+    isStreaming.value = false;
+  } catch (err) {
+    console.error('HITL 피드백 실패:', err);
+    isLoading.value = false;
+    alert('피드백 처리 중 오류가 발생했습니다.');
+  }
 };
 
 const openModal = () => (showModal.value = true);
