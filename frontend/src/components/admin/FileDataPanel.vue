@@ -162,6 +162,33 @@
             </svg>
           </button>
 
+          <!-- Run Pipeline -->
+          <button
+            v-if="item.s3_key"
+            class="px-2.5 py-1.5 rounded-md bg-emerald-500/60 hover:bg-emerald-400/80 text-white text-xs font-semibold shadow-sm transition flex items-center justify-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
+            @click.stop="runPipeline(item)"
+            title="AI 파이프라인 실행"
+            :disabled="isRunning(item)"
+          >
+            <template v-if="isRunning(item)">
+              <span class="w-3 h-3 border-2 border-white/60 border-t-transparent rounded-full animate-spin"></span>
+              <span class="text-[11px] leading-none">RUN</span>
+            </template>
+            <template v-else-if="getStatus(item) === 'done'">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-white" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+              </svg>
+            </template>
+            <template v-else-if="getStatus(item) === 'failed' || getStatus(item) === 'error'">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-red-200" viewBox="0 0 24 24" fill="currentColor">
+                <path fill-rule="evenodd" d="M12 2a10 10 0 100 20 10 10 0 000-20zm-.75 5.25a.75.75 0 011.5 0v5a.75.75 0 01-1.5 0v-5zm.75 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+              </svg>
+            </template>
+            <template v-else>
+              <span class="text-[13px] leading-none">🤖</span>
+            </template>
+          </button>
+
           <!-- Download -->
           <button
             class="p-1.5 rounded-md bg-white/10 hover:bg-white/20 transition"
@@ -264,6 +291,7 @@ const filters = ref({
 const countries = ["US", "RU", "ID"];
 const fileList = ref([]);
 const showDateFilter = ref(false);
+const pipelineStatus = ref({});
 
 const toggleDateFilter = () => {
   // 이미 열려 있으면 → 닫으면서 초기화
@@ -332,7 +360,8 @@ onMounted(async () => {
 
     if (data.status === "success") {
       fileList.value = data.files.map(f => {
-        const parts = f.s3_key.split("/");
+        const s3Key = f.s3_key || f.key || f.path || "";
+        const parts = s3Key.split("/");
         const folder = parts[3];
         const country = parts[4];
         const filename = parts[5] || "unknown";
@@ -342,7 +371,7 @@ onMounted(async () => {
           name: filename,
           country,
           type: folder === "regulation" ? "reg" : "report",
-          s3_key: f.s3_key,
+          s3_key: s3Key,
           size: f.size,
           date: f.date
         };
@@ -360,7 +389,7 @@ function addFile(data) {
     name: data.name,
     type: data.type,
     country: data.country,
-    s3_key: data.s3_key,
+    s3_key: data.s3_key || data.key || data.path || "",
     date: data.date
   });
 }
@@ -382,8 +411,13 @@ async function deleteItem(item) {
 
 /* ---------- Download ---------- */
 async function downloadOriginal() {
+  const s3Key = popupTargetItem.value?.s3_key;
+  if (!s3Key) {
+    alert("S3 키 정보가 없습니다.");
+    return;
+  }
   const res = await api.post("/admin/s3/download-url", {
-    key: popupTargetItem.value.s3_key
+    s3_key: s3Key
   });
 
   if (res.data.url) window.open(res.data.url, "_blank");
@@ -402,6 +436,60 @@ function handleDownload(item) {
     showDownloadPopup.value = true;
   } else if (item.type === "report") {
     downloadOriginal();
+  }
+}
+
+/* ---------- Pipeline Trigger ---------- */
+const setStatus = (key, status) => {
+  pipelineStatus.value = { ...pipelineStatus.value, [key]: status };
+};
+const getStatus = item => pipelineStatus.value[item.s3_key || item.id];
+const isRunning = item => getStatus(item) === "running";
+
+async function runPipeline(item) {
+  if (!item.s3_key) {
+    alert("S3 키 정보가 없습니다.");
+    return;
+  }
+  if (!confirm("해당 원문으로 AI 파이프라인을 실행할까요?")) return;
+  try {
+    setStatus(item.s3_key, "running");
+    await api.post("/admin/s3/run-pipeline", { s3_key: item.s3_key });
+    pollPipelineStatus(item.s3_key);
+  } catch (err) {
+    console.error("파이프라인 실행 실패:", err);
+    alert("파이프라인 실행 요청에 실패했습니다.");
+  }
+}
+
+async function pollPipelineStatus(s3Key, attempt = 0) {
+  const MAX_ATTEMPTS = 180; // 약 15분 (5초 간격)
+  const DELAY_MS = 5000;
+  try {
+    const res = await api.get("/admin/s3/pipeline-status", { params: { s3_key: s3Key } });
+    const status = res.data.status || "unknown";
+
+    if (status === "done" || status === "failed") {
+      setStatus(s3Key, status);
+      if (status === "failed" && res.data.error) {
+        console.error("파이프라인 실패:", res.data.error);
+      }
+      return;
+    }
+
+    if (attempt >= MAX_ATTEMPTS) {
+      setStatus(s3Key, "timeout");
+      return;
+    }
+
+    setTimeout(() => pollPipelineStatus(s3Key, attempt + 1), DELAY_MS);
+  } catch (err) {
+    console.error("상태 조회 실패:", err);
+    if (attempt >= MAX_ATTEMPTS) {
+      setStatus(s3Key, "error");
+      return;
+    }
+    setTimeout(() => pollPipelineStatus(s3Key, attempt + 1), DELAY_MS);
   }
 }
 
