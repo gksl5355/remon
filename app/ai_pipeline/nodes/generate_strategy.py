@@ -340,12 +340,17 @@ async def generate_strategy_node(state: AppState) -> Dict[str, Any]:
             else "- (no relevant historical strategies)"
         )
         
-        prompt = refined_prompt.format(
-            regulation_summary=regulation_summary,
-            products_block=products_block,
-            history_block=history_block,
-        )
-        print(f"[Strategy] ✅ Placeholder 채우기 완료: {len(prompt)} chars")
+        try:
+            prompt = refined_prompt.format(
+                regulation_summary=regulation_summary,
+                products_block=products_block,
+                history_block=history_block,
+            )
+            print(f"[Strategy] ✅ Placeholder 채우기 완료: {len(prompt)} chars")
+        except KeyError as e:
+            # JSON 형식 등 중괄호가 있는 경우 format() 실패 → 그대로 사용
+            print(f"[Strategy] ⚠️ Placeholder 채우기 실패 (KeyError: {e}), refined prompt 그대로 사용")
+            prompt = refined_prompt
     else:
         prompt = _build_llm_prompt(
             regulation_summary=regulation_summary,

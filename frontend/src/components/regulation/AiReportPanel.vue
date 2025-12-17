@@ -486,7 +486,7 @@ const runHV = async () => {
   try {
     // HITL 관련 코드 
     // const res = await api.post(`/ai/hitl/feedback`, { 
-    //   regulation_id: 214,
+    //   regulation_id: 218,
     //   user_message: hvInput.value
     // });
 

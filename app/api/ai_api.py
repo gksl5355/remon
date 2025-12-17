@@ -3,11 +3,12 @@ module: ai_api.py
 description: AI 파이프라인 실행 및 HITL API
 author: 조영우
 created: 2025-12-04
-updated: 2025-01-23 (HITL 통합)
+updated: 2025-01-23 (HITL 통합 재실행 구현)
 dependencies:
     - fastapi
     - app.core.database
     - app.ai_pipeline.nodes.hitl
+    - app.services.ai_service
 """
 
 import logging
@@ -18,10 +19,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from scripts import run_full_pipeline
 from app.core.database import get_db
+from app.services.ai_service import AIService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ai", tags=["AI Pipeline"])
+ai_service = AIService()
 
 
 # ==================== Request Models ====================
@@ -62,14 +65,14 @@ async def submit_hitl_feedback(
     db: AsyncSession = Depends(get_db)
 ) -> Dict[str, Any]:
     """
-    HITL 피드백 제출 및 파이프라인 재실행
+    HITL 피드백 제출 및 자동 재실행 (통합 엔드포인트)
     
     사용자 메시지를 받아 intent 분류 후:
-    - question: 답변만 반환
-    - modification: 파이프라인 재실행
+    - question: 답변만 반환 (재실행 없음)
+    - modification: 자동으로 파이프라인 재실행 + 새 보고서 생성
     """
     try:
-        from app.ai_pipeline.nodes.hitl import classify_intent, detect_target_node, refine_hitl_feedback
+        from app.ai_pipeline.nodes.hitl import classify_intent, detect_target_node
         from app.core.repositories.intermediate_output_repository import IntermediateOutputRepository
         
         repo = IntermediateOutputRepository()
@@ -116,21 +119,29 @@ async def submit_hitl_feedback(
             }
         
         else:  # modification
-            # 수정 처리: target_node 식별 및 피드백 정제
+            # 수정 처리: 자동 재실행
             target_node = detect_target_node(request.user_message)
-            cleaned_feedback = refine_hitl_feedback(request.user_message, target_node)
             
             logger.info(
                 f"🔄 HITL 수정 요청: target_node={target_node}, "
-                f"cleaned_feedback={cleaned_feedback}"
+                f"자동 재실행 시작..."
+            )
+            
+            # ✅ 파이프라인 자동 재실행
+            result = await ai_service.run_pipeline_with_hitl(
+                db=db,
+                regulation_id=request.regulation_id,
+                user_message=request.user_message,
+                target_node=target_node
             )
             
             return {
-                "status": "accepted",
+                "status": "completed",
                 "intent": "modification",
-                "regulation_id": request.regulation_id,
-                "target_node": target_node,
-                "message": f"{target_node} 노드 재실행이 필요합니다. 파이프라인을 다시 실행하세요."
+                "regulation_id": result["regulation_id"],
+                "report_id": result["report_id"],
+                "restarted_from": result["restarted_from"],
+                "message": f"파이프라인 재실행 완료. 새 보고서가 생성되었습니다."
             }
         
     except HTTPException:
