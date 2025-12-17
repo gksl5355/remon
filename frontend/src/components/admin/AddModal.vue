@@ -133,12 +133,16 @@ async function uploadFile() {
       throw new Error(res.data.detail || "업로드 실패");
     }
 
+    if (!res.data.s3_key && !res.data.key) {
+      throw new Error("업로드 응답에 s3_key가 없습니다.");
+    }
+
     // 부모로 전달 (FileDataPanel.vue에서 리스트 갱신)
     emit("save", {
       name: form.name,
       country: form.country,
       type: form.type,
-      s3_key: res.data.key,
+      s3_key: res.data.s3_key || res.data.key,
       date: new Date().toISOString().split("T")[0]
     });
 
