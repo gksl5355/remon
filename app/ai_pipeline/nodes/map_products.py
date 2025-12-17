@@ -1,18 +1,35 @@
+#app/ai_pipeline/nodes/map_products.py
 """
 module: map_products.py
 description: 검색 TOOL + LLM 매핑 Node
 author: AI Agent
 created: 2025-01-18
-updated: 2025-12-09
+updated: 2025-01-23 (HITL 기능 추가)
 dependencies:
     - openai
     - app.ai_pipeline.tools.retrieval_tool
     - app.core.repositories.product_repository
+
+changelog:
+    2025-01-20: Phase 1 정리 - 미사용 메서드 삭제 (150줄 감소)
+        - build_product_filters import 제거
+        - _match_features_to_changes() 삭제 (통합 프롬프트로 대체)
+        - _rule_rank_candidates() 삭제 (미사용)
+        - _build_rerank_prompt() 삭제 (통합 프롬프트로 대체)
+        - _rerank_candidates() 삭제 (통합 프롬프트로 대체)
+    2025-01-20: 버그 수정
+        - _is_semantically_related() None 체크 추가
+        - regulation_id 소스 통일 및 로깅 강화
+    2025-01-23: Section 기반 매칭 강화 + HITL 기능 추가
+        - _match_change_results_to_candidate()에 Section 우선 매칭 추가
+        - Change Detection의 section_ref를 1순위로 활용
+        - refined_map_products_prompt 지원 (DB 기존 결과 + 전문가 프롬프트)
 """
 
 import asyncio
 import json
 import logging
+import os
 from decimal import Decimal
 from datetime import datetime
 from pathlib import Path
@@ -36,7 +53,7 @@ from app.ai_pipeline.state import (
 )
 
 from app.ai_pipeline.prompts.mapping_prompt import MAPPING_PROMPT
-from app.ai_pipeline.tools.retrieval_utils import build_product_filters
+from app.ai_pipeline.prompts.feature_selection_prompt import FEATURE_SELECTION_PROMPT
 from app.ai_pipeline.tools.retrieval_tool import (
     RetrievalOutput,
     get_retrieval_tool,
@@ -61,7 +78,7 @@ class MappingNode:
         self,
         llm_client,
         search_tool,
-        top_k: int = 10,
+        top_k: int = 3,
         alpha: float = 0.7,
         product_repository: Optional[ProductRepository] = None,
         max_candidates_per_doc: int = 2,
@@ -88,6 +105,27 @@ class MappingNode:
         normalized = re.sub(r"[§\s]", "", section_ref)
         match = re.search(r"(\d+\.\d+)", normalized)
         return match.group(1) if match else normalized
+    
+    def _extract_country_from_state(self, state: Dict[str, Any]) -> Optional[str]:
+        """state에서 국가 코드 추출."""
+        # 1순위: regulation 메타데이터
+        regulation = state.get("regulation", {})
+        country = regulation.get("country") or regulation.get("jurisdiction_code")
+        if country:
+            return country
+        
+        # 2순위: preprocess_results의 vision 메타데이터
+        preprocess_results = state.get("preprocess_results", [])
+        if preprocess_results:
+            first_result = preprocess_results[0]
+            vision_results = first_result.get("vision_extraction_result", [])
+            if vision_results:
+                metadata = vision_results[0].get("structure", {}).get("metadata", {})
+                country = metadata.get("jurisdiction_code") or metadata.get("country")
+                if country:
+                    return country
+        
+        return None
 
     def _extract_change_scope(
         self,
@@ -238,6 +276,81 @@ class MappingNode:
 
         return filters or None
 
+    async def _llm_select_features(
+        self,
+        present_features: Dict[str, Any],
+        change_results: List[Dict[str, Any]],
+        regulation_hints: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        LLM을 사용하여 매핑 대상 feature 지능적 선택 (규칙 기반 대체).
+        
+        오타, 변형, 간접 관계를 모두 처리하여 누락 방지.
+        """
+        # Feature 리스트 생성
+        features_list = [
+            {
+                "name": name,
+                "value": str(value),
+                "unit": present_features.get("feature_units", {}).get(name)
+            }
+            for name, value in present_features.items()
+            if name != "feature_units"
+        ]
+        
+        # Change 요약 생성 (최대 10개)
+        changes_summary = []
+        for idx, change in enumerate(change_results[:10]):
+            if not change.get("change_detected"):
+                continue
+            changes_summary.append({
+                "section": change.get("section_ref", f"change_{idx}"),
+                "keywords": change.get("keywords", [])[:5],
+                "numerical_changes": change.get("numerical_changes", []),
+                "snippet": change.get("new_snippet", "")[:200],
+                "change_type": change.get("change_type")
+            })
+        
+        # LLM INPUT 구성
+        llm_input = {
+            "product_features": features_list,
+            "change_evidence": changes_summary,
+            "regulation_hints": regulation_hints or {},
+            "instructions": FEATURE_SELECTION_PROMPT
+        }
+        
+        prompt = f"""{FEATURE_SELECTION_PROMPT}
+
+**CURRENT ANALYSIS:**
+
+Product Features:
+{json.dumps(features_list, ensure_ascii=False, indent=2)}
+
+Regulation Changes:
+{json.dumps(changes_summary, ensure_ascii=False, indent=2)}
+
+Regulation Hints:
+{json.dumps(regulation_hints, ensure_ascii=False, indent=2)}
+
+**YOUR TASK:**
+Analyze the above and return JSON with selected_features, reasoning, and confidence.
+"""
+        
+        try:
+            res = await self.llm.chat.completions.create(
+                model="gpt-5-nano",
+                messages=[
+                    {"role": "system", "content": "You are a feature selector. Return JSON only."},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            result = json.loads(res.choices[0].message.content)
+            logger.info(f"🤖 LLM Feature 선택: {len(result.get('selected_features', []))}개")
+            return result
+        except Exception as e:
+            logger.warning(f"LLM feature selection 실패: {e}")
+            return {"selected_features": [], "reasoning": {}, "confidence": 0.0}
+
     def _select_features_for_mapping(
         self,
         present_features: Dict[str, Any],
@@ -329,7 +442,7 @@ class MappingNode:
                             "role": "user",
                             "content": json.dumps(prompt, ensure_ascii=False),
                         }
-                    ],
+                    ]
                 )
                 return json.loads(res.choices[0].message.content)
             except Exception:
@@ -385,16 +498,30 @@ class MappingNode:
         change_scope: Dict[str, Any],
         candidate: RetrievedChunk,
     ) -> List[Dict[str, Any]]:
-        """검색된 청크와 연관된 변경 감지 결과를 찾아 regulation_meta에 담는다."""
+        """검색된 청크와 연관된 변경 감지 결과를 찾아 regulation_meta에 담는다 (Section 우선 매칭)."""
         matches: List[Dict[str, Any]] = []
         meta = candidate.get("metadata") or {}
         doc_id = meta.get("meta_doc_id") or meta.get("doc_id")
         chunk_id = candidate.get("chunk_id")
+        
+        # ✅ Section 추출 (정규화)
+        chunk_section = self._extract_section_from_chunk(meta, candidate.get("chunk_text", ""))
+        
         for result in (change_scope.get("actionable_results") or []) + (
             change_scope.get("pending_results") or []
         ):
+            # 🔥 1순위: Section 매칭 (가장 정확)
+            result_section = self._normalize_section_ref(result.get("section_ref", ""))
+            if chunk_section and result_section and chunk_section == result_section:
+                matches.append(result)
+                logger.debug(f"✅ Section 매칭 성공: {chunk_section} == {result_section}")
+                continue
+            
+            # 2순위: chunk_id/doc_id 매칭 (기존 로직)
             if self._candidate_matches_change(result, doc_id, chunk_id):
                 matches.append(result)
+                logger.debug(f"✅ ID 매칭 성공: chunk_id={chunk_id}")
+        
         return matches
 
     def _build_regulation_filters(
@@ -516,116 +643,6 @@ class MappingNode:
             )
         return entries
 
-    def _rule_rank_candidates(
-        self,
-        candidates: List[RetrievedChunk],
-        change_hint: Optional[Dict[str, Any]],
-        top_n: int = 3,
-    ) -> List[RetrievedChunk]:
-        """
-        규칙 기반 스코어로 상위 후보 추림.
-        - semantic_score 우선
-        - change keywords, numerical_change 텍스트 매칭에 가점
-        """
-        if not candidates:
-            return []
-
-        keywords = set()
-        numbers = set()
-        if change_hint:
-            for kw in change_hint.get("keywords", []) or []:
-                if isinstance(kw, str):
-                    keywords.add(self._normalize_token(kw))
-            for num_entry in change_hint.get("numerical_changes", []) or []:
-                for key in ("legacy_value", "new_value"):
-                    val = num_entry.get(key)
-                    if isinstance(val, str):
-                        numbers.add(val.lower())
-
-        def score(cand: RetrievedChunk) -> float:
-            base = cand.get("semantic_score") or 0.0
-            text = (cand.get("chunk_text") or "").lower()
-            bonus = 0.0
-            for kw in keywords:
-                if kw in text:
-                    bonus += 0.05
-            for num in numbers:
-                if num and num in text:
-                    bonus += 0.05
-            return base + bonus
-
-        ranked = sorted(candidates, key=score, reverse=True)
-        return ranked[:top_n]
-
-    def _build_rerank_prompt(
-        self,
-        change_hint: Dict[str, Any],
-        candidates: List[RetrievedChunk],
-    ) -> str:
-        """
-        rerank + 변경 요약 + 요구사항 추출을 한 번에 수행하도록 LLM 프롬프트 구성.
-        """
-        evidence = {
-            "change_type": change_hint.get("change_type"),
-            "confidence_score": change_hint.get("confidence_score"),
-            "new_snippet": change_hint.get("new_snippet")
-            or change_hint.get("new_text")
-            or change_hint.get("new_ref_text"),
-            "legacy_snippet": change_hint.get("legacy_snippet")
-            or change_hint.get("legacy_text")
-            or change_hint.get("legacy_ref_text"),
-            "keywords": change_hint.get("keywords", []),
-            "numerical_changes": change_hint.get("numerical_changes", []),
-        }
-        cand_payload = []
-        for idx, cand in enumerate(candidates):
-            cand_payload.append(
-                {
-                    "id": cand.get("chunk_id"),
-                    "text": cand.get("chunk_text"),
-                    "metadata": cand.get("metadata", {}),
-                    "semantic_score": cand.get("semantic_score"),
-                }
-            )
-
-        prompt = {
-            "task": "select_best_point_and_summarize_change",
-            "change_evidence": evidence,
-            "candidates": cand_payload,
-            "instructions": (
-                "1) 후보 중 변화와 가장 잘 맞는 point_id를 1개 선택.\n"
-                "2) 무엇이 어떻게 바뀌었는지 한 줄로 요약.\n"
-                "3) 조항 내 요구사항을 bullet로 나열.\n"
-                "4) 최종 신뢰도 0~1 산출. 0.7 미만이면 pending=true."
-            ),
-            "output_schema": {
-                "selected_point_id": "string",
-                "reason": "string",
-                "change_summary": "string",
-                "requirements": ["string"],
-                "final_confidence": "float",
-                "pending": "boolean",
-            },
-        }
-        return json.dumps(prompt, ensure_ascii=False)
-
-    async def _rerank_candidates(
-        self,
-        change_hint: Dict[str, Any],
-        candidates: List[RetrievedChunk],
-    ) -> Optional[Dict[str, Any]]:
-        if not candidates:
-            return None
-        prompt = self._build_rerank_prompt(change_hint, candidates)
-        try:
-            res = await self.llm.chat.completions.create(
-                model="gpt-5-nano",
-                messages=[{"role": "user", "content": prompt}],
-            )
-            return json.loads(res.choices[0].message.content)
-        except Exception:
-            return None
-
     async def _run_search(
         self,
         product: ProductInfo,
@@ -634,35 +651,64 @@ class MappingNode:
         feature_unit: str | None,
         extra_filters: Optional[Dict[str, Any]] = None,
         change_query: Optional[str] = None,
+        state: Optional[AppState] = None,
     ) -> RetrievalResult:
         import asyncio
 
         product_id = product["product_id"]
-        base_query = self._build_search_query(feature_name, feature_value, feature_unit)
+        
+        # 🔥 LLM 기반 쿼리 생성 (변경 힌트 반영)
+        from app.ai_pipeline.tools.query_builder import QueryBuilder
+        
+        change_hints = None
+        if state and state.get("change_detection_results"):
+            # 해당 feature와 관련된 변경 힌트 추출
+            for result in state["change_detection_results"]:
+                if result.get("change_detected"):
+                    keywords = result.get("keywords", [])
+                    if any(feature_name.lower() in str(kw).lower() for kw in keywords):
+                        change_hints = {
+                            "keywords": keywords,
+                            "numerical_changes": result.get("numerical_changes", [])
+                        }
+                        break
+        
+        query_builder = QueryBuilder(llm_client=self.llm)
+        combined_query = await query_builder.build_query(
+            feature_name=feature_name,
+            feature_value=feature_value,
+            feature_unit=feature_unit,
+            change_hints=change_hints
+        )
 
-        # 개선: Change query를 별도 검색하지 않고 결합 (1회 검색)
-        if change_query:
-            combined_query = f"{base_query} {change_query}"
-        else:
-            combined_query = base_query
-
-        # 국가 필터만 사용
+        # 국가 + 신규 규제 필터
         filters = {}
         country = product.get("country")
         if country:
             filters["country"] = country
         if extra_filters:
-            # extra_filters에서도 국가만 추출
             if "country" in extra_filters:
                 filters["country"] = extra_filters["country"]
 
         async def _search_once(q: str) -> RetrievalOutput:
+            # 🔑 regulation_id 기반 필터링 (created_at 제거)
+            search_filters = dict(filters) if filters else {}
+            
+            # state에서 신규 규제 ID 가져오기
+            regulation = state.get("regulation", {}) if state else {}
+            regulation_id = regulation.get("regulation_id") if regulation else None
+            
+            if regulation_id:
+                # 해당 규제의 청크만 검색
+                search_filters["regulation_id"] = regulation_id
+                logger.debug(f"🔍 신규 규제 필터: regulation_id = {regulation_id}")
+            
             return await self.search_tool.search(
                 query=q,
                 strategy="hybrid",
                 top_k=self.top_k,
                 alpha=self.alpha,
-                filters=filters or None,
+                filters=search_filters or None,
             )
 
         async def _search_with_retry(q: str) -> Optional[RetrievalOutput]:
@@ -670,6 +716,14 @@ class MappingNode:
                 try:
                     return await _search_once(q)
                 except Exception as exc:
+                    # Qdrant 503 에러 감지
+                    error_msg = str(exc).lower()
+                    if "503" in error_msg or "service unavailable" in error_msg:
+                        logger.error(
+                            "🚨 Qdrant 서버 503 에러 - 검색 건너뜀: %s", exc
+                        )
+                        return None
+                    
                     if attempt < 2:
                         backoff = 0.5 * (attempt + 1)
                         logger.warning(
@@ -690,6 +744,7 @@ class MappingNode:
         tool_result = await _search_with_retry(combined_query)
 
         if tool_result is None:
+            logger.info(f"⚠️ 검색 실패 - 기존 데이터로 진행: {feature_name}")
             return RetrievalResult(
                 product_id=product_id,
                 feature_name=feature_name,
@@ -800,7 +855,50 @@ class MappingNode:
 
         return None
 
-    def _build_prompt(
+    def _is_semantically_related(self, feature_name: str, change: Dict) -> bool:
+        """Feature와 Change의 의미적 연관성 판단."""
+        if not change or not isinstance(change, dict):
+            return False
+        
+        feature_lower = feature_name.lower()
+        keywords_raw = change.get("keywords", [])
+        if not keywords_raw:
+            return False
+        
+        keywords = [k.lower() for k in keywords_raw if k]
+        
+        if feature_lower in " ".join(keywords):
+            return True
+        
+        semantic_groups = {
+            "nicotine": ["nicotine", "mg/ml", "concentration", "content", "liquid"],
+            "tar": ["tar", "mg", "tobacco", "smoke"],
+            "label": ["label", "warning", "text", "size", "package"],
+            "label_size": ["label", "warning", "text", "size", "package"],
+            "images_size": ["image", "graphic", "picture", "warning"],
+            "battery": ["battery", "mah", "capacity", "power", "lithium"],
+            "menthol": ["menthol", "flavor", "flavored", "mint"],
+            "flavor": ["flavor", "flavored", "taste", "menthol"],
+        }
+        
+        feature_group = semantic_groups.get(feature_lower, [feature_lower])
+        return any(term in " ".join(keywords) for term in feature_group)
+    
+    def _get_expected_keywords(self, feature_name: str) -> List[str]:
+        """Feature별 예상 키워드 반환."""
+        keyword_map = {
+            "nicotine": ["nicotine", "mg/ml", "concentration", "liquid"],
+            "tar": ["tar", "mg", "tobacco", "smoke"],
+            "label": ["label", "warning", "text", "package", "size"],
+            "label_size": ["label", "warning", "text", "package", "size"],
+            "images_size": ["image", "graphic", "picture", "warning"],
+            "battery": ["battery", "mah", "capacity", "lithium"],
+            "menthol": ["menthol", "flavor", "flavored", "mint"],
+            "flavor": ["flavor", "flavored", "taste", "menthol"],
+        }
+        return keyword_map.get(feature_name.lower(), [feature_name.lower()])
+
+    async def _build_prompt(
         self,
         feature_name,
         present_value,
@@ -810,6 +908,7 @@ class MappingNode:
         chunk_metadata: Optional[Dict[str, Any]] = None,
         change_evidence: Optional[Dict[str, Any]] = None,
         change_context: Optional[Dict[str, Any]] = None,
+        state: Optional[AppState] = None,
     ):
         feature = {
             "name": feature_name,
@@ -819,7 +918,60 @@ class MappingNode:
         }
         feature_json = json.dumps(feature, ensure_ascii=False)
 
-        # 조항 번호 추출
+        # 🆕 HITL: DB에서 기존 매핑 결과 로드 + 전문가 프롬프트 조합
+        hitl_context = ""
+        if state and state.get("refined_map_products_prompt"):
+            from app.core.repositories.intermediate_output_repository import IntermediateOutputRepository
+            from app.core.database import AsyncSessionLocal
+            
+            regulation_id = state.get("regulation", {}).get("regulation_id")
+            if regulation_id:
+                try:
+                    async with AsyncSessionLocal() as session:
+                        intermediate_repo = IntermediateOutputRepository()
+                        existing_data = await intermediate_repo.get_intermediate(
+                            session, regulation_id, "map_products"
+                        )
+                        
+                        if existing_data and existing_data.get("mapping", {}).get("items"):
+                            # 해당 feature의 기존 매핑 결과 찾기
+                            existing_items = existing_data["mapping"]["items"]
+                            feature_item = next(
+                                (item for item in existing_items if item.get("feature_name") == feature_name),
+                                None
+                            )
+                            
+                            if feature_item:
+                                hitl_context = f"""\n\n[EXISTING MAPPING - For Reference]
+Previous Applies: {feature_item.get('applies')}
+Previous Required: {feature_item.get('required_value')}
+Previous Reasoning: {feature_item.get('reasoning')}
+
+[EXPERT GUIDANCE]
+{state['refined_map_products_prompt']}
+
+**CRITICAL**: Re-evaluate based on expert guidance above.
+"""
+                                logger.info(f"✅ HITL: Feature {feature_name} - 기존 결과 + 전문가 프롬프트 적용")
+                except Exception as e:
+                    logger.warning(f"⚠️ HITL 컨텍스트 로드 실패: {e}")
+
+        # 🔑 변경 감지 증거를 PRIMARY SOURCE로 배치
+        primary_source = ""
+        if change_evidence:
+            primary_source = f"""\n[PRIMARY SOURCE - CHANGE DETECTION]
+**CRITICAL: Use this as the PRIMARY basis for your analysis**
+
+Change Type: {change_evidence.get('change_type', 'N/A')}
+Confidence: {change_evidence.get('confidence_score', 0)}
+Keywords: {', '.join(change_evidence.get('keywords', []))}
+Legacy Text: {change_evidence.get('legacy_snippet', '')[:200]}
+New Text: {change_evidence.get('new_snippet', '')[:200]}
+Numerical Changes: {change_evidence.get('numerical_changes', [])}
+Reasoning: {change_evidence.get('reasoning', {}).get('step4_final_judgment', 'N/A')}
+"""
+
+        # 조항 번호 (참조용)
         section_info = ""
         if chunk_metadata:
             section = self._extract_section_number(
@@ -828,37 +980,63 @@ class MappingNode:
             citation = chunk_metadata.get("citation_code")
 
             if section or citation:
-                section_info = "\n[REGULATION METADATA]\n"
+                section_info = "\n[REFERENCE - Regulation Metadata]\n"
                 if citation:
                     section_info += f"Citation: {citation}\n"
                 if section:
                     section_info += f"Section: {section}\n"
 
-        # 변경 감지 증거 포맷팅
-        if change_evidence:
-            evidence_text = f"""\n[CHANGE EVIDENCE]
-Change Type: {change_evidence.get('change_type', 'N/A')}
-Confidence: {change_evidence.get('confidence_score', 0)}
-Keywords: {', '.join(change_evidence.get('keywords', []))}
-Reasoning: {change_evidence.get('reasoning', {}).get('step4_final_judgment', 'N/A')}
-"""
-        else:
-            evidence_text = ""
+        # Qdrant 청크는 SUPPORTING REFERENCE로 배치
+        evidence_text = primary_source
 
-        # 🎯 Change Context 주입 (검색 실패 시 보정)
+        # 🎯 Change Context 추가 (변경 감지 직접 데이터)
         if change_context:
-            evidence_text += f"""\n[KNOWN CHANGE - Direct from Change Detection]
+            evidence_text += f"""\n[ADDITIONAL CHANGE CONTEXT]
 Section: {change_context.get('section_ref', 'N/A')}
-Legacy Text: {change_context.get('legacy_snippet', '')[:200]}
-New Text: {change_context.get('new_snippet', '')[:200]}
-Numerical Changes: {change_context.get('numerical_changes', [])}
+Legacy: {change_context.get('legacy_snippet', '')[:200]}
+New: {change_context.get('new_snippet', '')[:200]}
+Numerical: {change_context.get('numerical_changes', [])}
+"""
+        
+        # 🔑 Feature-Change 의미적 일치성 검증 컨텍스트
+        if change_context and change_context.get("all_detected_changes"):
+            feature_related_changes = [
+                c for c in change_context.get("all_detected_changes", [])
+                if c.get("change_detected") and 
+                self._is_semantically_related(feature_name, c)
+            ]
+            
+            if feature_related_changes:
+                expected_kw = self._get_expected_keywords(feature_name)
+                evidence_text += f"""\n[SEMANTIC VALIDATION CONTEXT]
+Current Feature: {feature_name} ({feature_unit})
+Expected Keywords: {', '.join(expected_kw)}
+Related Changes Detected: {len(feature_related_changes)}
+
+Detected Changes:
+"""
+                for c in feature_related_changes[:3]:
+                    evidence_text += f"""- Section {c.get('section_ref')}: {', '.join(c.get('keywords', [])[:5])}
+  Numerical: {c.get('numerical_changes', [])}
+"""
+                
+                evidence_text += f"""\n**CRITICAL VALIDATION**: 
+- If chunk discusses "{feature_name}" or related terms → VALID
+- If chunk discusses unrelated topics (e.g., "label" for "nicotine" feature) → applies=false, reasoning="semantic_mismatch"
+"""
+
+        # Qdrant 청크를 SUPPORTING REFERENCE로 명시
+        supporting_ref = f"""\n[SUPPORTING REFERENCE - Qdrant Chunk]
+**Use this ONLY as supporting context, NOT as primary source**
+
+{chunk_text[:500]}
 """
 
         return (
             MAPPING_PROMPT.replace("{feature}", feature_json)
-            .replace("{chunk}", chunk_text)
+            .replace("{chunk}", supporting_ref)
             .replace("{metadata}", section_info)
-            .replace("{change_evidence}", evidence_text)
+            .replace("{change_evidence}", evidence_text + hitl_context)
         )
 
     def _build_search_query(self, feature_name, feature_value, feature_unit):
@@ -893,10 +1071,157 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
 
         return pruned
 
+    async def _build_unified_prompt(
+        self,
+        feature_name: str,
+        present_value: Any,
+        target_value: Any,
+        feature_unit: str,
+        chunks_context: List[Dict[str, Any]],
+        change_context: Dict[str, Any],
+        state: Optional[AppState] = None
+    ) -> str:
+        """피처별 모든 청크를 한 번에 판단하는 통합 프롬프트 생성 (HITL 지원)."""
+        feature_json = json.dumps({
+            "name": feature_name,
+            "present_value": present_value,
+            "target_value": target_value,
+            "unit": feature_unit,
+        }, ensure_ascii=False)
+        
+        # 🆕 HITL: DB에서 기존 매핑 결과 로드
+        hitl_context = ""
+        if state and state.get("refined_map_products_prompt"):
+            from app.core.repositories.intermediate_output_repository import IntermediateOutputRepository
+            from app.core.database import AsyncSessionLocal
+            
+            regulation_id = state.get("regulation", {}).get("regulation_id")
+            if regulation_id:
+                try:
+                    async with AsyncSessionLocal() as session:
+                        intermediate_repo = IntermediateOutputRepository()
+                        existing_data = await intermediate_repo.get_intermediate(
+                            session, regulation_id, "map_products"
+                        )
+                        
+                        if existing_data and existing_data.get("mapping", {}).get("items"):
+                            existing_items = existing_data["mapping"]["items"]
+                            feature_item = next(
+                                (item for item in existing_items if item.get("feature_name") == feature_name),
+                                None
+                            )
+                            
+                            if feature_item:
+                                hitl_context = f"""\n\n[EXISTING MAPPING - For Reference]
+Previous Applies: {feature_item.get('applies')}
+Previous Required: {feature_item.get('required_value')}
+Previous Reasoning: {feature_item.get('reasoning')}
+
+[EXPERT GUIDANCE]
+{state['refined_map_products_prompt']}
+"""
+                                logger.info(f"✅ HITL: Feature {feature_name} - 기존 결과 + 전문가 프롬프트 적용")
+                except Exception as e:
+                    logger.warning(f"⚠️ HITL 컨텍스트 로드 실패: {e}")
+        
+        # Change Context 요약
+        change_summary = ""
+        if change_context and change_context.get("all_detected_changes"):
+            feature_related_changes = [
+                c for c in change_context.get("all_detected_changes", [])
+                if c.get("change_detected") and self._is_semantically_related(feature_name, c)
+            ]
+            if feature_related_changes:
+                expected_kw = self._get_expected_keywords(feature_name)
+                change_summary = f"""\n[SEMANTIC VALIDATION CONTEXT]
+Current Feature: {feature_name} ({feature_unit})
+Expected Keywords: {', '.join(expected_kw)}
+Related Changes: {len(feature_related_changes)}
+"""
+        
+        # 모든 청크 정보 포맷팅
+        chunks_text = ""
+        for idx, chunk in enumerate(chunks_context, 1):
+            section = chunk.get("section_ref", "Unknown")
+            text = chunk["chunk_text"][:500]
+            score = chunk.get("semantic_score", 0.0)
+            
+            change_info = ""
+            if chunk.get("change_evidence"):
+                ce = chunk["change_evidence"]
+                change_info = f"\n  Change: {ce.get('change_type', 'N/A')}, Keywords: {ce.get('keywords', [])}"
+            
+            chunks_text += f"""\n[CHUNK {idx}] ID: {chunk['chunk_id']}
+Section: {section}
+Score: {score:.2f}{change_info}
+Text: {text}
+---
+"""
+        
+        prompt = f"""You are analyzing regulation chunks for a product feature.
+
+**TASK**: Evaluate ALL chunks below and determine which ones apply to this feature.
+
+**Feature**:
+{feature_json}
+
+{change_summary}
+
+**Regulation Chunks** ({len(chunks_context)} total):
+{chunks_text}
+
+**INSTRUCTIONS**:
+1. For EACH chunk, determine if it regulates this specific feature
+2. Check semantic relevance (e.g., "nicotine" chunk for "nicotine" feature = VALID)
+3. Reject unrelated chunks (e.g., "label" chunk for "nicotine" feature = INVALID)
+4. Return JSON array with one result per chunk
+
+**OUTPUT FORMAT**:
+{{
+  "chunk_results": [
+    {{
+      "chunk_id": "...",
+      "applies": true/false,
+      "required_value": "0.3mg/g" or null,
+      "current_value": "{present_value}",
+      "gap": "...",
+      "reasoning": "[§XXX] [regulation] [status]",
+      "parsed": {{"category": "...", "requirement_type": "..."}}
+    }}
+  ]
+}}
+
+**CRITICAL**: If chunk discusses different topic than feature, set applies=false with reasoning="N/A (unrelated): §XXX addresses [topic], not {feature_name}"{hitl_context}
+"""
+        return prompt
+    
+    async def _call_unified_llm(self, prompt: str) -> Dict:
+        """통합 프롬프트를 처리하는 LLM 호출."""
+        try:
+            from app.ai_pipeline.preprocess.config import PreprocessConfig
+            
+            res = await self.llm.chat.completions.create(
+                model=PreprocessConfig.MAPPING_MODEL,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a compliance mapping agent. Analyze multiple regulation chunks and return JSON array with one result per chunk. Be strict about semantic relevance.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+            )
+            return json.loads(res.choices[0].message.content)
+        except Exception as e:
+            logger.error(f"Unified LLM call failed: {e}")
+            return {"chunk_results": []}
+
     async def _call_llm(self, prompt: str) -> Dict:
         try:
+            from app.ai_pipeline.preprocess.config import PreprocessConfig
+            
+            # GPT-5: Chat Completions API (SDK 버전 호환성)
             res = await self.llm.chat.completions.create(
-                model="gpt-5-nano",
+                model=PreprocessConfig.MAPPING_MODEL,
                 messages=[
                     {
                         "role": "system",
@@ -914,7 +1239,6 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
                 "current_value": None,
                 "gap": None,
                 "reasoning": "LLM call failed",
-                "reasoning": "LLM call failed",
                 "parsed": {
                     "category": None,
                     "requirement_type": "other",
@@ -929,6 +1253,13 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
         change_results: List[Dict[str, Any]] = (
             state.get("change_detection_results") or []
         )
+        
+        # 🔑 Change Context 구성 (전체 변경 감지 결과)
+        change_context_global = {
+            "all_detected_changes": change_results,
+            "change_summary": state.get("change_summary", {}),
+            "total_changes": len([c for c in change_results if c.get("change_detected")])
+        }
 
         # ⭐ 동적 필터링: product_info 없으면 국가별 제품 조회
         if not product:
@@ -984,17 +1315,85 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
                     f"✅ {len(products)}개 제품 발견: {[p['product_name'] for p in products[:3]]}..."
                 )
 
-                # 각 제품별로 매핑 실행 (세션 없이)
+                # 🎯 피처별 규제 검색 (제품 독립적, 1회만)
+                if not state.get("feature_regulation_cache"):
+                    logger.info("🔍 피처별 규제 검색 시작 (제품 독립적)")
+                    
+                    # 1) 모든 제품의 피처 취합
+                    all_features_map = {}  # {feature_name: [(product_id, value, unit), ...]}
+                    for p in products:
+                        p_features = p.get("mapping", {}).get("present_state", {})
+                        p_units = p.get("feature_units", {})
+                        p_id = p.get("product_id")
+                        
+                        for fname, fval in p_features.items():
+                            if fname == "feature_units":
+                                continue
+                            if fname not in all_features_map:
+                                all_features_map[fname] = []
+                            all_features_map[fname].append((p_id, fval, p_units.get(fname)))
+                    
+                    logger.info(f"📊 피처 취합 완료: {len(all_features_map)}개 피처 (제품 {len(products)}개)")
+                    
+                    # 2) 검색 필터 준비 (단일 제품 실행 시와 동일)
+                    temp_product = products[0]
+                    temp_extra_filters = {
+                        key: value
+                        for key, value in mapping_filters.items()
+                        if key not in {"product_id"}
+                    }
+                    
+                    # 🔑 임시 변수 초기화 (조건부 정의 방지)
+                    temp_present_features = temp_product.get("mapping", {}).get("present_state", {})
+                    temp_change_scope = self._extract_change_scope(change_results, temp_present_features)
+                    temp_change_hint = self._choose_change_hint(temp_change_scope)
+                    
+                    temp_change_filters = self._build_change_filters(temp_change_scope)
+                    temp_regulation_filters = self._build_regulation_filters(regulation_meta)
+                    temp_merged_filters = self._merge_filters(
+                        temp_extra_filters, temp_change_filters, temp_regulation_filters
+                    )
+                    temp_change_query = self._build_change_query(temp_change_hint)
+                    
+                    # 3) 피처별 규제 검색 (1회씩만)
+                    feature_regulation_cache = {}
+                    for fname, values_list in all_features_map.items():
+                        # 대표값 선택 (첫 번째 제품의 값)
+                        representative_value = values_list[0][1]
+                        representative_unit = values_list[0][2]
+                        
+                        # 검색 실행
+                        retrieval = await self._run_search(
+                            product=temp_product,  # 국가 정보만 사용
+                            feature_name=fname,
+                            feature_value=representative_value,
+                            feature_unit=representative_unit,
+                            extra_filters=temp_merged_filters,
+                            change_query=temp_change_query,
+                            state=state,
+                        )
+                        
+                        # 캐시 저장
+                        feature_regulation_cache[fname] = {
+                            "candidates": retrieval["candidates"],
+                            "search_query": self._build_search_query(fname, representative_value, representative_unit)
+                        }
+                        
+                        logger.info(f"  ✅ {fname}: {len(retrieval['candidates'])}개 규제 청크")
+                    
+                    state["feature_regulation_cache"] = feature_regulation_cache
+                    logger.info(f"💾 피처별 규제 캐시 생성 완료: {len(feature_regulation_cache)}개")
+                
+                # 3) 각 제품별로 매핑 분석 (캐시된 규제 재사용)
                 all_mapping_results = []
                 for product in products:
-                    state["product_info"] = product
-                    result = await self._run_mapping_for_single_product(state)
-                    all_mapping_results.append(result)
+                    temp_state = dict(state)
+                    temp_state["product_info"] = product
+                    temp_state["feature_regulation_cache"] = state["feature_regulation_cache"]
+                    temp_result = await self.run(temp_state)
+                    all_mapping_results.append(temp_result.get("mapping"))
 
                 # 결과 병합
-                state["mapping"] = self._merge_multi_product_results(
-                    all_mapping_results
-                )
                 state["mapping"] = self._merge_multi_product_results(
                     all_mapping_results
                 )
@@ -1010,10 +1409,15 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
         )
         units = product.get("feature_units", {})
 
+        # 🔑 변수 초기화 (조건부 정의 방지)
         change_scope = self._extract_change_scope(change_results, present_features)
         change_hint = self._choose_change_hint(change_scope)
         change_query = self._build_change_query(change_hint)
         recovered_hints: Set[str] = set()
+        
+        # 🔑 검색 필터 변수 초기화 (재사용 시 누락 방지)
+        change_search_filters = self._build_change_filters(change_scope)
+        regulation_filters = self._build_regulation_filters(regulation_meta)
 
         mapping_results: List[MappingItem] = []
         mapping_targets: Dict[str, Dict[str, Any]] = {}
@@ -1024,8 +1428,7 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
             for key, value in mapping_filters.items()
             if key not in {"product_id"}
         }
-        change_search_filters = self._build_change_filters(change_scope)
-        regulation_filters = self._build_regulation_filters(regulation_meta)
+        # 🔑 필터는 이미 위에서 초기화됨 (중복 제거)
         merged_search_filters = self._merge_filters(
             extra_search_filters, change_search_filters, regulation_filters
         )
@@ -1053,6 +1456,44 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
                 logger.info(
                     "💤 매핑 대상 특성이 없습니다. mapping.present_state나 target을 확인하세요."
                 )
+        
+        # 🆕 LLM 기반 Feature 선택 (규제 기준 1회만, 제품 무관)
+        llm_selection_cache_key = "llm_selection_global"
+        llm_selection = {"selected_features": [], "reasoning": {}, "confidence": 0.0}  # 기본값 초기화
+        
+        if llm_selection_cache_key not in state:
+            if change_results or regulation_hints:
+                unified_features = {f: "placeholder" for f in present_features.keys()}
+                
+                try:
+                    llm_selection = await self._llm_select_features(
+                        unified_features,
+                        change_results,
+                        regulation_hints
+                    )
+                    state[llm_selection_cache_key] = llm_selection
+                    logger.info(f"💾 LLM Feature 선택 (규제 기준 1회): {len(llm_selection.get('selected_features', []))}개")
+                except Exception as e:
+                    logger.warning(f"LLM feature selection 실패: {e}")
+                    state[llm_selection_cache_key] = llm_selection  # 기본값 저장
+            else:
+                state[llm_selection_cache_key] = llm_selection
+        else:
+            llm_selection = state[llm_selection_cache_key]
+            logger.info(f"♻️ LLM Feature 선택 캐시 재사용: {len(llm_selection.get('selected_features', []))}개")
+        
+        # LLM 선택 결과를 feature_hints에 병합
+        llm_selected = set(llm_selection.get("selected_features", []))
+        if llm_selected:
+            change_scope["feature_hints"] = change_scope.get("feature_hints", set()) | llm_selected
+            
+            # 디버그: 선택 이유 로깅
+            if self.debug_enabled:
+                reasoning = llm_selection.get("reasoning", {})
+                for feat, reason in list(reasoning.items())[:3]:
+                    logger.debug(f"  - {feat}: {reason}")
+        
+        # 기존 규칙 기반 힌트 복구 (fallback)
         if regulation_hints and not change_scope.get("feature_hints"):
             # 신규 규제 분석 결과에서 affected_areas를 feature_hints로 변환
             affected_areas = regulation_hints.get("affected_areas", [])
@@ -1091,178 +1532,158 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
                 ]
             )
 
-        # 🔥 feature별로 검색 TOOL → 매핑
-        llm_semaphore = asyncio.Semaphore(10)
+        # 💾 피처별 규제 캐시 확인
+        feature_reg_cache = state.get("feature_regulation_cache", {})
+        if feature_reg_cache:
+            logger.info(f"♻️ 피처별 규제 캐시 재사용: {len(feature_reg_cache)}개 (제품 독립적)")
+        else:
+            logger.info("🔍 피처별 규제 캐시 없음, 개별 검색 실행")
 
-        # 🔥 feature별로 검색 TOOL → 매핑
+        # 🔥 Change Detection 기반 직접 매핑 (검색 최소화)
         llm_semaphore = asyncio.Semaphore(10)
 
         async def process_feature(feature_name: str, present_value: Any):
             unit = units.get(feature_name)
             target_value = target_state.get(feature_name)
 
-            # a) 검색 TOOL 호출 (🔑 Change Detection 기반 Section 필터링)
-            if self.debug_enabled:
-                logger.info(
-                    "🔍 Searching feature=%s value=%s unit=%s",
+            # 🔄 캐시된 규제 재사용 (피처별 검색 결과)
+            feature_reg_cache = state.get("feature_regulation_cache", {})
+            cached_data = feature_reg_cache.get(feature_name)
+            
+            if cached_data:
+                # 캐시된 규제 사용 (검색 스킵)
+                candidates = cached_data["candidates"]
+                if self.debug_enabled:
+                    logger.info(
+                        "♻️ 캐시 재사용: feature=%s candidates=%d",
+                        feature_name,
+                        len(candidates),
+                    )
+            else:
+                # Fallback: 캐시 없으면 검색
+                retrieval: RetrievalResult = await self._run_search(
+                    product,
                     feature_name,
                     present_value,
-                    unit or "-",
+                    unit,
+                    merged_search_filters,
+                    change_query=change_query,
+                    state=state,
                 )
-
-            # 🔑 Change Hint에서 Section 추출
-            section_filter = None
-            if change_hint:
-                section_ref = change_hint.get("section_ref")
-                if section_ref:
-                    section_filter = {
-                        "section_ref": self._normalize_section_ref(section_ref)
-                    }
-                    logger.debug(f"🎯 Section 필터 적용: {section_ref}")
-
-            # Section 필터 병합
-            final_filters = dict(merged_search_filters or {})
-            if section_filter:
-                final_filters.update(section_filter)
-
-            retrieval: RetrievalResult = await self._run_search(
-                product,
-                feature_name,
-                present_value,
-                unit,
-                final_filters,
-                change_query=change_query,
-            )
-            original_count = len(retrieval["candidates"])
-            retrieval["candidates"] = self._prune_candidates(retrieval["candidates"])
-            pruned_count = len(retrieval["candidates"])
+                candidates = retrieval["candidates"]
+                if self.debug_enabled:
+                    logger.info(
+                        "🔍 Fallback 검색: feature=%s candidates=%d",
+                        feature_name,
+                        len(candidates),
+                    )
+            
+            # 중복 제거
+            candidates = self._prune_candidates(candidates)
+            
             if self.debug_enabled:
                 logger.info(
-                    "   ↳ candidates=%d (pruned to %d)",
-                    original_count,
-                    pruned_count,
+                    "   ↳ candidates=%d",
+                    len(candidates),
                 )
 
-            ranked_candidates = retrieval["candidates"]
-            rerank_result: Optional[Dict[str, Any]] = None
-            if change_hint and ranked_candidates:
-                # 규칙 기반으로 상위 3개 선택
-                ranked_candidates = self._rule_rank_candidates(
-                    ranked_candidates, change_hint, top_n=3
-                )
-                # LLM rerank로 최종 1개 선택
-                rerank_result = await self._rerank_candidates(
-                    change_hint, ranked_candidates
-                )
-                if rerank_result and rerank_result.get("selected_point_id"):
-                    selected_id = rerank_result["selected_point_id"]
-                    ranked_candidates = [
-                        cand
-                        for cand in ranked_candidates
-                        if cand.get("chunk_id") == selected_id
-                    ] or ranked_candidates
+            ranked_candidates = candidates
 
-            # rerank가 없거나 실패해도 중복 매핑을 피하기 위해 상위 1개만 사용
-            if ranked_candidates:
-                ranked_candidates = ranked_candidates[:1]
+            # b) LLM 매핑 수행 (피처별 모든 청크를 한 번에 판단)
+            if not ranked_candidates:
+                return []
+            
+            # 모든 청크의 컨텍스트 수집
+            chunks_context = []
+            for idx, cand in enumerate(ranked_candidates, 1):
 
-            # b) LLM 매핑 수행 (후보별 병렬 + Semaphore 제한)
-            # b) LLM 매핑 수행 (후보별 병렬 + Semaphore 제한)
-            async def process_candidate(cand: RetrievedChunk):
-                # 🔑 1순위: Chunk 메타데이터의 section_ref 사용
+
                 chunk_meta = cand.get("metadata", {})
                 section_ref = chunk_meta.get("section_ref")
-
-                # 🔑 2순위: Change Detection Index에서 조회
+                
+                # Change Context 조회
                 change_context = None
                 change_index = state.get("change_detection_index", {})
                 if section_ref:
                     normalized_section = self._normalize_section_ref(section_ref)
                     if normalized_section in change_index:
                         change_context = change_index[normalized_section]
-                        logger.debug(f"✅ Change Context 직접 매칭: {section_ref}")
-
-                # 🔑 3순위: 텍스트 기반 추출 (fallback)
+                
                 if not change_context and change_index:
-                    section = self._extract_section_from_chunk(
-                        chunk_meta, cand["chunk_text"]
-                    )
+                    section = self._extract_section_from_chunk(chunk_meta, cand["chunk_text"])
                     if section and section in change_index:
                         change_context = change_index[section]
-                        logger.debug(f"🎯 Change Context fallback: {section}")
-
-                # 변경 감지 증거 추출 (기존 로직 유지)
-                change_matches = self._match_change_results_to_candidate(
-                    change_scope, cand
-                )
+                
+                change_matches = self._match_change_results_to_candidate(change_scope, cand)
                 change_evidence = change_matches[0] if change_matches else None
-
-                # 🔑 Section 정보를 포함한 프롬프트 생성
-                prompt = self._build_prompt(
-                    feature_name,
-                    present_value,
-                    target_value,
-                    unit,
-                    cand["chunk_text"],
-                    chunk_metadata=chunk_meta,
-                    change_evidence=change_evidence,
-                    change_context=change_context,
-                )
-
-                # 📊 디버그: Section 연결 상태 로깅
-                if self.debug_enabled and section_ref:
-                    logger.debug(
-                        f"  ➡️ Chunk {cand.get('chunk_id')} → Section {section_ref} "
-                        f"(Change: {bool(change_context)})"
-                    )
-
-                # Semaphore로 LLM 호출 제한
-                async with llm_semaphore:
-                    llm_out = await self._call_llm(prompt)
-
-                parsed: MappingParsed = llm_out.get("parsed", {})
-                required_value = llm_out.get("required_value")
-                current_value = llm_out.get("current_value")
-                if (
-                    llm_out.get("applies")
-                    and required_value is None
-                    and target_value is not None
-                ):
+                
+                chunks_context.append({
+                    "chunk_id": cand["chunk_id"],
+                    "chunk_text": cand["chunk_text"],
+                    "section_ref": section_ref or "Unknown",
+                    "metadata": chunk_meta,
+                    "change_context": change_context,
+                    "change_evidence": change_evidence,
+                    "semantic_score": cand.get("semantic_score", 0.0)
+                })
+            
+            # 통합 프롬프트 생성 (모든 청크 포함)
+            merged_change_context = {**change_context_global} if change_context_global else {}
+            
+            unified_prompt = await self._build_unified_prompt(
+                feature_name=feature_name,
+                present_value=present_value,
+                target_value=target_value,
+                feature_unit=unit,
+                chunks_context=chunks_context,
+                change_context=merged_change_context,
+                state=state
+            )
+            
+            # 단일 LLM 호출 (모든 청크 종합 판단)
+            async with llm_semaphore:
+                llm_out = await self._call_unified_llm(unified_prompt)
+            
+            # 결과를 MappingItem 리스트로 변환
+            items: List[MappingItem] = []
+            for result in llm_out.get("chunk_results", []):
+                chunk_id = result.get("chunk_id")
+                chunk_data = next((c for c in chunks_context if c["chunk_id"] == chunk_id), None)
+                
+                if not chunk_data:
+                    continue
+                
+                parsed: MappingParsed = result.get("parsed", {})
+                required_value = result.get("required_value")
+                current_value = result.get("current_value") or present_value
+                
+                if result.get("applies") and required_value is None and target_value is not None:
                     required_value = target_value
-                if current_value is None and present_value is not None:
-                    current_value = present_value
-
-                return MappingItem(
+                
+                items.append(MappingItem(
+                    product_id=product_id,
+                    product_name=product_name,
                     feature_name=feature_name,
-                    applies=llm_out["applies"],
+                    applies=result["applies"],
                     required_value=required_value,
                     current_value=current_value,
-                    gap=llm_out["gap"],
-                    reasoning=llm_out.get("reasoning", "")[:250],
-                    regulation_chunk_id=cand["chunk_id"],
-                    regulation_summary=cand["chunk_text"][:120],
+                    gap=result.get("gap"),
+                    reasoning=result.get("reasoning", "")[:250],
+                    regulation_chunk_id=chunk_id,
+                    regulation_summary=chunk_data["chunk_text"][:120],
                     parsed=parsed,
-                )
-
-            # 후보별 병렬 처리
-            candidate_results = await asyncio.gather(
-                *[process_candidate(cand) for cand in ranked_candidates],
-                return_exceptions=True,
-            )
-            items: List[MappingItem] = []
-            for r in candidate_results:
-                if isinstance(r, Exception):
-                    continue
-                items.append(r)
+                ))
+                
                 if self.debug_enabled:
                     logger.info(
                         "🧩 applies=%s required=%s current=%s chunk=%s (%s)",
-                        r["applies"],
-                        r["required_value"],
-                        r["current_value"],
-                        r["regulation_chunk_id"],
-                        r["feature_name"],
+                        result["applies"],
+                        required_value,
+                        current_value,
+                        chunk_id,
+                        feature_name,
                     )
+            
             return items
 
         # feature별 병렬 처리
@@ -1376,247 +1797,55 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
                     "total_items": len(mapping_results),
                 }
 
-        return state
-
-    def _extract_country_from_state(self, state: Dict) -> Optional[str]:
-        """
-        State에서 국가 정보 추출 (우선순위 적용).
-
-                우선순위:
-                1. regulation 메타데이터
-                2. preprocess_results (Vision 추출)
-                3. change_detection_results
-        """
-        # 우선순위 1: regulation 메타데이터
-        regulation = state.get("regulation") or {}
-        country = regulation.get("country") or regulation.get("jurisdiction_code")
-        if country:
-            logger.debug(f"국가 추출 (regulation): {country}")
-            return country
-
-        # 우선순위 2: preprocess_results (Vision 추출)
-        preprocess_results = state.get("preprocess_results") or []
-        if preprocess_results:
-            first_result = preprocess_results[0]
-            vision_results = first_result.get("vision_extraction_result") or []
-            if vision_results:
-                first_page = vision_results[0]
-                metadata = first_page.get("structure", {}).get("metadata", {})
-                country = metadata.get("jurisdiction_code") or metadata.get("country")
-                if country:
-                    logger.debug(f"국가 추출 (vision): {country}")
-                    return country
-
-        # 우선순위 3: change_detection_results
-        change_results = state.get("change_detection_results") or []
-        if change_results:
-            for result in change_results:
-                metadata = result.get("metadata") or {}
-                country = metadata.get("country") or metadata.get("jurisdiction_code")
-                if country:
-                    logger.debug(f"국가 추출 (change_detection): {country}")
-                    return country
-
-        logger.warning("국가 정보 추출 실패")
-        return None
-
-    async def _run_mapping_for_single_product(self, state: Dict) -> MappingResults:
-        """단일 제품에 대한 매핑 실행 (기존 로직 재사용)."""
-        product: ProductInfo = state["product_info"]
-        product_id = product["product_id"]
-        product_name = product.get("product_name", product.get("name", "unknown"))
-        mapping_spec = product.get("mapping") or {}
-        target_state = mapping_spec.get("target") or {}
-        present_state = mapping_spec.get("present_state") or {}
-        present_features = (
-            present_state or target_state or product.get("features", {}) or {}
-        )
-        units = product.get("feature_units", {})
-
-        change_results: List[Dict[str, Any]] = (
-            state.get("change_detection_results") or []
-        )
-        regulation_meta: Dict[str, Any] = state.get("regulation") or {}
-        mapping_filters: Dict[str, Any] = state.get("mapping_filters") or {}
-
-        change_scope = self._extract_change_scope(change_results, present_features)
-        change_hint = self._choose_change_hint(change_scope)
-        change_query = self._build_change_query(change_hint)
-        recovered_hints: Set[str] = set()
-
-        regulation_hints = state.get("regulation_analysis_hints") or {}
-        if regulation_hints and not change_scope.get("feature_hints"):
-            affected_areas = regulation_hints.get("affected_areas", [])
-            for area in affected_areas:
-                normalized = self._normalize_token(area)
-                for norm_name, raw_name in {
-                    self._normalize_token(name): name
-                    for name in present_features.keys()
-                }.items():
-                    if normalized == norm_name or normalized in norm_name:
-                        recovered_hints.add(raw_name)
-
-        feature_iterable, unknown_hints = self._select_features_for_mapping(
-            present_features, change_scope, recovered_hints
-        )
-
-        mapping_results: List[MappingItem] = []
-        mapping_targets: Dict[str, Dict[str, Any]] = {}
-        unknown_requirements: List[Dict[str, Any]] = []
-
-        if unknown_hints:
-            unknown_requirements.extend(
-                [
-                    {
-                        "hint": hint,
-                        "reason": "change_detection_hint_not_in_product_features",
+        # 🆕 중간 결과물 저장 (HITL용)
+        # regulation_id 소스 우선순위: 1) regulation 2) preprocess_results
+        regulation_id = None
+        regulation = state.get("regulation", {})
+        if regulation:
+            regulation_id = regulation.get("regulation_id")
+        
+        if not regulation_id:
+            # Fallback: preprocess_results에서 추출
+            preprocess_results = state.get("preprocess_results", [])
+            if preprocess_results:
+                regulation_id = preprocess_results[0].get("regulation_id")
+        
+        if regulation_id and state.get("mapping"):
+            from app.core.repositories.intermediate_output_repository import IntermediateOutputRepository
+            
+            logger.info(f"💾 중간 결과물 저장 시작: regulation_id={regulation_id} (소스: {regulation.get('title', 'N/A')[:50]})")
+            
+            async with AsyncSessionLocal() as session:
+                intermediate_repo = IntermediateOutputRepository()
+                try:
+                    intermediate_data = {
+                        "mapping": state["mapping"],
+                        "product_info": state.get("product_info"),
+                        "mapping_debug": state.get("mapping_debug"),
+                        "regulation_meta": {  # 디버깅용 메타데이터 추가
+                            "regulation_id": regulation_id,
+                            "title": regulation.get("title"),
+                            "country": regulation.get("country"),
+                            "citation_code": regulation.get("citation_code")
+                        }
                     }
-                    for hint in unknown_hints
-                ]
-            )
+                    await intermediate_repo.save_intermediate(
+                        session,
+                        regulation_id=regulation_id,
+                        node_name="map_products",
+                        data=intermediate_data
+                    )
+                    await session.commit()
+                    logger.info(f"✅ 매핑 중간 결과물 저장 완료: regulation_id={regulation_id}")
+                except Exception as db_err:
+                    await session.rollback()
+                    logger.error(f"❌ 중간 결과물 저장 실패: regulation_id={regulation_id}, error={db_err}")
+                    import traceback
+                    traceback.print_exc()
+        else:
+            logger.warning(f"⚠️ 중간 결과물 저장 스킵: regulation_id={regulation_id}, mapping_exists={bool(state.get('mapping'))}")
 
-        extra_search_filters = {
-            key: value
-            for key, value in mapping_filters.items()
-            if key not in {"product_id"}
-        }
-        change_search_filters = self._build_change_filters(change_scope)
-        regulation_filters = self._build_regulation_filters(regulation_meta)
-        merged_search_filters = self._merge_filters(
-            extra_search_filters, change_search_filters, regulation_filters
-        )
-
-        async def process_feature(feature_name: str, present_value: Any):
-            unit = units.get(feature_name)
-            target_value = target_state.get(feature_name)
-
-            retrieval: RetrievalResult = await self._run_search(
-                product,
-                feature_name,
-                present_value,
-                unit,
-                merged_search_filters,
-                change_query=change_query,
-            )
-            original_count = len(retrieval["candidates"])
-            retrieval["candidates"] = self._prune_candidates(retrieval["candidates"])
-            pruned_count = len(retrieval["candidates"])
-
-            ranked_candidates = retrieval["candidates"]
-            rerank_result: Optional[Dict[str, Any]] = None
-            if change_hint and ranked_candidates:
-                ranked_candidates = self._rule_rank_candidates(
-                    ranked_candidates, change_hint, top_n=3
-                )
-                rerank_result = await self._rerank_candidates(
-                    change_hint, ranked_candidates
-                )
-                if rerank_result and rerank_result.get("selected_point_id"):
-                    selected_id = rerank_result["selected_point_id"]
-                    ranked_candidates = [
-                        cand
-                        for cand in ranked_candidates
-                        if cand.get("chunk_id") == selected_id
-                    ] or ranked_candidates
-
-            if ranked_candidates:
-                ranked_candidates = ranked_candidates[:1]
-
-            async def process_candidate(cand: RetrievedChunk):
-                prompt = self._build_prompt(
-                    feature_name,
-                    present_value,
-                    target_value,
-                    unit,
-                    cand["chunk_text"],
-                )
-                llm_out = await self._call_llm(prompt)
-
-                parsed: MappingParsed = llm_out.get("parsed", {})
-                required_value = llm_out.get("required_value")
-                current_value = llm_out.get("current_value")
-                if (
-                    llm_out.get("applies")
-                    and required_value is None
-                    and target_value is not None
-                ):
-                    required_value = target_value
-                if current_value is None and present_value is not None:
-                    current_value = present_value
-
-                regulation_meta = dict(cand.get("metadata") or {})
-                regulation_meta["semantic_score"] = cand.get("semantic_score")
-                change_matches = self._match_change_results_to_candidate(
-                    change_scope, cand
-                )
-                if change_matches:
-                    regulation_meta["change_detection_matches"] = change_matches
-                if rerank_result:
-                    regulation_meta["rerank"] = rerank_result
-
-                return MappingItem(
-                    product_id=product_id,
-                    product_name=product_name,
-                    feature_name=feature_name,
-                    applies=llm_out["applies"],
-                    required_value=required_value,
-                    current_value=current_value,
-                    gap=llm_out["gap"],
-                    regulation_chunk_id=cand["chunk_id"],
-                    regulation_summary=cand["chunk_text"][:120],
-                    regulation_meta=regulation_meta,
-                    parsed=parsed,
-                )
-
-            candidate_results = await asyncio.gather(
-                *[process_candidate(cand) for cand in ranked_candidates],
-                return_exceptions=True,
-            )
-            items: List[MappingItem] = []
-            for r in candidate_results:
-                if isinstance(r, Exception):
-                    continue
-                items.append(r)
-            return items
-
-        feature_results = await asyncio.gather(
-            *[process_feature(fname, fval) for fname, fval in feature_iterable],
-            return_exceptions=True,
-        )
-
-        for result in feature_results:
-            if isinstance(result, Exception):
-                logger.error(f"❌ Feature 처리 실패: {result}")
-                continue
-            if isinstance(result, list):
-                mapping_results.extend(result)
-                for item in result:
-                    if item["applies"]:
-                        feature_name = item["feature_name"]
-                        existing = mapping_targets.get(feature_name)
-                        has_req = item.get("required_value") is not None
-                        replace = False
-                        if existing is None:
-                            replace = True
-                        elif existing.get("required_value") is None and has_req:
-                            replace = True
-                        if replace:
-                            mapping_targets[feature_name] = {
-                                "required_value": item.get("required_value"),
-                                "chunk_id": item.get("regulation_chunk_id"),
-                                "doc_id": item.get("regulation_meta", {}).get(
-                                    "meta_doc_id"
-                                ),
-                            }
-
-        return MappingResults(
-            product_id=product_id,
-            items=mapping_results,
-            targets=mapping_targets,
-            actionable_changes=change_scope.get("actionable_results", []),
-            pending_changes=change_scope.get("pending_results", []),
-            unknown_requirements=unknown_requirements,
-        )
+        return state
 
     def _merge_multi_product_results(
         self, results: List[MappingResults]
@@ -1627,301 +1856,38 @@ Numerical Changes: {change_context.get('numerical_changes', [])}
         all_actionable = []
         all_pending = []
         all_unknown = []
+        product_names = []
 
         for result in results:
             all_items.extend(result["items"])
             all_targets.update(result["targets"])
-            all_actionable.extend(result["actionable_changes"])
-            all_pending.extend(result["pending_changes"])
+            all_actionable.extend(result.get("actionable_changes", []))
+            all_pending.extend(result.get("pending_changes", []))
             all_unknown.extend(result["unknown_requirements"])
+            
+            # 제품명 수집 (중복 제거)
+            pname = result.get("product_name")
+            if pname and pname not in product_names:
+                product_names.append(pname)
+
+        # regulation_cache 병합 (개선)
+        merged_cache = {}
+        for result in results:
+            merged_cache.update(result.get("regulation_cache", {}))
+        
+        # 제품명 포맷팅 (최대 3개)
+        if len(product_names) <= 3:
+            display_name = ", ".join(product_names)
+        else:
+            display_name = f"{', '.join(product_names[:3])} 외 {len(product_names)-3}개"
 
         return MappingResults(
             product_id="multi",
+            product_name=display_name,
             items=all_items,
             targets=all_targets,
             actionable_changes=all_actionable,
             pending_changes=all_pending,
-            unknown_requirements=all_unknown,
-        )
-
-    def _extract_country_from_state(self, state: Dict) -> Optional[str]:
-        """
-        State에서 국가 정보 추출 (우선순위 적용).
-
-                우선순위:
-                1. regulation 메타데이터
-                2. preprocess_results (Vision 추출)
-                3. change_detection_results
-        """
-        # 우선순위 1: regulation 메타데이터
-        regulation = state.get("regulation") or {}
-        country = regulation.get("country") or regulation.get("jurisdiction_code")
-        if country:
-            logger.debug(f"국가 추출 (regulation): {country}")
-            return country
-
-        # 우선순위 2: preprocess_results (Vision 추출)
-        preprocess_results = state.get("preprocess_results") or []
-        if preprocess_results:
-            first_result = preprocess_results[0]
-            vision_results = first_result.get("vision_extraction_result") or []
-            if vision_results:
-                first_page = vision_results[0]
-                metadata = first_page.get("structure", {}).get("metadata", {})
-                country = metadata.get("jurisdiction_code") or metadata.get("country")
-                if country:
-                    logger.debug(f"국가 추출 (vision): {country}")
-                    return country
-
-        # 우선순위 3: change_detection_results
-        change_results = state.get("change_detection_results") or []
-        if change_results:
-            for result in change_results:
-                metadata = result.get("metadata") or {}
-                country = metadata.get("country") or metadata.get("jurisdiction_code")
-                if country:
-                    logger.debug(f"국가 추출 (change_detection): {country}")
-                    return country
-
-        logger.warning("국가 정보 추출 실패")
-        return None
-
-    async def _run_mapping_for_single_product(self, state: Dict) -> MappingResults:
-        """단일 제품에 대한 매핑 실행 (기존 로직 재사용)."""
-        product: ProductInfo = state["product_info"]
-        product_id = product["product_id"]
-        product_name = product.get("product_name", product.get("name", "unknown"))
-        mapping_spec = product.get("mapping") or {}
-        target_state = mapping_spec.get("target") or {}
-        present_state = mapping_spec.get("present_state") or {}
-        present_features = (
-            present_state or target_state or product.get("features", {}) or {}
-        )
-        units = product.get("feature_units", {})
-
-        change_results: List[Dict[str, Any]] = (
-            state.get("change_detection_results") or []
-        )
-        regulation_meta: Dict[str, Any] = state.get("regulation") or {}
-        mapping_filters: Dict[str, Any] = state.get("mapping_filters") or {}
-
-        change_scope = self._extract_change_scope(change_results, present_features)
-        change_hint = self._choose_change_hint(change_scope)
-        change_query = self._build_change_query(change_hint)
-        recovered_hints: Set[str] = set()
-
-        regulation_hints = state.get("regulation_analysis_hints") or {}
-        if regulation_hints and not change_scope.get("feature_hints"):
-            affected_areas = regulation_hints.get("affected_areas", [])
-            for area in affected_areas:
-                normalized = self._normalize_token(area)
-                for norm_name, raw_name in {
-                    self._normalize_token(name): name
-                    for name in present_features.keys()
-                }.items():
-                    if normalized == norm_name or normalized in norm_name:
-                        recovered_hints.add(raw_name)
-
-        feature_iterable, unknown_hints = self._select_features_for_mapping(
-            present_features, change_scope, recovered_hints
-        )
-
-        mapping_results: List[MappingItem] = []
-        mapping_targets: Dict[str, Dict[str, Any]] = {}
-        unknown_requirements: List[Dict[str, Any]] = []
-
-        if unknown_hints:
-            unknown_requirements.extend(
-                [
-                    {
-                        "hint": hint,
-                        "reason": "change_detection_hint_not_in_product_features",
-                    }
-                    for hint in unknown_hints
-                ]
-            )
-
-        extra_search_filters = {
-            key: value
-            for key, value in mapping_filters.items()
-            if key not in {"product_id"}
-        }
-        change_search_filters = self._build_change_filters(change_scope)
-        regulation_filters = self._build_regulation_filters(regulation_meta)
-        merged_search_filters = self._merge_filters(
-            extra_search_filters, change_search_filters, regulation_filters
-        )
-
-        async def process_feature(feature_name: str, present_value: Any):
-            unit = units.get(feature_name)
-            target_value = target_state.get(feature_name)
-
-            retrieval: RetrievalResult = await self._run_search(
-                product,
-                feature_name,
-                present_value,
-                unit,
-                merged_search_filters,
-                change_query=change_query,
-            )
-            original_count = len(retrieval["candidates"])
-            retrieval["candidates"] = self._prune_candidates(retrieval["candidates"])
-            pruned_count = len(retrieval["candidates"])
-
-            ranked_candidates = retrieval["candidates"]
-            rerank_result: Optional[Dict[str, Any]] = None
-            if change_hint and ranked_candidates:
-                ranked_candidates = self._rule_rank_candidates(
-                    ranked_candidates, change_hint, top_n=3
-                )
-                rerank_result = await self._rerank_candidates(
-                    change_hint, ranked_candidates
-                )
-                if rerank_result and rerank_result.get("selected_point_id"):
-                    selected_id = rerank_result["selected_point_id"]
-                    ranked_candidates = [
-                        cand
-                        for cand in ranked_candidates
-                        if cand.get("chunk_id") == selected_id
-                    ] or ranked_candidates
-
-            if ranked_candidates:
-                ranked_candidates = ranked_candidates[:1]
-
-            async def process_candidate(cand: RetrievedChunk):
-                prompt = self._build_prompt(
-                    feature_name,
-                    present_value,
-                    target_value,
-                    unit,
-                    cand["chunk_text"],
-                )
-                llm_out = await self._call_llm(prompt)
-
-                parsed: MappingParsed = llm_out.get("parsed", {})
-                required_value = llm_out.get("required_value")
-                current_value = llm_out.get("current_value")
-                if (
-                    llm_out.get("applies")
-                    and required_value is None
-                    and target_value is not None
-                ):
-                    required_value = target_value
-                if current_value is None and present_value is not None:
-                    current_value = present_value
-
-                return MappingItem(
-                    feature_name=feature_name,
-                    applies=llm_out["applies"],
-                    required_value=required_value,
-                    current_value=current_value,
-                    gap=llm_out["gap"],
-                    reasoning=llm_out.get("reasoning", "")[:250],  # 최대 250자
-                    regulation_chunk_id=cand["chunk_id"],
-                    regulation_summary=cand["chunk_text"][:120],
-                    parsed=parsed,
-                )
-
-            candidate_results = await asyncio.gather(
-                *[process_candidate(cand) for cand in ranked_candidates],
-                return_exceptions=True,
-            )
-            items: List[MappingItem] = []
-            for r in candidate_results:
-                if isinstance(r, Exception):
-                    continue
-                items.append(r)
-            return items
-
-        feature_results = await asyncio.gather(
-            *[process_feature(fname, fval) for fname, fval in feature_iterable],
-            return_exceptions=True,
-        )
-
-        for result in feature_results:
-            if isinstance(result, Exception):
-                logger.error(f"❌ Feature 처리 실패: {result}")
-                continue
-            if isinstance(result, list):
-                mapping_results.extend(result)
-                for item in result:
-                    if item["applies"]:
-                        feature_name = item["feature_name"]
-                        existing = mapping_targets.get(feature_name)
-                        has_req = item.get("required_value") is not None
-                        replace = False
-                        if existing is None:
-                            replace = True
-                        elif existing.get("required_value") is None and has_req:
-                            replace = True
-                        if replace:
-                            mapping_targets[feature_name] = {
-                                "required_value": item.get("required_value"),
-                                "chunk_id": item.get("regulation_chunk_id"),
-                                "doc_id": item.get("regulation_meta", {}).get(
-                                    "meta_doc_id"
-                                ),
-                            }
-
-        # regulation_cache 생성
-        regulation_cache = {}
-        for item in mapping_results:
-            chunk_id = item["regulation_chunk_id"]
-            if chunk_id not in regulation_cache:
-                meta = change_scope.get("raw_results", [])
-                matched_change = next(
-                    (
-                        r
-                        for r in meta
-                        if r.get("chunk_id") == chunk_id
-                        or r.get("new_ref_id") == chunk_id
-                    ),
-                    None,
-                )
-                regulation_cache[chunk_id] = {
-                    "change_detected": bool(matched_change),
-                    "confidence_score": (
-                        matched_change.get("confidence_score")
-                        if matched_change
-                        else None
-                    ),
-                    "change_type": (
-                        matched_change.get("change_type") if matched_change else None
-                    ),
-                }
-
-        return MappingResults(
-            product_id=product_id,
-            product_name=product_name,
-            items=mapping_results,
-            targets=mapping_targets,
-            unknown_requirements=unknown_requirements,
-            regulation_cache=regulation_cache,
-        )
-
-    def _merge_multi_product_results(
-        self, results: List[MappingResults]
-    ) -> MappingResults:
-        """여러 제품의 매핑 결과 병합."""
-        all_items = []
-        all_targets = {}
-        all_unknown = []
-
-        for result in results:
-            all_items.extend(result["items"])
-            all_targets.update(result["targets"])
-            all_unknown.extend(result["unknown_requirements"])
-
-        # regulation_cache 병합
-        merged_cache = {}
-        for result in results:
-            merged_cache.update(result.get("regulation_cache", {}))
-
-        return MappingResults(
-            product_id="multi",
-            product_name="Multiple Products",
-            items=all_items,
-            targets=all_targets,
             unknown_requirements=all_unknown,
             regulation_cache=merged_cache,
         )
@@ -1933,7 +1899,7 @@ _DEFAULT_MAPPING_NODE: Optional[MappingNode] = None
 
 
 def _get_default_llm_client():
-    """AsyncOpenAI 싱글톤을 구성한다."""
+    """AsyncOpenAI 싱글톤을 구성한다 (LangSmith 래핑 포함)."""
     global _DEFAULT_LLM_CLIENT
     if _DEFAULT_LLM_CLIENT is not None:
         return _DEFAULT_LLM_CLIENT
@@ -1943,7 +1909,10 @@ def _get_default_llm_client():
             "openai 패키지를 찾을 수 없습니다. `pip install openai` 후 다시 시도하세요."
         )
 
-    _DEFAULT_LLM_CLIENT = AsyncOpenAI()
+    from app.ai_pipeline.preprocess.config import PreprocessConfig
+    
+    client = AsyncOpenAI()
+    _DEFAULT_LLM_CLIENT = PreprocessConfig.wrap_openai_client(client)
     return _DEFAULT_LLM_CLIENT
 
 

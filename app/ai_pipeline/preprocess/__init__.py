@@ -273,7 +273,8 @@ async def preprocess_node(state: AppState) -> AppState:
         if first_result.get("status") == "success" and use_vision:
             vision_pages = first_result.get("vision_extraction_result", [])
             if vision_pages:
-                metadata = vision_pages[0].get("structure", {}).get("metadata", {})
+                structure = vision_pages[0].get("structure", {})
+                metadata = structure.get("metadata") or {}
                 state["regulation"] = {
                     "country": metadata.get("jurisdiction_code", "US"),
                     "title": metadata.get("title", "Unknown Regulation"),

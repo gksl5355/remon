@@ -212,7 +212,7 @@ def _extract_history_strategies(results: List[Dict[str, Any]]) -> List[str]:
 # 메인 노드 함수
 #----------------------------------------------------------------------
 
-def generate_strategy_node(state: AppState) -> Dict[str, Any]:
+async def generate_strategy_node(state: AppState) -> Dict[str, Any]:
     """
     LangGraph node: generate_strategy
 
@@ -256,7 +256,8 @@ def generate_strategy_node(state: AppState) -> Dict[str, Any]:
         raise ValueError("MappingItem.regulation_summary 가 비어 있습니다.")
 
     # 제품 리스트: 현재 파이프라인은 단일 product 기준이므로 product_id 하나만 리스트로 사용
-    product_name = state.get("product_info", {}).get("product_name")
+    product_info = state.get("product_info") or {}
+    product_name = product_info.get("product_name") if isinstance(product_info, dict) else None
     mapped_products = [product_name] if product_name else []
 
     # 2) history 검색 (HybridRetriever)
@@ -311,9 +312,19 @@ def generate_strategy_node(state: AppState) -> Dict[str, Any]:
 
     new_strategies = _parse_strategies(raw_output_text)
 
+    # 🔍 전략 생성 결과 출력
+    print("\n" + "="*80)
+    print("📋 [전략 생성 완료]")
+    print("="*80)
+    for idx, strategy in enumerate(new_strategies, 1):
+        print(f"\n전략 {idx}:")
+        print(f"  {strategy}")
+    print("\n" + "="*80 + "\n")
+
     # refined prompt 성공 후 제거
     if state.get("refined_generate_strategy_prompt"):
         state["refined_generate_strategy_prompt"] = None
+        print("✅ HITL refined prompt 적용 완료 (제거됨)")
 
     # 4) Qdrant history 저장 (실패해도 파이프라인은 계속 진행)
     try:
@@ -328,6 +339,46 @@ def generate_strategy_node(state: AppState) -> Dict[str, Any]:
     # LangGraph 에서는 이 dict 이 AppState 에 merge 됨
     # (state["strategies"]: List[str])
     state["strategies"] = new_strategies
+    
+    # 🆕 중간 결과물 저장 (HITL용)
+    regulation_id = None
+    regulation = state.get("regulation", {})
+    if regulation:
+        regulation_id = regulation.get("regulation_id")
+    
+    if not regulation_id:
+        preprocess_results = state.get("preprocess_results", [])
+        if preprocess_results:
+            regulation_id = preprocess_results[0].get("regulation_id")
+    
+    if regulation_id and new_strategies:
+        from app.core.repositories.intermediate_output_repository import IntermediateOutputRepository
+        from app.core.database import AsyncSessionLocal
+        
+        print(f"💾 전략 중간 결과물 저장 시작: regulation_id={regulation_id}")
+        
+        async with AsyncSessionLocal() as session:
+            intermediate_repo = IntermediateOutputRepository()
+            try:
+                intermediate_data = {
+                    "strategies": new_strategies,
+                    "regulation_summary": regulation_summary,
+                    "mapped_products": mapped_products,
+                    "history_strategies_used": history_strategies,
+                }
+                await intermediate_repo.save_intermediate(
+                    session,
+                    regulation_id=regulation_id,
+                    node_name="generate_strategy",
+                    data=intermediate_data
+                )
+                await session.commit()
+                print(f"✅ 전략 중간 결과물 저장 완료: regulation_id={regulation_id}")
+            except Exception as db_err:
+                await session.rollback()
+                print(f"❌ 전략 중간 결과물 저장 실패: {db_err}")
+    else:
+        print(f"⚠️ 전략 중간 결과물 저장 스킵: regulation_id={regulation_id}, strategies={len(new_strategies) if new_strategies else 0}")
     
     return state
 
