@@ -547,7 +547,8 @@ const downloadReport = async () => {
 
   try {
     const res = await api.get(`/reports/${props.fileId}/download`, {
-      responseType: "blob"
+      responseType: "blob",
+      timeout: 30000
     });
     const blob = new Blob([res.data], { type: "application/pdf" });
     const url = URL.createObjectURL(blob);
@@ -558,7 +559,14 @@ const downloadReport = async () => {
     URL.revokeObjectURL(url);
   } catch (err) {
     console.error('리포트 다운로드 실패:', err);
-    alert('리포트 다운로드 중 오류가 발생했습니다.');
+    const status = err?.response?.status;
+    if (status === 503) {
+      alert('서버가 잠시 응답하지 않습니다. 잠시 후 다시 시도해주세요.');
+    } else if (status === 504 || err.code === 'ECONNABORTED') {
+      alert('다운로드 시간이 초과되었습니다. 다시 시도하거나 잠시 기다려주세요.');
+    } else {
+      alert('리포트 다운로드 중 오류가 발생했습니다.');
+    }
   }
 };
 </script>

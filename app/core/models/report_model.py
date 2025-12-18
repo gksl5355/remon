@@ -22,7 +22,6 @@ class Report(Base):
     
     report_id = Column(Integer, primary_key=True, autoincrement=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
     items = relationship("ReportItem", back_populates="report")

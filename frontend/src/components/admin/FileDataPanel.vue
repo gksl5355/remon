@@ -165,14 +165,18 @@
           <!-- Run Pipeline -->
           <button
             v-if="item.s3_key"
-            class="px-2.5 py-1.5 rounded-md bg-emerald-500/60 hover:bg-emerald-400/80 text-white text-xs font-semibold shadow-sm transition flex items-center justify-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
+            class="relative px-2.5 py-1.5 rounded-md bg-emerald-500/60 hover:bg-emerald-400/80 text-white text-xs font-semibold shadow-sm transition flex items-center justify-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed overflow-hidden"
             @click.stop="runPipeline(item)"
             title="AI 파이프라인 실행"
             :disabled="isRunning(item)"
           >
             <template v-if="isRunning(item)">
               <span class="w-3 h-3 border-2 border-white/60 border-t-transparent rounded-full animate-spin"></span>
-              <span class="text-[11px] leading-none">RUN</span>
+              <span class="text-[11px] leading-none">{{ getProgress(item).toFixed(1) }}%</span>
+              <span
+                class="absolute left-0 bottom-0 h-[2px] bg-white/70"
+                :style="{ width: getProgress(item) + '%' }"
+              ></span>
             </template>
             <template v-else-if="getStatus(item) === 'done'">
               <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-white" viewBox="0 0 20 20" fill="currentColor">
@@ -292,6 +296,9 @@ const countries = ["US", "RU", "ID"];
 const fileList = ref([]);
 const showDateFilter = ref(false);
 const pipelineStatus = ref({});
+const pipelineProgress = ref({});
+const progressTimers = {};
+const progressMeta = {};
 
 const toggleDateFilter = () => {
   // 이미 열려 있으면 → 닫으면서 초기화
@@ -446,6 +453,34 @@ const setStatus = (key, status) => {
 const getStatus = item => pipelineStatus.value[item.s3_key || item.id];
 const isRunning = item => getStatus(item) === "running";
 
+const getProgress = item => pipelineProgress.value[item.s3_key || item.id] || 0;
+
+const startFakeProgress = (key) => {
+  if (progressTimers[key]) return;
+  const durationMs = 12 * 60 * 1000 + Math.floor(Math.random() * 3 * 60 * 1000);
+  progressMeta[key] = { start: Date.now(), duration: durationMs };
+  pipelineProgress.value = { ...pipelineProgress.value, [key]: 0.1 };
+  progressTimers[key] = setInterval(() => {
+    const meta = progressMeta[key];
+    if (!meta) return;
+    const elapsed = Date.now() - meta.start;
+    const ratio = Math.min(1, elapsed / meta.duration);
+    const next = Math.min(95, ratio * 95);
+    pipelineProgress.value = { ...pipelineProgress.value, [key]: Number(next.toFixed(1)) };
+  }, 1000);
+};
+
+const stopFakeProgress = (key) => {
+  if (progressTimers[key]) {
+    clearInterval(progressTimers[key]);
+    delete progressTimers[key];
+  }
+  delete progressMeta[key];
+  const copy = { ...pipelineProgress.value };
+  delete copy[key];
+  pipelineProgress.value = copy;
+};
+
 async function runPipeline(item) {
   if (!item.s3_key) {
     alert("S3 키 정보가 없습니다.");
@@ -454,11 +489,13 @@ async function runPipeline(item) {
   if (!confirm("해당 원문으로 AI 파이프라인을 실행할까요?")) return;
   try {
     setStatus(item.s3_key, "running");
+    startFakeProgress(item.s3_key);
     await api.post("/admin/s3/run-pipeline", { s3_key: item.s3_key });
     pollPipelineStatus(item.s3_key);
   } catch (err) {
     console.error("파이프라인 실행 실패:", err);
     alert("파이프라인 실행 요청에 실패했습니다.");
+    stopFakeProgress(item.s3_key);
   }
 }
 
@@ -471,6 +508,7 @@ async function pollPipelineStatus(s3Key, attempt = 0) {
 
     if (status === "done" || status === "failed") {
       setStatus(s3Key, status);
+      stopFakeProgress(s3Key);
       if (status === "failed" && res.data.error) {
         console.error("파이프라인 실패:", res.data.error);
       }
@@ -479,6 +517,7 @@ async function pollPipelineStatus(s3Key, attempt = 0) {
 
     if (attempt >= MAX_ATTEMPTS) {
       setStatus(s3Key, "timeout");
+      stopFakeProgress(s3Key);
       return;
     }
 
@@ -487,6 +526,7 @@ async function pollPipelineStatus(s3Key, attempt = 0) {
     console.error("상태 조회 실패:", err);
     if (attempt >= MAX_ATTEMPTS) {
       setStatus(s3Key, "error");
+      stopFakeProgress(s3Key);
       return;
     }
     setTimeout(() => pollPipelineStatus(s3Key, attempt + 1), DELAY_MS);
