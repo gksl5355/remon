@@ -218,6 +218,7 @@
       <AiReportPanel
         class="lg:col-span-8"
         :fileId="fileId"
+        :regulationId="fileId"
       />
 
     </div>
@@ -226,10 +227,10 @@
 </template>
 
 <script setup>
+import api from "@/services/api";
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AiReportPanel from "../components/regulation/AiReportPanel.vue";
-import api from "@/services/api";
 
 const route = useRoute();
 const router = useRouter();

@@ -8,6 +8,7 @@ from typing import Optional
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
+from dotenv import load_dotenv
 
 from fastapi import APIRouter, UploadFile, Form, HTTPException, Query, Depends
 from fastapi.responses import FileResponse
@@ -18,6 +19,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.utils.db import get_async_db, fetch_regul_data_by_title
 from app.services.translation_service import TranslationService
 
+# .env 파일 로드
+ROOT_DIR = Path(__file__).resolve().parents[3]
+load_dotenv(ROOT_DIR / ".env")
 
 router = APIRouter()
 
@@ -25,10 +29,10 @@ router = APIRouter()
 # ENV
 # ==================================================
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_REGION = os.getenv("AWS_REGION")
 
-ACCESS_POINT_NAME = os.getenv("AWS_ACCESS_POINT_NAME")
+ACCESS_POINT_NAME = os.getenv("ACCESS_POINT_NAME")
 AWS_ACCOUNT_ID = os.getenv("AWS_ACCOUNT_ID")
 
 S3_BASE_PREFIX = os.getenv("S3_BASE_PREFIX")    # skala2

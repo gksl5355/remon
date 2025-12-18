@@ -1,13 +1,17 @@
 """
 app/ai_pipeline/nodes/report.py
 ReportAgent – 구조화 JSON 보고서 생성 & RDB 연동 가능 버전
+
+author: AI Agent
+created: 2025-01-18
+updated: 2025-01-24 (CoT 구조 전략 반영 - strategies Dict 처리)
 """
 
 import os
 import json
 import re
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from dotenv import load_dotenv
 
@@ -95,17 +99,54 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
     meta = state.get("product_info", {})
     mapping = state.get("mapping", {})
     mapping_items = mapping.get("items", [])
-    strategies = state.get("strategies", [])
+    strategies = state.get("strategies", [])  # CoT 구조: List[Dict]
     impact_score = (state.get("impact_scores") or [{}])[0]
     regulation = state.get("regulation", {})
+    
+    # ✅ CoT 구조 전략 처리
+    strategy_texts = []
+    if strategies:
+        if isinstance(strategies[0], dict):
+            # CoT 구조: recommended_strategy 추출
+            strategy_texts = [s.get("recommended_strategy", "") for s in strategies if s.get("recommended_strategy")]
+        else:
+            # Legacy 구조: 문자열 리스트
+            strategy_texts = strategies
 
     # fallback data
     major_analysis = llm_struct.get("major_analysis") or [
         "(빈값 대응) 주요 변경사항 분석 부족"
     ]
-    strategy_steps = llm_struct.get("strategies") or [
-        "(빈값 대응) 전략 수립 데이터 부족"
-    ]
+    
+    # ✅ CoT 구조 전략 처리 (사용자 친화적 포맷)
+    strategies_raw = state.get("strategies", [])
+    strategy_steps = []
+    
+    if strategies_raw:
+        if isinstance(strategies_raw[0], dict):
+            # 사용자 친화적 5단계 포맷
+            for s in strategies_raw:
+                reg_change = s.get("regulation_change", "")
+                prod_context = s.get("product_context", "")
+                prev_strategy = s.get("previous_strategy", "없음")
+                new_strategy = s.get("recommended_strategy", "")
+                rationale = s.get("rationale", "")
+                
+                # 사용자 친화적 포맷
+                strategy_text = f"""변경 규제: {reg_change}
+제품 (관련내용): {prod_context}
+기존 적용되었던 전략: {prev_strategy}
+새롭게 제안되는 전략: {new_strategy}
+근거: {rationale}"""
+                strategy_steps.append(strategy_text)
+        else:
+            # Legacy 구조
+            strategy_steps = strategies_raw
+    
+    if not strategy_steps:
+        strategy_steps = llm_struct.get("strategies") or [
+            "(빈값 대응) 전략 수립 데이터 부족"
+        ]
 
     # product_name은 mapping에서 가져오기
     product_name = mapping.get("product_name", "Unknown")
@@ -233,12 +274,20 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
         else []
     )
 
+    # ✅ CoT 구조 전략 요약 (첫 번째 전략만)
+    first_strategy_summary = ""
+    if strategies_raw:
+        if isinstance(strategies_raw[0], dict):
+            first_strategy_summary = strategies_raw[0].get("recommended_strategy", "")
+        else:
+            first_strategy_summary = strategies_raw[0] if strategies_raw else ""
+    
     summary_content = [
         f"국가 / 지역: {country} ({meta.get('region', '')})",
         f"카테고리: {mapping_items[0].get('parsed',{}).get('category','') if mapping_items else ''}",
         f"규제 요약: {mapping_items[0].get('regulation_summary','') if mapping_items else ''}",
         f"영향도: {impact_score.get('impact_level','N/A')} (점수 {impact_score.get('weighted_score',0.0)})",
-        f"전략 권고: {strategies[0] if strategies else ''}",
+        f"전략 권고: {first_strategy_summary}",
     ]
 
     # 0. 종합 요약 (list 형식으로 변경)
@@ -249,7 +298,7 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
         "content": summary_content,
     }
 
-    # 1. 규제 변경 요약 (change_detection_results 활용)
+    # 1. 규제 변경 요약 (change_detection_results 활용 + reasoning 추가)
     change_items = []
     change_results = state.get("change_detection_results") or []  # ✅ None 방지
 
@@ -266,24 +315,36 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
 
         section = result.get("section_ref", "Unknown")
         numerical_changes = result.get("numerical_changes", [])
+        reasoning = result.get("reasoning", {})
 
         if numerical_changes:
             for num_change in numerical_changes:
                 field = num_change.get("field", "항목")
                 legacy_val = num_change.get("legacy_value", "없음")
                 new_val = num_change.get("new_value", "없음")
-                change_items.append(f"- {section}: {field} {legacy_val} → {new_val}")
+                change_items.append({
+                    "section": section,
+                    "type": "numerical",
+                    "field": field,
+                    "legacy_value": legacy_val,
+                    "new_value": new_val,
+                    "reasoning": reasoning
+                })
         else:
             change_type = result.get("change_type", "변경")
-            change_items.append(f"- {section}: {change_type}")
+            change_items.append({
+                "section": section,
+                "type": change_type,
+                "reasoning": reasoning
+            })
 
-    logger.info(f"✅ 변경 항목 생성: {len(change_items)}개")
+    logger.info(f"✅ 변경 항목 생성: {len(change_items)}개 (reasoning 포함)")
 
     change_summary_section = {
         "id": "change_summary",
-        "type": "list",
+        "type": "structured_list",
         "title": "1. 규제 변경 요약",
-        "content": change_items if change_items else ["변경 사항 없음"],
+        "content": change_items if change_items else [{"section": "변경 사항 없음", "type": "none"}],
     }
 
     # ✅ 제품별 하위 테이블 생성 (중복 제거된 데이터)
@@ -397,12 +458,20 @@ async def report_node(state: AppState) -> Dict[str, Any]:
     strategies = state.get("strategies", [])
     impact_score = (state.get("impact_scores") or [{}])[0]
     regulation_trace = meta.get("regulation_trace") if meta else None
+    
+    # ✅ CoT 구조 전략 처리
+    first_strategy = ""
+    if strategies:
+        if isinstance(strategies[0], dict):
+            first_strategy = strategies[0].get("recommended_strategy", "")
+        else:
+            first_strategy = strategies[0] if strategies else ""
 
     context_parts = [
         f"국가: {meta.get('country','')}, 지역: {meta.get('region','')}",
         f"요약: {mapping_items[0].get('regulation_summary','') if mapping_items else ''}",
         f"영향도: {impact_score.get('impact_level','N/A')}",
-        f"전략: {strategies[0] if strategies else ''}",
+        f"전략: {first_strategy}",
         f"근거: {impact_score.get('reasoning','')}",
     ]
     llm_context = "\n".join(context_parts)
@@ -422,15 +491,45 @@ async def report_node(state: AppState) -> Dict[str, Any]:
 
     async with AsyncSessionLocal() as db_session:
         from app.core.repositories.report_repository import ReportSummaryRepository
+        from app.core.repositories.regulation_keynote_repository import RegulationKeynoteRepository
 
         summary_repo = ReportSummaryRepository()
+        keynote_repo = RegulationKeynoteRepository()
 
         try:
-            # Change Detection Keynote는 change_detection 노드에서 이미 저장됨 (중복 제거)
+            # ReportSummary 저장
             summary = await summary_repo.create_report_summary(db_session, sections)
-            await db_session.commit()  # 즉시 commit
+            await db_session.commit()
             report_json["report_id"] = summary.summary_id
-            logger.info(f"ReportSummary 저장 완료: {summary.summary_id}")
+            logger.info(f"✅ ReportSummary 저장 완료: summary_id={summary.summary_id}")
+            
+            # ✅ Change Detection Keynote 저장 (Legacy 없어도 신규 규제 요약 저장)
+            keynote_data = state.get("change_keynote_data")
+            
+            if not keynote_data:
+                # Legacy 없으면 신규 규제 요약 Keynote 생성
+                regulation = state.get("regulation", {})
+                mapping = state.get("mapping", {})
+                
+                keynote_data = {
+                    "keynote_id": summary.summary_id,
+                    "country": regulation.get("country", "Unknown"),
+                    "regulation_title": regulation.get("title", "Unknown"),
+                    "regulation_id": regulation.get("regulation_id"),
+                    "status": "new_regulation",
+                    "total_changes": 0,
+                    "high_confidence_changes": 0,
+                    "section_changes": [],
+                    "summary": f"신규 규제 분석: {len(mapping.get('items', []))}개 항목 매핑 완료",
+                    "generated_at": datetime.utcnow().isoformat()
+                }
+                logger.info("📝 신규 규제 Keynote 생성 (Legacy 없음)")
+            else:
+                keynote_data["keynote_id"] = summary.summary_id
+            
+            await keynote_repo.create(db_session, keynote_data)
+            await db_session.commit()
+            logger.info(f"✅ Keynote 저장 완료: keynote_id={summary.summary_id}")
             
             # 규제 trace 저장
             if regulation_trace:

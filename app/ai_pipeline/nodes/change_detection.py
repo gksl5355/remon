@@ -288,29 +288,13 @@ class ChangeDetectionNode:
                             "legacy_regulation": None,
                         }
                         state["change_keynote_data"] = keynote_data
-                        logger.info("📝 신규 규제 Keynote 데이터 생성 완료")
+                        logger.info("📝 신규 규제 Keynote 데이터 생성 완료 (report 노드에서 저장 예정)")
                         logger.info(f"   - regulation_id: {new_regulation_id}")
                         logger.info(f"   - country: {new_country}")
                         logger.info(f"   - citation_code: {new_citation}")
                         logger.info(
                             f"   - key_requirements: {len(analysis_hints.get('key_requirements', []))}개"
                         )
-
-                        # ========== 신규 규제 Keynote DB 저장 ==========
-                        from app.core.repositories.regulation_keynote_repository import RegulationKeynoteRepository
-                        from app.core.database import AsyncSessionLocal
-
-                        async with AsyncSessionLocal() as save_session:
-                            keynote_repo = RegulationKeynoteRepository()
-                            try:
-                                saved_keynote = await keynote_repo.create_keynote(save_session, keynote_data)
-                                await save_session.commit()
-                                logger.info(f"✅ 신규 규제 Keynote DB 저장 완료: keynote_id={saved_keynote.keynote_id}")
-                            except Exception as db_err:
-                                await save_session.rollback()
-                                logger.error(f"❌ 신규 규제 Keynote DB 저장 실패: {db_err}")
-                                import traceback
-                                traceback.print_exc()
 
                         state["change_detection_results"] = []
                         state["change_summary"] = {
@@ -503,31 +487,19 @@ class ChangeDetectionNode:
             legacy_regulation_id=legacy_regulation_id,
         )
         state["change_keynote_data"] = keynote_data
-        logger.info("📝 Change Keynote 데이터 생성 완료")
+        logger.info("📝 Change Keynote 데이터 생성 완료 (report 노드에서 저장 예정)")
         logger.info(f"   - 데이터 크기: {len(str(keynote_data))} bytes")
         logger.info(
             f"   - section_changes: {len(keynote_data.get('section_changes', []))}개"
         )
         logger.info(f"   - regulation_id: {keynote_data.get('regulation_id')}")
 
-        # ========== DB 저장 (regulation_change_keynotes 테이블) ==========
-        from app.core.repositories.regulation_keynote_repository import RegulationKeynoteRepository
+        # ========== 중간 결과물 저장 (HITL용) ==========
         from app.core.repositories.intermediate_output_repository import IntermediateOutputRepository
         from app.core.database import AsyncSessionLocal
 
         async with AsyncSessionLocal() as session:
-            keynote_repo = RegulationKeynoteRepository()
             intermediate_repo = IntermediateOutputRepository()
-            
-            try:
-                saved_keynote = await keynote_repo.create_keynote(session, keynote_data)
-                await session.commit()
-                logger.info(f"✅ Keynote DB 저장 완료: keynote_id={saved_keynote.keynote_id}")
-            except Exception as db_err:
-                await session.rollback()
-                logger.error(f"❌ Keynote DB 저장 실패: {db_err}")
-                import traceback
-                traceback.print_exc()
             
             # 🆕 중간 결과물 저장 (HITL용)
             try:
@@ -778,15 +750,16 @@ class ChangeDetectionNode:
         """
         logger.info("🤖 LLM 기반 능동적 매칭 시작")
 
-        # 블록 요약 (LLM 입력 크기 제한)
-        def summarize_blocks(blocks: List[Dict[str, Any]], max_blocks: int = 20) -> List[Dict[str, Any]]:
+        # 블록 요약 (LLM 입력 크기 최대화 - GPT-4o-mini 128K 토큰)
+        def summarize_blocks(blocks: List[Dict[str, Any]], max_blocks: int = 100) -> List[Dict[str, Any]]:
+            """블록 요약 (최대 100개, 각 2000자 - 미탐 방지)"""
             summarized = []
             for idx, block in enumerate(blocks[:max_blocks]):
                 summarized.append({
                     "id": f"block_{idx}",
                     "section_ref": block.get("section_ref", f"Page {block.get('page_num')}"),
-                    "text_preview": block.get("text", "")[:300],
-                    "keywords": block.get("keywords", [])[:5],
+                    "text_preview": block.get("text", "")[:2000],  # 300 → 2000자
+                    "keywords": block.get("keywords", [])[:10],  # 5 → 10개
                     "page_num": block.get("page_num")
                 })
             return summarized
@@ -885,7 +858,7 @@ class ChangeDetectionNode:
         matched_pairs = []
         matched_legacy = set()
 
-        for new_block in new_blocks[:20]:
+        for new_block in new_blocks[:100]:  # 20 → 100
             new_kw = set(new_block.get("keywords", []))
             if not new_kw:
                 continue
@@ -893,7 +866,7 @@ class ChangeDetectionNode:
             best_match = None
             best_score = 0.0
 
-            for idx, legacy_block in enumerate(legacy_blocks[:20]):
+            for idx, legacy_block in enumerate(legacy_blocks[:100]):  # 20 → 100
                 if idx in matched_legacy:
                     continue
 

@@ -1,28 +1,27 @@
 #======================================================================
 # app/ai_pipeline/nodes/generate_strategy.py
-# 규제 대응 전략 생성 노드
+# 규제 대응 전략 생성 노드 (CoT 투명성 강화)
 #
 # [State 입출력 요약]
 # --- INPUT (from AppState) ---
 #   mapping: MappingResults
-#       - product_id: str
-#       - items: List[MappingItem]
-#           - regulation_summary: str        # 규제 요약 텍스트
-#           - ...                           # (기타 매핑 정보)
-#
-#   ※ map_products_node 가 state["mapping"] 에 채워주는 구조를 그대로 사용.
+#   change_detection_results: List[Dict]     # 변경 감지 상세 결과
+#   previous_regulation_summary: Optional[str] # 이전 규제 요약
 #
 # --- OUTPUT (to AppState) ---
-#   strategies: List[str]                    # 규제 기준 최종 대응 전략 문자열 리스트
+#   strategies: List[Dict]                   # CoT 구조화된 전략 리스트
+#       - previous_requirement: str
+#       - current_requirement: str
+#       - impact_reasoning: str (CoT)
+#       - recommended_strategy: str
 #
 # [큰 흐름]
-#   1) map_products 결과에서 현재 규제 요약 + 제품 ID 추출
-#   2) HybridRetriever 로 Qdrant history에서 유사 규제-제품 포인트 검색
-#   3) payload.meta_strategies 기반으로 과거 대응 전략 리스트(history) 구성
-#   4) 현재 규제 + 제품 + history 를 LLM 프롬프트에 넣어
-#      새로운 대응 전략 리스트 생성
-#   5) {"strategies": ...} 형태로 반환하여 state에 merge
-#   6) StrategyHistoryTool 로 Qdrant history 에도 새 대응 전략 저장
+#   1) 변경 감지 결과 + 이전 규제 정보 조회
+#   2) 현재 규제 요약 + 제품 ID 추출
+#   3) HybridRetriever로 유사 규제-제품 이력 검색
+#   4) CoT 프롬프트로 LLM 호출 (이전→현재→이유→전략)
+#   5) JSON 파싱하여 구조화된 전략 반환
+#   6) StrategyHistoryTool로 Qdrant에 저장
 #======================================================================
 
 from __future__ import annotations
@@ -69,21 +68,23 @@ history_tool = StrategyHistoryTool(
 # 유틸: LLM 출력 -> 전략 리스트 파싱
 #----------------------------------------------------------------------
 
-def _parse_strategies(raw_text: str) -> List[str]:
+def _parse_strategies(raw_text: str) -> List[Dict[str, str]]:
     """
-    LLM이 생성한 텍스트에서 대응 전략 문장 리스트만 추출하는 파서.
+    LLM이 생성한 JSON 텍스트에서 CoT 구조화된 전략 리스트 추출.
 
     처리 규칙:
-    - 0차: JSON 응답 감지 및 파싱 (HITL refined prompt 대응)
-    - 1차: '1.', '2)', '-', '•' 등으로 시작하는 라인의 번호/불릿만 제거하고 문장만 수집
-    - 2차: 1차 파싱 결과가 비어 있으면 전체 출력에서 공백이 아닌 각 줄을 그대로 전략 한 줄로 간주
+    - 1차: JSON 파싱 (CoT 구조: previous_requirement, current_requirement, impact_reasoning, recommended_strategy)
+    - 2차: Fallback - 기존 문자열 파싱 (하위 호환성)
+    
+    Returns:
+        List[Dict[str, str]]: CoT 구조화된 전략 리스트
     """
     import json
     
-    strategies: List[str] = []
+    strategies: List[Dict[str, str]] = []
     
     # -------------------------------
-    # 0차: JSON 응답 감지 (HITL refined prompt)
+    # 1차: JSON 파싱 (CoT 구조)
     # -------------------------------
     raw_stripped = raw_text.strip()
     if raw_stripped.startswith('{') or raw_stripped.startswith('[') or '```json' in raw_stripped:
@@ -91,13 +92,11 @@ def _parse_strategies(raw_text: str) -> List[str]:
             # 마크다운 코드 블록 제거
             json_text = raw_stripped
             if '```json' in json_text:
-                # ```json과 ``` 사이의 내용만 추출
                 start = json_text.find('```json') + 7
                 end = json_text.find('```', start)
                 if end > start:
                     json_text = json_text[start:end].strip()
             elif '```' in json_text:
-                # 일반 코드 블록
                 start = json_text.find('```') + 3
                 end = json_text.find('```', start)
                 if end > start:
@@ -105,53 +104,57 @@ def _parse_strategies(raw_text: str) -> List[str]:
             
             parsed = json.loads(json_text)
             
-            # items 배열에서 summary 추출
+            # CoT 구조 파싱
             if isinstance(parsed, dict) and 'items' in parsed:
                 for item in parsed['items']:
-                    if isinstance(item, dict) and 'summary' in item:
-                        strategies.append(item['summary'])
+                    if isinstance(item, dict):
+                        strategy = {
+                            "regulation_change": item.get("regulation_change", item.get("change_summary", "")),
+                            "product_context": item.get("product_context", item.get("current_product_status", "")),
+                            "previous_strategy": item.get("previous_strategy", "없음"),
+                            "recommended_strategy": item.get("recommended_strategy", item.get("summary", "")),
+                            "rationale": item.get("rationale", item.get("strategy_reasoning", ""))
+                        }
+                        if strategy["recommended_strategy"]:
+                            strategies.append(strategy)
+                
                 if strategies:
-                    print(f"✅ JSON 파싱 성공: {len(strategies)}개 전략 추출")
+                    print(f"✅ CoT JSON 파싱 성공: {len(strategies)}개 전략 추출")
                     return strategies
         except (json.JSONDecodeError, KeyError, TypeError) as e:
-            print(f"⚠️ JSON 파싱 실패, 기존 로직 사용: {e}")
-            pass  # JSON 파싱 실패 시 기존 로직으로 fallback
+            print(f"⚠️ JSON 파싱 실패, Fallback 사용: {e}")
     
-    # 번호 리스트 패턴: "1. 내용", "2) 내용"
+    # -------------------------------
+    # 2차 Fallback: 기존 문자열 파싱 (하위 호환성)
+    # -------------------------------
     numbered_list_pattern = re.compile(r"^[0-9]{1,2}[.)]\s+")
-
-    # -------------------------------
-    # 1차 파싱: 예상 형식 기반 파싱
-    # -------------------------------
+    text_strategies: List[str] = []
+    
     for line in raw_text.splitlines():
         line = line.strip()
         if not line:
             continue
-
+        
         cleaned = line
-
-        # 번호 리스트 ("1. 전략", "2) 전략") → 번호만 제거
         m = numbered_list_pattern.match(cleaned)
         if m:
             cleaned = cleaned[m.end():].strip()
-
-        # 불릿 ("- 전략", "• 전략", "* 전략") → 불릿만 제거
         if cleaned and cleaned[0] in ("-", "•", "*"):
             cleaned = cleaned[1:].strip()
-
+        
         if cleaned:
-            strategies.append(cleaned)
-
-    # -----------------------------------------
-    # 2차 fallback: 형식이 완전 망가져도 내용은 살린다
-    # -----------------------------------------
-    if not strategies:
-        for line in raw_text.splitlines():
-            cleaned = line.strip()
-            if not cleaned:
-                continue
-            strategies.append(cleaned)
-
+            text_strategies.append(cleaned)
+    
+    # 문자열을 CoT 구조로 변환 (Fallback)
+    for text in text_strategies:
+        strategies.append({
+            "regulation_change": "(변경 감지 실패)",
+            "product_context": "(알 수 없음)",
+            "previous_strategy": "없음",
+            "recommended_strategy": text,
+            "rationale": "(근거 없음)"
+        })
+    
     return strategies
 
 
@@ -178,7 +181,8 @@ def _build_query_text(regulation_summary: str, products: List[str]) -> str:
 #----------------------------------------------------------------------
 
 def _build_llm_prompt(
-    regulation_summary: str,
+    current_regulation_summary: str,
+    change_analysis: str,
     products: List[str],
     history_strategies: List[str],
 ) -> str:
@@ -194,7 +198,8 @@ def _build_llm_prompt(
     )
 
     prompt = STRATEGY_PROMPT.format(
-        regulation_summary=regulation_summary,
+        current_regulation_summary=current_regulation_summary,
+        change_analysis=change_analysis,
         products_block=products_block,
         history_block=history_block,
     )
@@ -323,13 +328,40 @@ async def generate_strategy_node(state: AppState) -> Dict[str, Any]:
 
     history_strategies = _extract_history_strategies(history_results)
 
-    # 3) LLM 호출하여 새로운 대응 전략 생성
+    # 3) regulation_id 조회
+    regulation_id = None
+    regulation = state.get("regulation", {})
+    if regulation:
+        regulation_id = regulation.get("regulation_id")
+    
+    if not regulation_id:
+        preprocess_results = state.get("preprocess_results", [])
+        if preprocess_results:
+            regulation_id = preprocess_results[0].get("regulation_id")
+    
+    # 4) 변경 감지 결과 조회 및 분석 텍스트 생성
+    change_detection_results = state.get("change_detection_results", [])
+    change_analysis = ""
+    
+    if change_detection_results:
+        change_lines = []
+        for idx, change in enumerate(change_detection_results[:5], 1):  # 최대 5개만
+            section = change.get("section", "Unknown")
+            change_type = change.get("change_type", "Unknown")
+            summary = change.get("summary", "")
+            change_lines.append(f"{idx}. [{section}] {change_type}: {summary}")
+        change_analysis = "\n".join(change_lines)
+        print(f"✅ 변경 감지 결과 활용: {len(change_detection_results)}개 변경사항")
+    else:
+        change_analysis = "(변경 감지 결과 없음 - 신규 규제 또는 변경 감지 실패)"
+        print("⚠️ 변경 감지 결과 없음")
+    
+    # 5) LLM 호출하여 새로운 대응 전략 생성 (CoT 구조)
     refined_prompt = state.get("refined_generate_strategy_prompt")
 
     if refined_prompt:
         print("[Strategy] Using REFINED STRATEGY PROMPT from validator")
         
-        # ✅ Refined prompt에 placeholder가 있으면 채우기
         products_block = (
             "\n".join(f"- {p}" for p in mapped_products) 
             if mapped_products else "- (no mapped products)"
@@ -340,15 +372,43 @@ async def generate_strategy_node(state: AppState) -> Dict[str, Any]:
             else "- (no relevant historical strategies)"
         )
         
-        prompt = refined_prompt.format(
-            regulation_summary=regulation_summary,
-            products_block=products_block,
-            history_block=history_block,
-        )
-        print(f"[Strategy] ✅ Placeholder 채우기 완료: {len(prompt)} chars")
+        try:
+            temp_prompt = refined_prompt
+            # Placeholder 임시 치환
+            temp_prompt = temp_prompt.replace("{current_regulation_summary}", "__CURR_REG__")
+            temp_prompt = temp_prompt.replace("{change_analysis}", "__CHANGE__")
+            temp_prompt = temp_prompt.replace("{products_block}", "__PRODUCTS__")
+            temp_prompt = temp_prompt.replace("{history_block}", "__HISTORY__")
+            
+            # 중괄호 이스케이프
+            temp_prompt = temp_prompt.replace("{", "{{").replace("}", "}}")
+            
+            # Placeholder 복원
+            temp_prompt = temp_prompt.replace("__CURR_REG__", "{current_regulation_summary}")
+            temp_prompt = temp_prompt.replace("__CHANGE__", "{change_analysis}")
+            temp_prompt = temp_prompt.replace("__PRODUCTS__", "{products_block}")
+            temp_prompt = temp_prompt.replace("__HISTORY__", "{history_block}")
+            
+            prompt = temp_prompt.format(
+                current_regulation_summary=regulation_summary,
+                change_analysis=change_analysis,
+                products_block=products_block,
+                history_block=history_block,
+            )
+            
+            print(f"[Strategy] ✅ Refined prompt 적용 완료: {len(prompt)} chars")
+        except KeyError as e:
+            print(f"⚠️ Refined prompt format 실패: {e}, 기본 프롬프트 사용")
+            prompt = _build_llm_prompt(
+                current_regulation_summary=regulation_summary,
+                change_analysis=change_analysis,
+                products=mapped_products,
+                history_strategies=history_strategies,
+            )
     else:
         prompt = _build_llm_prompt(
-            regulation_summary=regulation_summary,
+            current_regulation_summary=regulation_summary,
+            change_analysis=change_analysis,
             products=mapped_products,
             history_strategies=history_strategies,
         )
@@ -363,13 +423,17 @@ async def generate_strategy_node(state: AppState) -> Dict[str, Any]:
 
     new_strategies = _parse_strategies(raw_output_text)
 
-    # 🔍 전략 생성 결과 출력
+    # 🔍 전략 생성 결과 출력 (CoT 구조)
     print("\n" + "="*80)
-    print("📋 [전략 생성 완료]")
+    print("📋 [전략 생성 완료 - CoT 구조]")
     print("="*80)
     for idx, strategy in enumerate(new_strategies, 1):
         print(f"\n전략 {idx}:")
-        print(f"  {strategy}")
+        print(f"  [변경 규제] {strategy.get('regulation_change', 'N/A')}")
+        print(f"  [제품 관련내용] {strategy.get('product_context', 'N/A')}")
+        print(f"  [기존 적용 전략] {strategy.get('previous_strategy', 'N/A')}")
+        print(f"  [새롭게 제안되는 전략] {strategy.get('recommended_strategy', 'N/A')}")
+        print(f"  [근거] {strategy.get('rationale', 'N/A')}")
     print("\n" + "="*80 + "\n")
 
     # refined prompt 성공 후 제거
@@ -377,12 +441,14 @@ async def generate_strategy_node(state: AppState) -> Dict[str, Any]:
         state["refined_generate_strategy_prompt"] = None
         print("✅ HITL refined prompt 적용 완료 (제거됨)")
 
-    # 4) Qdrant history 저장 (실패해도 파이프라인은 계속 진행)
+    # 6) Qdrant history 저장 (실패해도 파이프라인은 계속 진행)
     try:
+        # CoT 구조에서 recommended_strategy만 추출하여 저장
+        strategy_texts = [s.get("recommended_strategy", "") for s in new_strategies if s.get("recommended_strategy")]
         history_tool.save_strategy_history(
             regulation_summary=regulation_summary,
             mapped_products=mapped_products,
-            strategies=new_strategies,
+            strategies=strategy_texts,
         )
     except Exception as e:
         print(f"[generate_strategy_node] history 저장 중 예외 발생: {e}")
@@ -414,6 +480,7 @@ async def generate_strategy_node(state: AppState) -> Dict[str, Any]:
                 intermediate_data = {
                     "strategies": new_strategies,
                     "regulation_summary": regulation_summary,
+                    "change_analysis": change_analysis,
                     "mapped_products": mapped_products,
                     "history_strategies_used": history_strategies,
                 }

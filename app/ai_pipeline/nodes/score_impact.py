@@ -99,7 +99,13 @@ async def score_impact_node(state: AppState) -> AppState:
             "gap": item.get("gap"),
         })
 
-    strategy_text = " ".join(strategies_list).strip()
+    # ✅ CoT 구조 전략 처리
+    if strategies_list and isinstance(strategies_list[0], dict):
+        # CoT 구조: recommended_strategy만 추출
+        strategy_text = " ".join([s.get("recommended_strategy", "") for s in strategies_list if s.get("recommended_strategy")]).strip()
+    else:
+        # Legacy 구조: 문자열 리스트
+        strategy_text = " ".join(strategies_list).strip()
 
     # -----------------------------
     # 프롬프트 생성 + 로그
