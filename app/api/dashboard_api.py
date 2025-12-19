@@ -39,59 +39,49 @@ weeklyData = {
 timeline = [
   {
     "id": 1,
-    "date": "US · 2025-12-03",
-    "title": "금일 변경사항 없음",
-    "type": "no-change",
-    "description": "시스템 모니터링 활성"
+    "date": "2025-12-15",
+    "title": "정기 규제 크롤링",
+    "type": "crawling",
+    "status": "crawling"
   },
   {
     "id": 2,
-    "date": "US · 2025-12-02",
-    "title": "전자담배 광고 규제 업데이트",
-    "type": "change",
-    "description": "디지털 마케팅 제한에 대한 새로운 연방 지침"
+    "date": "US · 2025-12-15",
+    "title": "규제 변경 사항 AI 리포트",
+    "type": "reporting",
+    "status": "reporting"
   },
   {
     "id": 3,
-    "date": "ID · 2025-12-01",
-    "title": "포장 요구사항 신설",
-    "type": "new",
-    "description": "건강 경고 라벨 크기가 패키지의 90%로 증가"
+    "date": "2025-12-10",
+    "title": "정기 규제 모니터링 결과",
+    "type": "no-change",
+    "description": "규제 변동 사항이 확인되지 않았습니다.",
+    "status": "done"
   },
   {
     "id": 4,
-    "date": "ID · 2025-11-30",
-    "title": "흡연 구역 규제 확대",
-    "type": "change",
-    "description": "금연 구역으로 지정된 추가 공공 장소"
+    "date": "US · 2025-12-5",
+    "title": "담배 제품 포장 요구사항 신설",
+    "type": "new",
+    "description": "건강 경고 라벨 표시 면적이 패키지의 90%로 확대되었습니다.",
+    "status": "done"
   },
   {
     "id": 5,
-    "date": "RU · 2025-11-28",
-    "title": "정기 모니터링 검사 완료",
-    "type": "no-change",
-    "description": "규제 변경 사항 없음"
+    "date": "RU · 2025-11-30",
+    "title": "흡연 구역 규제 범위 확대",
+    "type": "change",
+    "description": "학교 및 공공시설 인근 지역이 추가 금연 구역으로 지정되었습니다.",
+    "status": "done"
   },
   {
     "id": 6,
-    "date": "ID · 2025-12-01",
-    "title": "니코틴 함량 제한 강화",
-    "type": "new",
-    "description": "니코틴의 함량 규제가 기존 1.2mg 에서 0.8mg으로 축소"
-  },
-  {
-    "id": 7,
-    "date": "ID · 2025-11-30",
-    "title": "흡연 구역 규제 확대",
-    "type": "change",
-    "description": "금연 구역으로 지정된 추가 공공 장소"
-  },
-  {
-    "id": 8,
-    "date": "RU · 2025-11-28",
-    "title": "정기 모니터링 검사 완료",
+    "date": "2025-11-25",
+    "title": "정기 규제 모니터링 결과",
     "type": "no-change",
-    "description": "규제 변경 사항 없음"
+    "description": "규제 변동 사항이 확인되지 않았습니다.",
+    "status": "done"
   }
 ]
 

@@ -3,16 +3,29 @@
 import os
 import re
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
 
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 
-from fastapi import APIRouter, UploadFile, Form, HTTPException, Query, Depends
+from fastapi import (
+    APIRouter,
+    UploadFile,
+    Form,
+    HTTPException,
+    Query,
+    Depends,
+    BackgroundTasks,
+)
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+import asyncio
+import tempfile
+from pathlib import Path
+from sqlalchemy import text
+from app.core.database import AsyncSessionLocal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -91,6 +104,127 @@ def generate_presigned_download_url(key: str, expires: int = 3600) -> str:
         },
         ExpiresIn=expires,
     )
+
+# 파이프라인 상태를 DB에 기록하기 위한 설정
+_pipeline_table_initialized = False
+
+
+async def _ensure_pipeline_table(session) -> None:
+    """pipeline_jobs 테이블이 없으면 생성 (간단한 상태 저장용)."""
+    global _pipeline_table_initialized
+    if _pipeline_table_initialized:
+        return
+    await session.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS pipeline_jobs (
+                s3_key TEXT PRIMARY KEY,
+                status TEXT,
+                error TEXT,
+                updated_at TIMESTAMPTZ DEFAULT now()
+            );
+            """
+        )
+    )
+    _pipeline_table_initialized = True
+
+
+async def _set_job_status(s3_key: str, status: str, error: Optional[str] = None):
+    async with AsyncSessionLocal() as session:
+        await _ensure_pipeline_table(session)
+        await session.execute(
+            text(
+                """
+                INSERT INTO pipeline_jobs (s3_key, status, error, updated_at)
+                VALUES (:s3_key, :status, :error, now())
+                ON CONFLICT (s3_key) DO UPDATE
+                SET status = EXCLUDED.status,
+                    error = EXCLUDED.error,
+                    updated_at = now();
+                """
+            ),
+            {"s3_key": s3_key, "status": status, "error": error},
+        )
+        await session.commit()
+
+
+async def _get_job_status(s3_key: str) -> Dict[str, str]:
+    async with AsyncSessionLocal() as session:
+        await _ensure_pipeline_table(session)
+        res = await session.execute(
+            text(
+                "SELECT status, error, updated_at FROM pipeline_jobs WHERE s3_key = :s3_key"
+            ),
+            {"s3_key": s3_key},
+        )
+        row = res.fetchone()
+        if row:
+            return {"status": row.status, "error": row.error, "updated_at": str(row.updated_at)}
+        return {"status": "unknown"}
+
+
+# ==================================================
+# PIPELINE TRIGGER
+# ==================================================
+class RunPipelineRequest(BaseModel):
+    s3_key: str
+
+
+async def _download_s3_to_tmp(s3_key: str) -> Path:
+    """S3 객체를 임시 파일로 다운로드 후 경로 반환."""
+    tmp_dir = Path(tempfile.gettempdir())
+    local_path = tmp_dir / Path(s3_key).name
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, s3_client.download_file, ACCESS_POINT_ARN, s3_key, str(local_path))
+    return local_path
+
+
+async def _run_pipeline_worker(s3_key: str):
+    """S3 키를 받아 파이프라인을 비동기로 실행."""
+    try:
+        from app.ai_pipeline.graph import build_graph
+
+        # 1) S3 → 로컬 임시 저장
+        local_pdf = await _download_s3_to_tmp(s3_key)
+
+        # 2) 파이프라인 초기 상태 구성
+        initial_state = {
+            "preprocess_request": {
+                "pdf_paths": [str(local_pdf)],
+                "use_vision_pipeline": True,
+                "enable_change_detection": True,
+            },
+            "change_context": {},
+            "mapping_filters": {},
+            "validation_retry_count": 0,
+        }
+
+        app = build_graph()
+        await app.ainvoke(initial_state, config={"configurable": {}})
+        logger.info("✅ pipeline completed for s3_key=%s", s3_key)
+        await _set_job_status(s3_key, "done")
+    except Exception as exc:
+        logger.error("❌ pipeline failed for s3_key=%s, error=%s", s3_key, exc, exc_info=True)
+        await _set_job_status(s3_key, "failed", str(exc))
+
+
+@router.post("/run-pipeline")
+async def run_pipeline_from_s3(req: RunPipelineRequest, background_tasks: BackgroundTasks):
+    """
+    S3 키로 업로드된 규제 PDF를 즉시 AI 파이프라인에 태우는 엔드포인트.
+    응답은 바로 반환되고, 백그라운드에서 처리됩니다.
+    """
+    await _set_job_status(req.s3_key, "running")
+    background_tasks.add_task(_run_pipeline_worker, req.s3_key)
+    return {"status": "accepted", "s3_key": req.s3_key}
+
+
+@router.get("/pipeline-status")
+async def pipeline_status_check(s3_key: str):
+    """
+    파이프라인 상태 확인 (DB 기반).
+    """
+    return await _get_job_status(s3_key)
 
 # ==================================================
 # UTIL
@@ -192,14 +326,22 @@ def delete_file(s3_key: str = Query(...)):
 # PRESIGNED DOWNLOAD
 # ==================================================
 class DownloadURLRequest(BaseModel):
-    key: str
+    key: Optional[str] = None
+    s3_key: Optional[str] = None
 
 
 @router.post("/download-url")
-def generate_download_url(req: DownloadURLRequest):
+def generate_download_url(
+    req: DownloadURLRequest,
+    key: Optional[str] = Query(None),
+    s3_key: Optional[str] = Query(None),
+):
+    selected = key or s3_key or req.key or req.s3_key
+    if not selected:
+        raise HTTPException(status_code=422, detail="key (or s3_key) is required")
     return {
         "status": "success",
-        "url": generate_presigned_download_url(req.key),
+        "url": generate_presigned_download_url(selected),
     }
 
 # ==================================================

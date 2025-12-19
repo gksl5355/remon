@@ -299,35 +299,34 @@ async def run_full_pipeline(citation_code: str | None = None):
     # Step 3: S3에서 파일 로드
     logger.info("\n[Step 3] S3에서 파일 로드")
     from app.ai_pipeline.preprocess.s3_loader import load_today_regulations
-    
+
     pdf_paths = load_today_regulations(date=None)
-    
+
     if not pdf_paths:
         logger.error("❌ S3에서 파일을 찾을 수 없습니다")
         return
-    
+
     logger.info(f"  ✅ {len(pdf_paths)}개 파일 로드 완료")
     for i, path in enumerate(pdf_paths, 1):
         logger.info(f"    {i}. {path}")
-    
+
     # Step 4: 다중 파일 파이프라인 실행
     logger.info("\n[Step 4] 다중 파일 파이프라인 실행 (각 파일별 독립 처리)")
     from app.services.ai_service import AIService
-    
+
     service = AIService()
     result = await service.run_multi_file_pipeline(
-        pdf_paths=pdf_paths,
-        vision_config=None
+        pdf_paths=pdf_paths, vision_config=None
     )
-    
+
     logger.info("\n[Step 5] 실행 결과 요약")
     logger.info(f"  📊 전체: {result['total']}개")
     logger.info(f"  ✅ 성공: {result['succeeded']}개")
     logger.info(f"  ❌ 실패: {result['failed']}개")
-    
-    reports = result.get('reports', [])
+
+    reports = result.get("reports", [])
     for i, report in enumerate(reports, 1):
-        if report.get('report_id'):
+        if report.get("report_id"):
             logger.info(f"  📄 보고서 {i}: report_id={report['report_id']}")
         else:
             logger.warning(f"  ⚠️ 보고서 {i}: 생성 실패")
@@ -335,17 +334,17 @@ async def run_full_pipeline(citation_code: str | None = None):
     # ------------------------------------------------------------------
     # Step 6: HITL 인터랙티브 루프 (첫 번째 보고서 기준)
     # ------------------------------------------------------------------
-    if not reports or not reports[0].get('report_id'):
+    if not reports or not reports[0].get("report_id"):
         logger.warning("⚠️ 보고서가 없어 HITL을 건너뜁니다")
         return result
-    
+
     first_report = reports[0]
-    regulation_id = first_report.get('regulation_id')
-    
+    regulation_id = first_report.get("regulation_id")
+
     if not regulation_id:
         logger.warning("⚠️ regulation_id가 없어 HITL을 건너뜁니다")
         return result
-    
+
     logger.info("\n[Step 6] HITL 피드백 루프 시작 (첫 번째 보고서 기준)")
     logger.info(f"  📄 대상 보고서: report_id={first_report.get('report_id')}")
 
@@ -353,7 +352,9 @@ async def run_full_pipeline(citation_code: str | None = None):
         while True:
             print("\n" + "-" * 80)
             print("💬 결과에 대한 HITL 피드백을 입력하세요.")
-            print("   - 예) '변경 없음으로 처리해줘', '매핑 다시 해줘', '전략 좀 더 보수적으로'")
+            print(
+                "   - 예) '변경 없음으로 처리해줘', '매핑 다시 해줘', '전략 좀 더 보수적으로'"
+            )
             print("   - 아무것도 입력하지 않고 엔터 → HITL 종료")
             print("   - 'exit' / 'quit' / '완료' 입력 → HITL 종료")
             print("-" * 80)
@@ -369,13 +370,13 @@ async def run_full_pipeline(citation_code: str | None = None):
                 break
 
             logger.info(f"[HITL] 피드백: '{feedback}'")
-            
+
             try:
                 hitl_result = await service.run_pipeline_with_hitl(
                     db=session,
                     regulation_id=regulation_id,
                     user_message=feedback,
-                    target_node="map_products"
+                    target_node="map_products",
                 )
                 logger.info(f"✅ HITL 재실행 완료: {hitl_result}")
             except Exception as e:

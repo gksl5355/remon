@@ -288,7 +288,9 @@ class ChangeDetectionNode:
                             "legacy_regulation": None,
                         }
                         state["change_keynote_data"] = keynote_data
-                        logger.info("📝 신규 규제 Keynote 데이터 생성 완료 (report 노드에서 저장 예정)")
+                        logger.info(
+                            "📝 신규 규제 Keynote 데이터 생성 완료 (report 노드에서 저장 예정)"
+                        )
                         logger.info(f"   - regulation_id: {new_regulation_id}")
                         logger.info(f"   - country: {new_country}")
                         logger.info(f"   - citation_code: {new_citation}")
@@ -383,43 +385,49 @@ class ChangeDetectionNode:
             section = self._normalize_section_ref(result.get("section_ref", ""))
             if not section:
                 continue
-            
+
             # 같은 Section이 있으면 신뢰도 높은 것만 유지
             if section in seen_sections:
                 existing = seen_sections[section]
-                if result.get("confidence_score", 0) > existing.get("confidence_score", 0):
+                if result.get("confidence_score", 0) > existing.get(
+                    "confidence_score", 0
+                ):
                     seen_sections[section] = result
             else:
                 seen_sections[section] = result
-        
+
         detection_results = list(seen_sections.values())
         logger.info(f"🔄 중복 제거 후: {len(detection_results)}개 유니크 섹션")
-        
+
         # 신뢰도 조정 및 필터링
         filtered_results = []
         for result in detection_results:
-            result["confidence_score"] = self.confidence_scorer.adjust_confidence(result)
+            result["confidence_score"] = self.confidence_scorer.adjust_confidence(
+                result
+            )
             result["confidence_level"] = self.confidence_scorer.get_confidence_level(
                 result["confidence_score"]
             )
-            
+
             # LOW/UNCERTAIN 필터링 (완화된 조건)
             if result.get("change_detected"):
                 if result["confidence_score"] >= 0.5:  # 완화: 0.65 → 0.5
                     filtered_results.append(result)
                 else:
-                    logger.debug(f"⚠️ 낮은 신뢰도로 제외: {result.get('section_ref')} ({result['confidence_score']:.2f})")
+                    logger.debug(
+                        f"⚠️ 낮은 신뢰도로 제외: {result.get('section_ref')} ({result['confidence_score']:.2f})"
+                    )
             else:
                 # 변경 없음도 완화
                 if result["confidence_score"] >= 0.55:  # 완화: 0.7 → 0.55
                     filtered_results.append(result)
-        
+
         # 필터링 전 전체 결과 백업 (Keynote 저장용)
         all_detection_results = detection_results.copy()
-        
+
         detection_results = filtered_results
         logger.info(f"✅ 신뢰도 필터링 후: {len(detection_results)}개")
-        
+
         total_changes = sum(1 for r in detection_results if r.get("change_detected"))
         high_confidence = sum(
             1 for r in detection_results if r.get("confidence_level") == "HIGH"
@@ -495,32 +503,39 @@ class ChangeDetectionNode:
         logger.info(f"   - regulation_id: {keynote_data.get('regulation_id')}")
 
         # ========== 중간 결과물 저장 (HITL용) ==========
-        from app.core.repositories.intermediate_output_repository import IntermediateOutputRepository
+        from app.core.repositories.intermediate_output_repository import (
+            IntermediateOutputRepository,
+        )
         from app.core.database import AsyncSessionLocal
 
         async with AsyncSessionLocal() as session:
             intermediate_repo = IntermediateOutputRepository()
-            
+
             # 🆕 중간 결과물 저장 (HITL용)
             try:
                 intermediate_data = {
                     "change_detection_results": detection_results,
                     "change_summary": state["change_summary"],
                     "change_detection_index": change_index,
-                    "regulation_analysis_hints": state.get("regulation_analysis_hints", {})
+                    "regulation_analysis_hints": state.get(
+                        "regulation_analysis_hints", {}
+                    ),
                 }
                 await intermediate_repo.save_intermediate(
                     session,
                     regulation_id=new_regulation_id,
                     node_name="change_detection",
-                    data=intermediate_data
+                    data=intermediate_data,
                 )
                 await session.commit()
-                logger.info(f"✅ 변경 감지 중간 결과물 저장 완료: regulation_id={new_regulation_id}")
+                logger.info(
+                    f"✅ 변경 감지 중간 결과물 저장 완료: regulation_id={new_regulation_id}"
+                )
             except Exception as db_err:
                 await session.rollback()
                 logger.error(f"❌ 중간 결과물 저장 실패: {db_err}")
                 import traceback
+
                 traceback.print_exc()
 
         # ========== 임베딩 필요 여부 플래그 ==========
@@ -751,17 +766,23 @@ class ChangeDetectionNode:
         logger.info("🤖 LLM 기반 능동적 매칭 시작")
 
         # 블록 요약 (LLM 입력 크기 최대화 - GPT-4o-mini 128K 토큰)
-        def summarize_blocks(blocks: List[Dict[str, Any]], max_blocks: int = 100) -> List[Dict[str, Any]]:
+        def summarize_blocks(
+            blocks: List[Dict[str, Any]], max_blocks: int = 100
+        ) -> List[Dict[str, Any]]:
             """블록 요약 (최대 100개, 각 2000자 - 미탐 방지)"""
             summarized = []
             for idx, block in enumerate(blocks[:max_blocks]):
-                summarized.append({
-                    "id": f"block_{idx}",
-                    "section_ref": block.get("section_ref", f"Page {block.get('page_num')}"),
-                    "text_preview": block.get("text", "")[:2000],  # 300 → 2000자
-                    "keywords": block.get("keywords", [])[:10],  # 5 → 10개
-                    "page_num": block.get("page_num")
-                })
+                summarized.append(
+                    {
+                        "id": f"block_{idx}",
+                        "section_ref": block.get(
+                            "section_ref", f"Page {block.get('page_num')}"
+                        ),
+                        "text_preview": block.get("text", "")[:2000],  # 300 → 2000자
+                        "keywords": block.get("keywords", [])[:10],  # 5 → 10개
+                        "page_num": block.get("page_num"),
+                    }
+                )
             return summarized
 
         new_summary = summarize_blocks(new_blocks)
@@ -801,14 +822,17 @@ class ChangeDetectionNode:
             response = await self.llm.chat.completions.create(
                 model=self.model_name,
                 messages=[
-                    {"role": "system", "content": "You are a regulatory document matcher. Return JSON only."},
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "system",
+                        "content": "You are a regulatory document matcher. Return JSON only.",
+                    },
+                    {"role": "user", "content": prompt},
                 ],
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"},
             )
 
             content = response.choices[0].message.content
-            
+
             # JSON 파싱 (배열 또는 객체 처리)
             try:
                 parsed = json.loads(content)
@@ -827,18 +851,22 @@ class ChangeDetectionNode:
             for match in matches:
                 new_id = match.get("new_block_id", "")
                 legacy_id = match.get("legacy_block_id", "")
-                
+
                 try:
                     new_idx = int(new_id.split("_")[1])
                     legacy_idx = int(legacy_id.split("_")[1])
-                    
+
                     if new_idx < len(new_blocks) and legacy_idx < len(legacy_blocks):
-                        matched_pairs.append({
-                            "new_block": new_blocks[new_idx],
-                            "legacy_block": legacy_blocks[legacy_idx],
-                            "match_confidence": match.get("confidence", 0.5),
-                            "match_reason": match.get("reason", "LLM semantic match")
-                        })
+                        matched_pairs.append(
+                            {
+                                "new_block": new_blocks[new_idx],
+                                "legacy_block": legacy_blocks[legacy_idx],
+                                "match_confidence": match.get("confidence", 0.5),
+                                "match_reason": match.get(
+                                    "reason", "LLM semantic match"
+                                ),
+                            }
+                        )
                 except (IndexError, ValueError) as e:
                     logger.warning(f"매칭 인덱스 파싱 실패: {e}")
                     continue
@@ -874,26 +902,36 @@ class ChangeDetectionNode:
                 if not legacy_kw:
                     continue
 
-                score = len(new_kw & legacy_kw) / len(new_kw | legacy_kw) if (new_kw | legacy_kw) else 0.0
+                score = (
+                    len(new_kw & legacy_kw) / len(new_kw | legacy_kw)
+                    if (new_kw | legacy_kw)
+                    else 0.0
+                )
 
                 if score > best_score and score >= 0.3:
                     best_score = score
                     best_match = (idx, legacy_block)
 
             if best_match:
-                matched_pairs.append({
-                    "new_block": new_block,
-                    "legacy_block": best_match[1],
-                    "match_confidence": best_score,
-                    "match_reason": f"Keyword fallback: {best_score:.2f}"
-                })
+                matched_pairs.append(
+                    {
+                        "new_block": new_block,
+                        "legacy_block": best_match[1],
+                        "match_confidence": best_score,
+                        "match_reason": f"Keyword fallback: {best_score:.2f}",
+                    }
+                )
                 matched_legacy.add(best_match[0])
 
         logger.info(f"✅ Fallback 매칭: {len(matched_pairs)}개 쌍")
         return matched_pairs
 
     async def _detect_change_by_ref_id(
-        self, pair: Dict[str, Any], new_regulation_id: str, legacy_regulation_id: str, state: Optional[AppState] = None
+        self,
+        pair: Dict[str, Any],
+        new_regulation_id: str,
+        legacy_regulation_id: str,
+        state: Optional[AppState] = None,
     ) -> Optional[Dict[str, Any]]:
         """CoT Step 2-4: Reference ID 기반 정밀 변경 감지 (Agentic + HITL)."""
         new_block = pair["new_block"]
@@ -917,9 +955,11 @@ class ChangeDetectionNode:
         hitl_context = ""
         if state and state.get("refined_change_detection_prompt"):
             # DB에서 기존 변경 감지 결과 로드
-            from app.core.repositories.intermediate_output_repository import IntermediateOutputRepository
+            from app.core.repositories.intermediate_output_repository import (
+                IntermediateOutputRepository,
+            )
             from app.core.database import AsyncSessionLocal
-            
+
             regulation_id = state.get("regulation", {}).get("regulation_id")
             if regulation_id:
                 try:
@@ -928,15 +968,21 @@ class ChangeDetectionNode:
                         existing_data = await intermediate_repo.get_intermediate(
                             session, regulation_id, "change_detection"
                         )
-                        
-                        if existing_data and existing_data.get("change_detection_results"):
+
+                        if existing_data and existing_data.get(
+                            "change_detection_results"
+                        ):
                             # 해당 섹션의 기존 결과 찾기
                             existing_results = existing_data["change_detection_results"]
                             section_result = next(
-                                (r for r in existing_results if r.get("section_ref") == section_ref),
-                                None
+                                (
+                                    r
+                                    for r in existing_results
+                                    if r.get("section_ref") == section_ref
+                                ),
+                                None,
                             )
-                            
+
                             if section_result:
                                 hitl_context = f"""\n\n[EXISTING ANALYSIS - For Reference]
 Previous Detection: {section_result.get('change_detected')}
@@ -949,7 +995,9 @@ Previous Reasoning: {section_result.get('reasoning', {})}
 
 **CRITICAL**: Re-evaluate based on expert guidance above.
 """
-                                logger.info(f"✅ HITL: Section {section_ref} - 기존 결과 + 전문가 프롬프트 적용")
+                                logger.info(
+                                    f"✅ HITL: Section {section_ref} - 기존 결과 + 전문가 프롬프트 적용"
+                                )
                 except Exception as e:
                     logger.warning(f"⚠️ HITL 컨텍스트 로드 실패: {e}")
 

@@ -102,13 +102,17 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
     strategies = state.get("strategies", [])  # CoT 구조: List[Dict]
     impact_score = (state.get("impact_scores") or [{}])[0]
     regulation = state.get("regulation", {})
-    
+
     # ✅ CoT 구조 전략 처리
     strategy_texts = []
     if strategies:
         if isinstance(strategies[0], dict):
             # CoT 구조: recommended_strategy 추출
-            strategy_texts = [s.get("recommended_strategy", "") for s in strategies if s.get("recommended_strategy")]
+            strategy_texts = [
+                s.get("recommended_strategy", "")
+                for s in strategies
+                if s.get("recommended_strategy")
+            ]
         else:
             # Legacy 구조: 문자열 리스트
             strategy_texts = strategies
@@ -117,11 +121,11 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
     major_analysis = llm_struct.get("major_analysis") or [
         "(빈값 대응) 주요 변경사항 분석 부족"
     ]
-    
+
     # ✅ CoT 구조 전략 처리 (사용자 친화적 포맷)
     strategies_raw = state.get("strategies", [])
     strategy_steps = []
-    
+
     if strategies_raw:
         if isinstance(strategies_raw[0], dict):
             # 사용자 친화적 5단계 포맷
@@ -131,7 +135,7 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
                 prev_strategy = s.get("previous_strategy", "없음")
                 new_strategy = s.get("recommended_strategy", "")
                 rationale = s.get("rationale", "")
-                
+
                 # 사용자 친화적 포맷
                 strategy_text = f"""변경 규제: {reg_change}
 제품 (관련내용): {prod_context}
@@ -142,7 +146,7 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
         else:
             # Legacy 구조
             strategy_steps = strategies_raw
-    
+
     if not strategy_steps:
         strategy_steps = llm_struct.get("strategies") or [
             "(빈값 대응) 전략 수립 데이터 부족"
@@ -223,11 +227,12 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
 
         # S3 하드코딩 경로
         s3_base_url = "https://skala-s3-bucket.s3.ap-northeast-2.amazonaws.com/skala2/skala-2.4.17/remon/regulation"
-        
+
         if source_url:
             link = source_url
         elif file_path:
             from pathlib import Path
+
             filename = Path(file_path).name
             link = f"{s3_base_url}/{jurisdiction}/{filename}"
         else:
@@ -253,7 +258,9 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
 
     # 2) Legacy 규제 추가 (change_context에서)
     change_summary = state.get("change_summary") or {}
-    legacy_regulation_id = change_summary.get("legacy_regulation_id") if change_summary else None
+    legacy_regulation_id = (
+        change_summary.get("legacy_regulation_id") if change_summary else None
+    )
 
     if legacy_regulation_id:
         change_context = state.get("change_context", {})
@@ -281,7 +288,7 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
             first_strategy_summary = strategies_raw[0].get("recommended_strategy", "")
         else:
             first_strategy_summary = strategies_raw[0] if strategies_raw else ""
-    
+
     summary_content = [
         f"국가 / 지역: {country} ({meta.get('region', '')})",
         f"카테고리: {mapping_items[0].get('parsed',{}).get('category','') if mapping_items else ''}",
@@ -322,29 +329,35 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
                 field = num_change.get("field", "항목")
                 legacy_val = num_change.get("legacy_value", "없음")
                 new_val = num_change.get("new_value", "없음")
-                change_items.append({
-                    "section": section,
-                    "type": "numerical",
-                    "field": field,
-                    "legacy_value": legacy_val,
-                    "new_value": new_val,
-                    "reasoning": reasoning
-                })
+                change_items.append(
+                    {
+                        "section": section,
+                        "type": "numerical",
+                        "field": field,
+                        "legacy_value": legacy_val,
+                        "new_value": new_val,
+                        "reasoning": reasoning,
+                    }
+                )
         else:
             change_type = result.get("change_type", "변경")
-            change_items.append({
-                "section": section,
-                "type": change_type,
-                "reasoning": reasoning
-            })
+            change_items.append(
+                {"section": section, "type": change_type, "reasoning": reasoning}
+            )
 
     logger.info(f"✅ 변경 항목 생성: {len(change_items)}개 (reasoning 포함)")
+
+    logger.info(f"✅ 변경 항목 생성: {len(change_items)}개")
 
     change_summary_section = {
         "id": "change_summary",
         "type": "structured_list",
         "title": "1. 규제 변경 요약",
-        "content": change_items if change_items else [{"section": "변경 사항 없음", "type": "none"}],
+        "content": (
+            change_items
+            if change_items
+            else [{"section": "변경 사항 없음", "type": "none"}]
+        ),
     }
 
     # ✅ 제품별 하위 테이블 생성 (중복 제거된 데이터)
@@ -399,12 +412,12 @@ def build_sections(state: AppState, llm_struct: Dict[str, Any]) -> List[Dict[str
             "content": references,
         },
     ]
-    
+
     logger.info("🔍 [DEBUG] build_sections 반환값 분석")
     for idx, section in enumerate(sections_list):
         section_json = json.dumps(section, ensure_ascii=False)
         logger.info(f"  [{idx}] {section.get('id')}: {len(section_json):,} chars")
-    
+
     return sections_list
 
 
@@ -458,7 +471,7 @@ async def report_node(state: AppState) -> Dict[str, Any]:
     strategies = state.get("strategies", [])
     impact_score = (state.get("impact_scores") or [{}])[0]
     regulation_trace = meta.get("regulation_trace") if meta else None
-    
+
     # ✅ CoT 구조 전략 처리
     first_strategy = ""
     if strategies:
@@ -491,7 +504,9 @@ async def report_node(state: AppState) -> Dict[str, Any]:
 
     async with AsyncSessionLocal() as db_session:
         from app.core.repositories.report_repository import ReportSummaryRepository
-        from app.core.repositories.regulation_keynote_repository import RegulationKeynoteRepository
+        from app.core.repositories.regulation_keynote_repository import (
+            RegulationKeynoteRepository,
+        )
 
         summary_repo = ReportSummaryRepository()
         keynote_repo = RegulationKeynoteRepository()
@@ -502,15 +517,15 @@ async def report_node(state: AppState) -> Dict[str, Any]:
             await db_session.commit()
             report_json["report_id"] = summary.summary_id
             logger.info(f"✅ ReportSummary 저장 완료: summary_id={summary.summary_id}")
-            
+
             # ✅ Change Detection Keynote 저장 (Legacy 없어도 신규 규제 요약 저장)
             keynote_data = state.get("change_keynote_data")
-            
+
             if not keynote_data:
                 # Legacy 없으면 신규 규제 요약 Keynote 생성
                 regulation = state.get("regulation", {})
                 mapping = state.get("mapping", {})
-                
+
                 keynote_data = {
                     "keynote_id": summary.summary_id,
                     "country": regulation.get("country", "Unknown"),
@@ -521,16 +536,16 @@ async def report_node(state: AppState) -> Dict[str, Any]:
                     "high_confidence_changes": 0,
                     "section_changes": [],
                     "summary": f"신규 규제 분석: {len(mapping.get('items', []))}개 항목 매핑 완료",
-                    "generated_at": datetime.utcnow().isoformat()
+                    "generated_at": datetime.utcnow().isoformat(),
                 }
                 logger.info("📝 신규 규제 Keynote 생성 (Legacy 없음)")
             else:
                 keynote_data["keynote_id"] = summary.summary_id
-            
+
             await keynote_repo.create(db_session, keynote_data)
             await db_session.commit()
             logger.info(f"✅ Keynote 저장 완료: keynote_id={summary.summary_id}")
-            
+
             # 규제 trace 저장
             if regulation_trace:
                 pid = meta.get("product_id")
@@ -559,22 +574,26 @@ async def report_node(state: AppState) -> Dict[str, Any]:
         country = regulation.get("country", "Unknown")
         regulation_title = regulation.get("title", "규제명 없음")
         impact_level = impact_score.get("impact_level", "N/A")
-        
+
         # 유효 카테고리 추출
         valid_features_set = set()
         for item in mapping_items:
             if item.get("applies"):
                 valid_features_set.add(item.get("feature_name"))
-        
+
         valid_features = sorted(list(valid_features_set))
         valid_features_str = ", ".join(valid_features[:2]) if valid_features else "없음"
-        
+
         # Key Change 추출 (우선순위: change_detection_results > mapping fallback)
         key_change = "No changes detected"
         change_results = state.get("change_detection_results", [])
-        
+
         if change_results:
-            high_conf = [c for c in change_results if c.get("confidence_level") == "HIGH" and c.get("change_detected")]
+            high_conf = [
+                c
+                for c in change_results
+                if c.get("confidence_level") == "HIGH" and c.get("change_detected")
+            ]
             if high_conf:
                 first = high_conf[0]
                 key_change = f"{first.get('section_ref', '')}: {first.get('change_type', 'updated')}"
@@ -585,12 +604,12 @@ async def report_node(state: AppState) -> Dict[str, Any]:
                 summary = mapping_items[0].get("regulation_summary", "")[:100]
                 if category and summary:
                     key_change = f"[{category}] {summary}..."
-        
-        report_id = report_json.get('report_id', 'N/A')
+
+        report_id = report_json.get("report_id", "N/A")
         report_url = "https://ingress.skala25a.project.skala-ai.com/skala2-4-17/"
-        
+
         slack_message = f":bell: REMON 보고서 생성 완료 ({country})\n규제명칭: {regulation_title}\n영향도: {impact_level} | 매핑 항목: {len(valid_features)}개 유효 카테고리 ({valid_features_str})\n제품: {product_name}\nKey Change: {key_change}\nREMON-{report_id} | <{report_url}|Open in REMON>"
-        
+
         send_slack_notification(slack_message)
     except Exception as e:
         logger.warning(f"Slack 알림 전송 실패 (무시): {e}")
