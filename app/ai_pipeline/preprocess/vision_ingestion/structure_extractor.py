@@ -307,28 +307,24 @@ class StructureExtractor:
                 entities=[
                     ExtractedEntity(**e) for e in unified_result.get("entities", [])
                 ],
-                tables=[],  # 항상 빈 배열
+                tables=[ExtractedTable(**t) for t in unified_result.get("tables", [])],  # ✅ 표 추출 활성화
             )
 
-            # 모든 페이지에 동일한 통합 결과 반환 (하위 호환성)
-            results = []
-            for page_info in page_infos:
-                results.append(
-                    {
-                        "page_index": page_info["page_index"],
-                        "page_num": page_info["page_index"] + 1,
-                        "model_used": model,
-                        "content": unified_result.get("markdown_content", ""),
-                        "complexity_score": page_info["complexity"],
-                        "tokens_used": total_tokens // len(page_infos),
-                        "structure": structure.dict(),
-                    }
-                )
+            # 단일 통합 결과만 반환 (중복 제거)
+            result = {
+                "page_index": 0,
+                "page_num": 1,
+                "model_used": model,
+                "content": unified_result.get("markdown_content", ""),
+                "complexity_score": sum(p["complexity"] for p in page_infos) / len(page_infos),
+                "tokens_used": total_tokens,
+                "structure": structure.dict(),
+            }
 
             logger.info(
                 f"배치 파싱 완료: 통합 문서 ({len(page_infos)}페이지), {total_tokens}토큰"
             )
-            return results
+            return [result]
 
         except Exception as e:
             logger.error(f"배치 응답 파싱 실패: {e}")

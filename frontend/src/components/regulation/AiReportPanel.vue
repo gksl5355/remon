@@ -60,9 +60,10 @@
         <section>
           <h3 class="sec-title">0. 종합 요약</h3>
 
-          <p class="text-gray-300 whitespace-pre-line">
-            {{ baseOverall }}
-          </p>
+          <ul class="list-disc pl-5 space-y-1 text-gray-300">
+            <li v-for="(v,i) in baseOverall" :key="i">{{ v }}</li>
+          </ul>
+          <br></br>
         </section>
 
         <!-- SECTION 1 -->
@@ -78,19 +79,19 @@
         <section class="mt-6">
           <h3 class="sec-title">2. 영향받는 제품 목록</h3>
 
-          <table class="w-full text-left text-[13px] text-gray-300 border-collapse">
-            <thead class="text-gray-400 border-b border-gray-600/40">
-              <tr><th class="py-2">항목</th><th class="py-2">제품명</th><th class="py-2">조치</th></tr>
-            </thead>
-
-            <tbody>
-              <tr v-for="(row, idx) in baseProducts" :key="idx" class="border-b border-gray-700/20">
-                <td class="py-2">{{ row.item }}</td>
-                <td class="py-2">{{ row.product }}</td>
-                <td class="py-2">{{ row.action }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <div v-for="(table, idx) in baseProducts" :key="idx" class="mb-6">
+            <h4 class="text-gray-200 font-semibold mb-3">제품: {{ table.product_name }}</h4>
+            <table class="w-full text-left text-[13px] text-gray-300 border-collapse">
+              <thead class="text-gray-400 border-b border-gray-600/40">
+                <tr><th v-for="h in table.headers" :key="h" class="py-2">{{ h }}</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, ridx) in table.rows" :key="ridx" class="border-b border-gray-700/20">
+                  <td v-for="(cell, cidx) in row" :key="cidx" class="py-2">{{ cell }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <!-- SECTION 3 -->
@@ -117,7 +118,14 @@
 
         <section class="mt-6">
           <h3 class="sec-title">6. 참고 및 원문 링크</h3>
-          <p class="text-gray-300 whitespace-pre-line">{{ baseUrl }}</p>
+          <div class="space-y-2">
+            <a v-for="(link, idx) in baseUrl" :key="idx" 
+               :href="link.url" 
+               target="_blank"
+               class="block text-blue-400 hover:text-blue-300 underline">
+              {{'원문링크' }}
+            </a>
+          </div>
         </section>
 
       </div>
@@ -131,10 +139,13 @@
         <section v-if="showSection0">
           <h3 class="sec-title">0. 종합 요약</h3>
 
-          <p class="text-gray-300 whitespace-pre-line leading-relaxed">
-            {{ streamedOverrall }}
-            <span v-if="cursorAt === 'Overrall'" class="cursor">|</span>
-          </p>
+          <ul class="list-disc pl-5 space-y-1 text-gray-300">
+            <li v-for="(v,i) in streamedOverrall" :key="i">
+              {{ v }}
+              <span v-if="cursorAt === 'Overrall' && i === streamedAnalysis.length - 1"
+                    class="cursor">|</span>
+            </li>
+          </ul>
         </section>
 
         <!-- SECTION 1 (ONE TEXT STREAM) -->
@@ -151,23 +162,19 @@
         <section v-if="showSection2" class="mt-6">
           <h3 class="sec-title">2. 영향받는 제품 목록</h3>
 
-          <table class="w-full text-left text-[13px] text-gray-300 border-collapse">
-            <thead class="text-gray-400 border-b border-gray-600/40">
-              <tr><th class="py-2">항목</th><th class="py-2">제품명</th><th class="py-2">조치</th></tr>
-            </thead>
-
-            <tbody>
-              <tr v-for="(row, idx) in streamedProducts" :key="idx" class="border-b border-gray-700/20">
-                <td class="py-2">{{ row.item }}</td>
-                <td class="py-2">{{ row.product }}</td>
-                <td class="py-2">
-                  {{ row.action }}
-                  <span v-if="cursorAt === 'products' && idx === streamedProducts.length - 1"
-                        class="cursor">|</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div v-for="(table, idx) in streamedProducts" :key="idx" class="mb-6">
+            <h4 class="text-gray-200 font-semibold mb-3">{{ table.product_name }}</h4>
+            <table class="w-full text-left text-[13px] text-gray-300 border-collapse">
+              <thead class="text-gray-400 border-b border-gray-600/40">
+                <tr><th v-for="h in table.headers" :key="h" class="py-2">{{ h }}</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, ridx) in table.rows" :key="ridx" class="border-b border-gray-700/20">
+                  <td v-for="(cell, cidx) in row" :key="cidx" class="py-2">{{ cell }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <!-- SECTION 3 -->
@@ -209,10 +216,14 @@
         <section v-if="showSection6" class="mt-6">
           <h3 class="sec-title">6. 참고 및 원문 링크</h3>
 
-          <p class="text-gray-300 whitespace-pre-line">
-            {{ streamedReferences }}
-            <span v-if="cursorAt === 'references'" class="cursor">|</span>
-          </p>
+          <div class="space-y-2">
+            <a v-for="(link, idx) in streamedReferences" :key="idx" 
+               :href="link.url" 
+               target="_blank"
+               class="block text-blue-400 hover:text-blue-300 underline">
+              {{ '원문링크' }}
+            </a>
+          </div>
         </section>
 
       </div>
@@ -312,7 +323,7 @@
 
 <script setup>
 import api from "@/services/api";
-import { computed, ref, watch } from "vue";
+import { ref, watch } from "vue";
 
 /* AUTO SCROLL */
 const scrollArea = ref(null);
@@ -330,7 +341,7 @@ function autoScroll() {
 /* STREAM VARIABLES */
 const isStreaming = ref(false);
 
-const streamedOverrall = ref("");
+const streamedOverrall = ref([]);
 const streamedSection1 = ref("");
 const streamedProducts = ref([]);
 const streamedAnalysis = ref([]);
@@ -357,6 +368,7 @@ const baseAnalysis = ref([]);
 const baseStrategy = ref([]);
 const baseImpactReason = ref("");
 const baseUrl = ref([]);
+const regulationId = ref(null);
 /* MODAL */
 const showModal = ref(false);
 const hvInput = ref("");
@@ -364,7 +376,8 @@ const isLoading = ref(false);
 
 /* REPORT INPUT */
 const props = defineProps({
-  fileId: Number
+  fileId: Number,
+  regulationId: Number
 });
 
 /* TYPEWRITER BASED ON CHARACTER */
@@ -408,30 +421,7 @@ async function typeList(targetRef, list, section, speed = 17) {
 /* PRODUCT STREAM */
 async function typeProducts(targetRef, products, section, speed = 17) {
   cursorAt.value = section;
-  targetRef.value = [];
-
-  for (let p of products) {
-    let full = p.action;
-    let typed = "";
-
-    for (let i = 0; i < full.length; i++) {
-      typed += full[i];
-
-      targetRef.value[targetRef.value.length - 1] = {
-        item: p.item,
-        product: p.product,
-        action: typed
-      };
-
-      targetRef.value = [...targetRef.value];
-      autoScroll();
-      await new Promise(r => setTimeout(r, speed));
-    }
-
-    targetRef.value.push({});
-    await new Promise(r => setTimeout(r, 120));
-  }
-
+  targetRef.value = JSON.parse(JSON.stringify(products));
   cursorAt.value = null;
 }
 
@@ -447,6 +437,9 @@ watch(
       const res = await api.get(`/reports/${id}`);
       const data = res.data;
 
+      // regulation_id 저장
+      regulationId.value = data.regulation_id;
+
       // sections 배열을 파싱하여 각 섹션에 맞게 할당
       if (data.sections && Array.isArray(data.sections)) {
         data.sections.forEach(section => {
@@ -455,13 +448,7 @@ watch(
           } else if (section.title.includes('규제 변경 요약')) {
             baseSection1.value = section.content.join('\n');
           } else if (section.title.includes('제품 분석')) {
-            baseProducts.value = section.tables.flatMap(table => 
-              table.rows.map(row => ({
-                item: row[0],      // 제품 속성
-                product: table.product_name,  // 제품명
-                action: row[1]
-            }))
-          );
+            baseProducts.value = section.tables;
           } else if (section.title.includes('변경 사항')) {
             baseAnalysis.value = section.content;
           } else if (section.title.includes('대응 전략')) {
@@ -474,12 +461,12 @@ watch(
         });
       }
 
-      streamedOverrall.value = "";
+      streamedOverrall.value = [];
       streamedSection1.value = "";
       streamedProducts.value = [];
       streamedAnalysis.value = [];
       streamedStrategy.value = [];
-      streamedImpactReason.value = [];
+      streamedImpactReason.value = "";
       streamedReferences.value = [];
 
       isStreaming.value = false;
@@ -494,49 +481,220 @@ watch(
 
 /* HUMAN VALIDATION */
 const runHV = async () => {
+  if (!hvInput.value.trim()) {
+    alert('피드백을 입력해주세요.');
+    return;
+  }
+
+  if (!props.regulationId) {
+    alert('규제 ID가 없습니다.');
+    return;
+  }
+
   showModal.value = false;
   isLoading.value = true;
 
-  await new Promise(r => setTimeout(r, 600));
-  isLoading.value = false;
+  try {
+    // ✅ 백엔드 HITL API 호출
+    const res = await api.post('/ai/hitl/feedback', {
+      regulation_id: props.regulationId,
+      user_message: hvInput.value
+    });
 
-  isStreaming.value = true;
+    console.log('✅ HITL 응답:', res.data);
 
-  showSection0.value = false;
-  showSection1.value = false;
-  showSection2.value = false;
-  showSection3.value = false;
-  showSection4.value = false;
-  showSection5.value = false;
-  showSection6.value = false;
+    // Intent 분기 처리
+    if (res.data.intent === 'question') {
+      // 질문 답변만 표시 (재실행 없음)
+      alert(`답변: ${res.data.answer}`);
+      isLoading.value = false;
+      hvInput.value = '';
+      return;
+    }
 
-  showSection0.value = true;
-  await typeList(streamedOverrall, baseOverall.value, "Overrall");
+    // ✅ 현재 보고서를 스트리밍으로 표시 (HITL 완료 여부 무관)
+    isLoading.value = false;
+    
+    // 스트리밍 데이터 초기화
+    streamedOverrall.value = [];
+    streamedSection1.value = "";
+    streamedProducts.value = [];
+    streamedAnalysis.value = [];
+    streamedStrategy.value = [];
+    streamedImpactReason.value = "";
+    streamedReferences.value = [];
+    
+    showSection0.value = false;
+    showSection1.value = false;
+    showSection2.value = false;
+    showSection3.value = false;
+    showSection4.value = false;
+    showSection5.value = false;
+    showSection6.value = false;
+    
+    isStreaming.value = true;
 
-  /* SECTION 1: ONE TEXT STREAM */
-  showSection1.value = true;
-  await typeText(streamedSection1, baseSection1.value, "section1");
+    showSection0.value = true;
+    await typeList(streamedOverrall, baseOverall.value, "Overrall");
+    await new Promise(r => setTimeout(r, 600));
 
-  /* SECTION 2 */
-  showSection2.value = true;
-  await typeProducts(streamedProducts, baseProducts.value, "products");
+    showSection1.value = true;
+    await typeText(streamedSection1, baseSection1.value, "section1");
+    await new Promise(r => setTimeout(r, 600));
 
-  /* SECTION 3 */
-  showSection3.value = true;
-  await typeList(streamedAnalysis, baseAnalysis.value, "analysis");
+    showSection2.value = true;
+    await typeProducts(streamedProducts, baseProducts.value, "products");
+    await new Promise(r => setTimeout(r, 600));
 
-  /* SECTION 4 */
-  showSection4.value = true;
-  await typeList(streamedStrategy, baseStrategy.value, "strategy");
+    showSection3.value = true;
+    await typeList(streamedAnalysis, baseAnalysis.value, "analysis");
+    await new Promise(r => setTimeout(r, 600));
 
-  /* SECTION 5 */
-  showSection5.value = true;
-  await typeText(streamedImpactReason, baseImpactReason.value, "impactReason");
+    showSection4.value = true;
+    await typeList(streamedStrategy, baseStrategy.value, "strategy");
+    await new Promise(r => setTimeout(r, 600));
 
-  showSection6.value = true;
-  await typeList(streamedReferences, baseUrl.value, "references");
+    showSection5.value = true;
+    await typeText(streamedImpactReason, baseImpactReason.value, "impactReason");
+    await new Promise(r => setTimeout(r, 600));
 
-  isStreaming.value = false;
+    showSection6.value = true;
+    await typeList(streamedReferences, baseUrl.value, "references");
+
+    isStreaming.value = false;
+
+    // modification: 새 보고서 로드 (완료된 경우만)
+    if (res.data.report_id) {
+      const reportRes = await api.get(`/reports/${res.data.report_id}`);
+      const data = reportRes.data;
+
+      // ✅ 새 데이터로 업데이트
+      if (data.sections && Array.isArray(data.sections)) {
+        data.sections.forEach(section => {
+          if (section.title.includes('종합 요약')){
+            baseOverall.value = section.content;
+          } else if (section.title.includes('규제 변경 요약')) {
+            baseSection1.value = section.content.join('\n');
+          } else if (section.title.includes('제품 분석')) {
+            baseProducts.value = section.tables;
+          } else if (section.title.includes('변경 사항')) {
+            baseAnalysis.value = section.content;
+          } else if (section.title.includes('대응 전략')) {
+            baseStrategy.value = section.content;
+          } else if (section.title.includes('영향 평가')) {
+            baseImpactReason.value = section.content.join('\n');
+          } else if (section.title.includes('참고 및 원문 링크')) {
+            baseUrl.value = section.content;
+          }
+        });
+      }
+
+
+      // ✅ 새 데이터를 스트리밍으로 다시 표시
+      // 스트리밍 데이터 초기화
+      streamedOverrall.value = [];
+      streamedSection1.value = "";
+      streamedProducts.value = [];
+      streamedAnalysis.value = [];
+      streamedStrategy.value = [];
+      streamedImpactReason.value = "";
+      streamedReferences.value = [];
+      
+      showSection0.value = false;
+      showSection1.value = false;
+      showSection2.value = false;
+      showSection3.value = false;
+      showSection4.value = false;
+      showSection5.value = false;
+      showSection6.value = false;
+      
+      isStreaming.value = true;
+
+      showSection0.value = true;
+      await typeList(streamedOverrall, baseOverall.value, "Overrall");
+      await new Promise(r => setTimeout(r, 600));
+
+      showSection1.value = true;
+      await typeText(streamedSection1, baseSection1.value, "section1");
+      await new Promise(r => setTimeout(r, 600));
+
+      showSection2.value = true;
+      await typeProducts(streamedProducts, baseProducts.value, "products");
+      await new Promise(r => setTimeout(r, 600));
+
+      showSection3.value = true;
+      await typeList(streamedAnalysis, baseAnalysis.value, "analysis");
+      await new Promise(r => setTimeout(r, 600));
+
+      showSection4.value = true;
+      await typeList(streamedStrategy, baseStrategy.value, "strategy");
+      await new Promise(r => setTimeout(r, 600));
+
+      showSection5.value = true;
+      await typeText(streamedImpactReason, baseImpactReason.value, "impactReason");
+      await new Promise(r => setTimeout(r, 600));
+
+      showSection6.value = true;
+      await typeList(streamedReferences, baseUrl.value, "references");
+
+      isStreaming.value = false;
+    }
+
+  } catch (err) {
+    console.error('❌ HITL 실패:', err);
+    
+    // ✅ 에러 발생해도 현재 보고서를 스트리밍으로 표시
+    isLoading.value = false;
+    
+    streamedOverrall.value = [];
+    streamedSection1.value = "";
+    streamedProducts.value = [];
+    streamedAnalysis.value = [];
+    streamedStrategy.value = [];
+    streamedImpactReason.value = "";
+    streamedReferences.value = [];
+    
+    showSection0.value = false;
+    showSection1.value = false;
+    showSection2.value = false;
+    showSection3.value = false;
+    showSection4.value = false;
+    showSection5.value = false;
+    showSection6.value = false;
+    
+    isStreaming.value = true;
+
+    showSection0.value = true;
+    await typeList(streamedOverrall, baseOverall.value, "Overrall");
+    await new Promise(r => setTimeout(r, 600));
+
+    showSection1.value = true;
+    await typeText(streamedSection1, baseSection1.value, "section1");
+    await new Promise(r => setTimeout(r, 600));
+
+    showSection2.value = true;
+    await typeProducts(streamedProducts, baseProducts.value, "products");
+    await new Promise(r => setTimeout(r, 600));
+
+    showSection3.value = true;
+    await typeList(streamedAnalysis, baseAnalysis.value, "analysis");
+    await new Promise(r => setTimeout(r, 600));
+
+    showSection4.value = true;
+    await typeList(streamedStrategy, baseStrategy.value, "strategy");
+    await new Promise(r => setTimeout(r, 600));
+
+    showSection5.value = true;
+    await typeText(streamedImpactReason, baseImpactReason.value, "impactReason");
+    await new Promise(r => setTimeout(r, 600));
+
+    showSection6.value = true;
+    await typeList(streamedReferences, baseUrl.value, "references");
+
+    isStreaming.value = false;
+  } finally {
+    hvInput.value = '';
+  }
 };
 
 const openModal = () => (showModal.value = true);
