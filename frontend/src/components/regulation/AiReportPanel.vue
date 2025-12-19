@@ -512,7 +512,58 @@ const runHV = async () => {
       return;
     }
 
-    // modification: 새 보고서 로드
+    // ✅ 현재 보고서를 스트리밍으로 표시 (HITL 완료 여부 무관)
+    isLoading.value = false;
+    
+    // 스트리밍 데이터 초기화
+    streamedOverrall.value = [];
+    streamedSection1.value = "";
+    streamedProducts.value = [];
+    streamedAnalysis.value = [];
+    streamedStrategy.value = [];
+    streamedImpactReason.value = "";
+    streamedReferences.value = [];
+    
+    showSection0.value = false;
+    showSection1.value = false;
+    showSection2.value = false;
+    showSection3.value = false;
+    showSection4.value = false;
+    showSection5.value = false;
+    showSection6.value = false;
+    
+    isStreaming.value = true;
+
+    showSection0.value = true;
+    await typeList(streamedOverrall, baseOverall.value, "Overrall");
+    await new Promise(r => setTimeout(r, 600));
+
+    showSection1.value = true;
+    await typeText(streamedSection1, baseSection1.value, "section1");
+    await new Promise(r => setTimeout(r, 600));
+
+    showSection2.value = true;
+    await typeProducts(streamedProducts, baseProducts.value, "products");
+    await new Promise(r => setTimeout(r, 600));
+
+    showSection3.value = true;
+    await typeList(streamedAnalysis, baseAnalysis.value, "analysis");
+    await new Promise(r => setTimeout(r, 600));
+
+    showSection4.value = true;
+    await typeList(streamedStrategy, baseStrategy.value, "strategy");
+    await new Promise(r => setTimeout(r, 600));
+
+    showSection5.value = true;
+    await typeText(streamedImpactReason, baseImpactReason.value, "impactReason");
+    await new Promise(r => setTimeout(r, 600));
+
+    showSection6.value = true;
+    await typeList(streamedReferences, baseUrl.value, "references");
+
+    isStreaming.value = false;
+
+    // modification: 새 보고서 로드 (완료된 경우만)
     if (res.data.report_id) {
       const reportRes = await api.get(`/reports/${res.data.report_id}`);
       const data = reportRes.data;
@@ -525,13 +576,7 @@ const runHV = async () => {
           } else if (section.title.includes('규제 변경 요약')) {
             baseSection1.value = section.content.join('\n');
           } else if (section.title.includes('제품 분석')) {
-            baseProducts.value = section.tables.flatMap(table => 
-              table.rows.map(row => ({
-                item: row[0],
-                product: table.product_name,
-                action: row[1]
-            }))
-          );
+            baseProducts.value = section.tables;
           } else if (section.title.includes('변경 사항')) {
             baseAnalysis.value = section.content;
           } else if (section.title.includes('대응 전략')) {
@@ -544,10 +589,17 @@ const runHV = async () => {
         });
       }
 
-      // ✅ 스트리밍 효과로 표시
-      isLoading.value = false;
-      isStreaming.value = true;
 
+      // ✅ 새 데이터를 스트리밍으로 다시 표시
+      // 스트리밍 데이터 초기화
+      streamedOverrall.value = [];
+      streamedSection1.value = "";
+      streamedProducts.value = [];
+      streamedAnalysis.value = [];
+      streamedStrategy.value = [];
+      streamedImpactReason.value = "";
+      streamedReferences.value = [];
+      
       showSection0.value = false;
       showSection1.value = false;
       showSection2.value = false;
@@ -555,24 +607,32 @@ const runHV = async () => {
       showSection4.value = false;
       showSection5.value = false;
       showSection6.value = false;
+      
+      isStreaming.value = true;
 
       showSection0.value = true;
       await typeList(streamedOverrall, baseOverall.value, "Overrall");
+      await new Promise(r => setTimeout(r, 600));
 
       showSection1.value = true;
       await typeText(streamedSection1, baseSection1.value, "section1");
+      await new Promise(r => setTimeout(r, 600));
 
       showSection2.value = true;
       await typeProducts(streamedProducts, baseProducts.value, "products");
+      await new Promise(r => setTimeout(r, 600));
 
       showSection3.value = true;
       await typeList(streamedAnalysis, baseAnalysis.value, "analysis");
+      await new Promise(r => setTimeout(r, 600));
 
       showSection4.value = true;
       await typeList(streamedStrategy, baseStrategy.value, "strategy");
+      await new Promise(r => setTimeout(r, 600));
 
       showSection5.value = true;
       await typeText(streamedImpactReason, baseImpactReason.value, "impactReason");
+      await new Promise(r => setTimeout(r, 600));
 
       showSection6.value = true;
       await typeList(streamedReferences, baseUrl.value, "references");
@@ -582,9 +642,57 @@ const runHV = async () => {
 
   } catch (err) {
     console.error('❌ HITL 실패:', err);
-    alert('피드백 처리 중 오류가 발생했습니다.');
-  } finally {
+    
+    // ✅ 에러 발생해도 현재 보고서를 스트리밍으로 표시
     isLoading.value = false;
+    
+    streamedOverrall.value = [];
+    streamedSection1.value = "";
+    streamedProducts.value = [];
+    streamedAnalysis.value = [];
+    streamedStrategy.value = [];
+    streamedImpactReason.value = "";
+    streamedReferences.value = [];
+    
+    showSection0.value = false;
+    showSection1.value = false;
+    showSection2.value = false;
+    showSection3.value = false;
+    showSection4.value = false;
+    showSection5.value = false;
+    showSection6.value = false;
+    
+    isStreaming.value = true;
+
+    showSection0.value = true;
+    await typeList(streamedOverrall, baseOverall.value, "Overrall");
+    await new Promise(r => setTimeout(r, 600));
+
+    showSection1.value = true;
+    await typeText(streamedSection1, baseSection1.value, "section1");
+    await new Promise(r => setTimeout(r, 600));
+
+    showSection2.value = true;
+    await typeProducts(streamedProducts, baseProducts.value, "products");
+    await new Promise(r => setTimeout(r, 600));
+
+    showSection3.value = true;
+    await typeList(streamedAnalysis, baseAnalysis.value, "analysis");
+    await new Promise(r => setTimeout(r, 600));
+
+    showSection4.value = true;
+    await typeList(streamedStrategy, baseStrategy.value, "strategy");
+    await new Promise(r => setTimeout(r, 600));
+
+    showSection5.value = true;
+    await typeText(streamedImpactReason, baseImpactReason.value, "impactReason");
+    await new Promise(r => setTimeout(r, 600));
+
+    showSection6.value = true;
+    await typeList(streamedReferences, baseUrl.value, "references");
+
+    isStreaming.value = false;
+  } finally {
     hvInput.value = '';
   }
 };
