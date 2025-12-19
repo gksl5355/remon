@@ -45,7 +45,8 @@ AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_REGION = os.getenv("AWS_REGION")
 
-ACCESS_POINT_NAME = os.getenv("ACCESS_POINT_NAME")
+# Keep env var names consistent with Kubernetes secrets (prefixed with AWS_)
+ACCESS_POINT_NAME = os.getenv("AWS_ACCESS_POINT_NAME")
 AWS_ACCOUNT_ID = os.getenv("AWS_ACCOUNT_ID")
 
 S3_BASE_PREFIX = os.getenv("S3_BASE_PREFIX")    # skala2
