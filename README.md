@@ -218,21 +218,16 @@ npm run dev
 
 ---
 
-## 10. License
+## 10. License & Third-Party Notices
+
+This project uses the following open-source libraries:
+
+- Apache License 2.0: fastapi, uvicorn, torch, langchain, pandas
+- MIT License: aiohttp, loguru, python-dotenv
+- BSD License: numpy
+
+Detailed license texts are available in each repository.
 
 
 
 ---
-
-## 11. Contact
-
-
-
----
-
-
-
-
-
-
-
