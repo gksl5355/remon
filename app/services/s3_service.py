@@ -6,7 +6,8 @@ from botocore.config import Config
 from botocore.exceptions import ClientError
 
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY")
+# Align with standard AWS secret naming
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_REGION = os.getenv("AWS_REGION")
 
 ACCESS_POINT_NAME = os.getenv("AWS_ACCESS_POINT_NAME")
