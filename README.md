@@ -1,3 +1,9 @@
+![Python](https://img.shields.io/badge/Python-3.11-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-Backend-green)
+![Vue](https://img.shields.io/badge/Vue-3-42b883)
+![License](https://img.shields.io/badge/License-Educational-lightgrey)
+![AI-Native](https://img.shields.io/badge/AI--Native-RegTech-purple)
+
 # REMON
 
 **AI-Native Regulation Monitoring & Mapping System**
@@ -203,3 +209,4 @@ Commercial use requires separate permission.
   numpy
 
 Detailed license texts are available in each respective repository.
+
