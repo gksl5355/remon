@@ -94,7 +94,7 @@ class RegulationService:
                 change_type = "문언 정비"
             elif (change_type == "scope_change"):
                 change_type = "범위 변경"
-            elif (change_type == "" or change_type is None):
+            elif (change_type == "" or change_type is None or change_type == "none"):
                 change_type = "개정 없음"
 
 
@@ -277,6 +277,8 @@ class RegulationService:
                 "collectedTime": collected_time,  # 프론트 타이포 호환
             }
 
+            reg_id = keynote_data.get("regulation_id")
+
             return {
                 "id": keynote.keynote_id,
                 "fileName": keynote_data.get("citation_code") or keynote_data.get("title") or f"regulation_{keynote.keynote_id}",
@@ -286,6 +288,7 @@ class RegulationService:
                 "articles": articles,
                 "aiReports": keynote_data.get("change_summary") or {},
                 "cocollected_time": collected_time,
+                "regulation_id": reg_id,
             }
         except Exception as e:
             logger.error(f"Error fetching regulation detail: {e}", exc_info=True)
