@@ -227,18 +227,17 @@ async def run_full_pipeline(citation_code: str | None = None):
     Args:
         citation_code: 규제 식별 코드 (None이면 전처리에서 자동 추출)
 
-    전체 파이프라인 실행 (S3 자동 로드 + LangGraph + HITL 루프)
+    전체 파이프라인 실행 (S3 자동 로드 + 다중 파일 처리 + HITL 루프)
 
-    1차 실행:
-        - preprocess → ... → validator → report → END
-
-    HITL 재실행:
-        - hitl 를 엔트리 포인트로 사용 (✅ validator보다 먼저 HITL 해석)
-        - hitl → validator(HITL) → fallback 노드 → ... → report → END
+    흐름:
+        1. S3에서 파일 로드
+        2. 각 파일별로 독립 파이프라인 실행 (번역까지)
+        3. 전체 결과 수집
+        4. HITL 루프 (사용자 피드백)
     """
 
     logger.info("=" * 80)
-    logger.info("🚀 REMON AI Pipeline 전체 실행 시작")
+    logger.info("🚀 REMON AI Pipeline 전체 실행 시작 (다중 파일 지원)")
     logger.info("=" * 80)
 
     # ------- 그래프 컴파일 -------
@@ -297,100 +296,94 @@ async def run_full_pipeline(citation_code: str | None = None):
     else:
         logger.info("  ℹ️ citation_code 미지정 → 전처리/변경감지 단계에서 자동 추출")
 
-    # Step 3: 전체 파이프라인 1회 실행 (자동 모드)
-    logger.info("\n[Step 3] 전체 파이프라인 1회 실행 (자동 모드)")
-    logger.info("  ℹ️ S3에서 오늘 업로드된 파일 자동 로드 (skala2/skala-2.4.17/test)")
-    logger.info("  ℹ️ 전처리에서 추출한 국가 정보로 제품 자동 필터링")
-    logger.info("  ℹ️ change_detection_node에서 Legacy 자동 검색 및 비교")
+    # Step 3: S3에서 파일 로드
+    logger.info("\n[Step 3] S3에서 파일 로드")
+    from app.ai_pipeline.preprocess.s3_loader import load_today_regulations
 
-    state: AppState = {
-        "preprocess_request": {
-            "load_from_s3": True,  # S3 자동 로드 활성화
-            "s3_date": None,  # None이면 오늘 날짜
-            "use_vision_pipeline": True,
-            "enable_change_detection": True,
-        },
-        "change_context": {},  # 전처리 후 자동 채워짐
-        "mapping_filters": {},
-        "validation_retry_count": 0,
-    }
+    pdf_paths = load_today_regulations(date=None)
 
-    try:
-        # ✅ 1차 실행은 preprocess부터 전체 파이프라인
-        state = await app_full.ainvoke(state, config={"configurable": {}})
-        logger.info("✅ 1차 파이프라인 실행 완료")
-    except Exception as e:
-        logger.error(f"❌ 파이프라인 실행 실패: {e}", exc_info=True)
+    if not pdf_paths:
+        logger.error("❌ S3에서 파일을 찾을 수 없습니다")
         return
 
-    if state:
-        logger.info("\n[Step 4] 1차 실행 결과 요약")
-        print_pipeline_summary(state)
+    logger.info(f"  ✅ {len(pdf_paths)}개 파일 로드 완료")
+    for i, path in enumerate(pdf_paths, 1):
+        logger.info(f"    {i}. {path}")
+
+    # Step 4: 다중 파일 파이프라인 실행
+    logger.info("\n[Step 4] 다중 파일 파이프라인 실행 (각 파일별 독립 처리)")
+    from app.services.ai_service import AIService
+
+    service = AIService()
+    result = await service.run_multi_file_pipeline(
+        pdf_paths=pdf_paths, vision_config=None
+    )
+
+    logger.info("\n[Step 5] 실행 결과 요약")
+    logger.info(f"  📊 전체: {result['total']}개")
+    logger.info(f"  ✅ 성공: {result['succeeded']}개")
+    logger.info(f"  ❌ 실패: {result['failed']}개")
+
+    reports = result.get("reports", [])
+    for i, report in enumerate(reports, 1):
+        if report.get("report_id"):
+            logger.info(f"  📄 보고서 {i}: report_id={report['report_id']}")
+        else:
+            logger.warning(f"  ⚠️ 보고서 {i}: 생성 실패")
 
     # ------------------------------------------------------------------
-    # Step 5: HITL 인터랙티브 루프
-    #   - 사람이 결과를 보고 피드백을 입력하면
-    #     → external_hitl_feedback 에 넣고 HITL 그래프(hitl entry)로 재실행
-    #   - 그래프 안에서는:
-    #       hitl → validator(HITL) → restart_node → ... → report → END
+    # Step 6: HITL 인터랙티브 루프 (첫 번째 보고서 기준)
     # ------------------------------------------------------------------
-    logger.info("\n[Step 5] HITL 피드백 루프 시작 (엔터만 입력하면 종료)")
+    if not reports or not reports[0].get("report_id"):
+        logger.warning("⚠️ 보고서가 없어 HITL을 건너뜁니다")
+        return result
 
-    while True:
-        print("\n" + "-" * 80)
-        print("💬 결과에 대한 HITL 피드백을 입력하세요.")
-        print(
-            "   - 예) '변경 없음으로 처리해줘', '매핑 다시 해줘', '전략 좀 더 보수적으로'"
-        )
-        print("   - 아무것도 입력하지 않고 엔터 → HITL 종료")
-        print("   - 'exit' / 'quit' / '완료' 입력 → HITL 종료")
-        print("-" * 80)
+    first_report = reports[0]
+    regulation_id = first_report.get("regulation_id")
 
-        try:
-            feedback = input("HITL> ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print("\nHITL 입력이 중단되었습니다. 파이프라인을 종료합니다.")
-            break
+    if not regulation_id:
+        logger.warning("⚠️ regulation_id가 없어 HITL을 건너뜁니다")
+        return result
 
-        if not feedback or feedback.lower() in {"exit", "quit", "완료"}:
-            logger.info("HITL 루프 종료 요청 → 파이프라인 종료.")
-            break
+    logger.info("\n[Step 6] HITL 피드백 루프 시작 (첫 번째 보고서 기준)")
+    logger.info(f"  📄 대상 보고서: report_id={first_report.get('report_id')}")
 
-        # 그래프에서 hitl_node가 읽을 입력값 주입
-        state["external_hitl_feedback"] = feedback
-
-        # validator 자동 retry 카운터 초기화 (HITL는 별도 사이클)
-        state["validation_retry_count"] = 0
-
-        # 안전하게 이전 HITL 메타데이터도 초기화
-        state.pop("hitl_target_node", None)
-        state.pop("hitl_feedback_text", None)
-        state.pop("hitl_feedback", None)
-        state.pop("hitl_session_active", None)
-
-        logger.info(
-            f"[HITL] 새로운 피드백으로 그래프 재실행 (hitl entry): '{feedback}'"
-        )
-        logger.info(
-            f"[HITL] State 전: external_hitl_feedback={state.get('external_hitl_feedback')}, hitl_target_node={state.get('hitl_target_node')}"
-        )
-
-        try:
-            # ✅ HITL 재실행은 hitl을 엔트리포인트로 사용하는 그래프
-            state = await app_hitl.ainvoke(state, config={"configurable": {}})
-            logger.info("✅ HITL 반영 후 파이프라인 재실행 완료")
-            logger.info(
-                f"[HITL] State 후: external_hitl_feedback={state.get('external_hitl_feedback')}, hitl_target_node={state.get('hitl_target_node')}"
+    async with AsyncSessionLocal() as session:
+        while True:
+            print("\n" + "-" * 80)
+            print("💬 결과에 대한 HITL 피드백을 입력하세요.")
+            print(
+                "   - 예) '변경 없음으로 처리해줘', '매핑 다시 해줘', '전략 좀 더 보수적으로'"
             )
-        except Exception as e:
-            logger.error(f"❌ HITL 재실행 중 오류: {e}", exc_info=True)
-            break
+            print("   - 아무것도 입력하지 않고 엔터 → HITL 종료")
+            print("   - 'exit' / 'quit' / '완료' 입력 → HITL 종료")
+            print("-" * 80)
 
-        # 재실행 결과 요약
-        logger.info("\n[HITL] 재실행 결과 요약")
-        print_pipeline_summary(state)
+            try:
+                feedback = input("HITL> ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print("\nHITL 입력이 중단되었습니다.")
+                break
 
-    return state
+            if not feedback or feedback.lower() in {"exit", "quit", "완료"}:
+                logger.info("HITL 루프 종료")
+                break
+
+            logger.info(f"[HITL] 피드백: '{feedback}'")
+
+            try:
+                hitl_result = await service.run_pipeline_with_hitl(
+                    db=session,
+                    regulation_id=regulation_id,
+                    user_message=feedback,
+                    target_node="map_products",
+                )
+                logger.info(f"✅ HITL 재실행 완료: {hitl_result}")
+            except Exception as e:
+                logger.error(f"❌ HITL 재실행 실패: {e}", exc_info=True)
+                break
+
+    return result
 
 
 async def main():

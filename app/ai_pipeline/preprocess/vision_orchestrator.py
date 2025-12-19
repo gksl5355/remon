@@ -212,9 +212,7 @@ class VisionOrchestrator:
                 "language_code": language_code,
                 "vision_extraction_result": vision_results,
                 "graph_data": graph_data,
-                "dual_index_summary": index_summary,
-                "processing_results": processing_results,  # 테스트용으로 추가
-                "chunks": processing_results["chunks"]  # 임베딩용 청크 저장
+                "dual_index_summary": index_summary
             }
             
             logger.info(f"✅ Vision Pipeline 완료: {len(vision_results)}개 페이지 처리")

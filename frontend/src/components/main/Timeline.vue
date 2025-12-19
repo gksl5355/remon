@@ -34,34 +34,36 @@
       >
         <div class="flex flex-col items-center">
 
+          <!-- DOT -->
           <div
-            class="w-3 h-3 rounded-full border-2 transition-all duration-300"
-            :class="[
-              item.type === 'no-change'
-                ? (isDark ? 'bg-mid-navy border-gray-600' : 'bg-gray-300 border-gray-400')
-                : '',
-              item.type === 'change'
-                ? (isDark ? 'bg-primary-accent border-primary-accent'
-                          : 'bg-blue-500 border-blue-400')
-                : '',
-              item.type === 'new'
-                ? (isDark ? 'bg-accent-yellow border-accent-yellow'
-                          : 'bg-yellow-400 border-yellow-300')
-                : ''
-            ]"
-          ></div>
+            class="relative rounded-full border transition-all duration-300"
+            :class="dotWrapperClass(item)"
+          >
+            <!-- inner dot -->
+            <div
+              class="w-full h-full rounded-full"
+              :class="dotInnerClass(item)"
+            />
 
+            <!-- pulse (parse) effect -->
+            <span
+              v-if="isParsing(item)"
+              class="absolute inset-0 rounded-full animate-ping opacity-40"
+              :class="dotPingClass(item)"
+            />
+          </div>
+
+          <!-- LINE -->
           <div
             v-if="i !== timeline.length - 1"
             class="w-[2px] flex-1 mt-1 transition-all duration-300"
-            :class="isDark ? 'bg-timeline-line' : 'bg-gray-300'"
-          ></div>
-
+            :class="lineClass(item)"
+          />
         </div>
 
         <div class="pb-4">
           <div
-            class="text-[8px] mb-0.5 transition-all"
+            class="text-[13px] mb-0.5 transition-all"
             :class="isDark ? 'text-gray-500' : 'text-gray-500'"
           >
             {{ item.date }}
@@ -76,27 +78,16 @@
             </span>
 
             <span
-              v-if="item.type !== 'no-change'"
-              class="text-[8px] px-1.5 py-0.5 rounded-full border transition-all"
-              :class="[
-                item.type === 'change'
-                  ? (isDark
-                      ? 'bg-primary-accent/10 text-primary-accent border-primary-accent/40'
-                      : 'bg-blue-50 text-blue-600 border-blue-300')
-                  : '',
-                item.type === 'new'
-                  ? (isDark
-                      ? 'bg-accent-yellow/10 text-accent-yellow border-accent-yellow/40'
-                      : 'bg-yellow-50 text-yellow-600 border-yellow-300')
-                  : ''
-              ]"
+              v-if="item.status === 'crawling' || item.status === 'reporting'"
+              class="text-[8px] px-1.5 py-0.5 rounded-full border animate-pulse"
+              :class="statusBadgeClass(item)"
             >
-              {{ item.type === 'change' ? '최근 변경' : '신규 규제' }}
+              {{ statusText(item.status) }}
             </span>
           </div>
 
           <div
-            class="text-xs leading-relaxed transition-all"
+            class="text-[11px] leading-relaxed transition-all"
             :class="isDark ? 'text-gray-400' : 'text-gray-600'"
           >
             {{ item.description }}
@@ -116,7 +107,7 @@ const timeline = ref([]);
 
 const fetchTimeline = async () => {
   try {
-    const response = await api.get('/main/timeline');
+    const response = await api.get('/main/timeline');  
     timeline.value = response.data;
   } catch (error) {
     console.error('Failed to load timeline:', error);
@@ -124,10 +115,102 @@ const fetchTimeline = async () => {
   }
 };
 
-onMounted(() => {
-  fetchTimeline();
-});
+onMounted(fetchTimeline);
 
+/* =========================
+   STATUS TEXT
+========================= */
+const statusText = (status) => {
+  if (status === "crawling") return "진행 중";
+  if (status === "reporting") return "AI 생성 중";
+  return "";
+};
+
+/* =========================
+   STATUS BADGE
+========================= */
+const statusBadgeClass = (item) => {
+  if (item.status === "crawling")
+    return "bg-emerald-400/10 text-emerald-300 border-emerald-400/40";
+
+  if (item.status === "reporting")
+    return "bg-sky-400/10 text-sky-300 border-sky-400/40";
+
+  return "";
+};
+
+const isParsing = (item) =>
+  item.status === "crawling" || item.status === "reporting";
+
+/* =========================
+   DOT SIZE + BORDER
+========================= */
+const dotWrapperClass = (item) => {
+  if (item.status === "crawling")
+    return "w-3 h-3 border-emerald-400";
+
+  if (item.status === "reporting")
+    return "w-3 h-3 border-sky-400";
+
+  if (item.status === "done" && item.type !== "no-change")
+    return "w-3 h-3 border-yellow-400/50";
+
+  // done + no-change
+  return "w-3 h-3 border-gray-400/40";
+};
+
+/* =========================
+   DOT COLOR
+========================= */
+const dotInnerClass = (item) => {
+  if (item.status === "crawling")
+    return "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.6)]";
+
+  if (item.status === "reporting")
+    return "bg-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.6)]";
+
+  if (item.status === "done" && item.type !== "no-change")
+    return "bg-yellow-400/40";
+
+  // done + no-change
+  return "bg-gray-400/30";
+};
+
+/* =========================
+   PULSE COLOR
+========================= */
+const dotPingClass = (item) => {
+  if (item.status === "crawling") return "bg-emerald-400";
+  if (item.status === "reporting") return "bg-sky-400";
+  return "";
+};
+
+/* =========================
+   LINE STYLE
+========================= */
+const lineClass = (item) => {
+  if (item.status === "crawling") {
+    return isDark.value
+      ? "bg-gradient-to-b from-emerald-400/70 via-emerald-400/30 to-transparent"
+      : "bg-gradient-to-b from-emerald-500/70 via-emerald-500/30 to-transparent";
+  }
+
+  if (item.status === "reporting") {
+    return isDark.value
+      ? "bg-gradient-to-b from-sky-400/60 via-sky-400/25 to-transparent"
+      : "bg-gradient-to-b from-sky-500/60 via-sky-500/25 to-transparent";
+  }
+
+  if (item.status === "done" && item.type !== "no-change") {
+    return isDark.value
+      ? "bg-gradient-to-b from-yellow-400/35 to-transparent"
+      : "bg-gradient-to-b from-yellow-500/35 to-transparent";
+  }
+
+  return isDark.value
+    ? "bg-timeline-line opacity-20"
+    : "bg-gray-300/30";
+};
 </script>
 
 <style scoped>

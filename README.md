@@ -1,190 +1,166 @@
-# REMON – Regulation Monitoring AI System
+![Python](https://img.shields.io/badge/Python-3.11-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-Backend-green)
+![Vue](https://img.shields.io/badge/Vue-3-42b883)
+![License](https://img.shields.io/badge/License-Educational-lightgrey)
+![AI-Native](https://img.shields.io/badge/AI--Native-RegTech-purple)
 
-AI 기반 해외 규제 문서를 자동 수집·정제·분석·매핑하여 제품 영향도와 대응 전략을 생성하는 규제 분석 자동화 플랫폼.
+# REMON
 
-PDF/HTML 규제 문서를 업로드하면 **번역 → 임베딩 → 매핑 → 영향도 → 리포트**까지 단일 파이프라인에서 처리한다.
+**AI-Native Regulation Monitoring & Mapping System**
 
----
+REMON은 글로벌 규제 문서를 자동으로 수집·분석하고,
+제품 단위 영향도 평가와 대응 리포트를 생성하는 AI 기반 규제 대응 플랫폼입니다.
 
-## 1. Overview
+규제 변경 감지부터 판단 통제(Human-in-the-Loop)까지,
+실무 규제 대응 흐름 전체를 하나의 파이프라인으로 통합합니다.
 
-REMON은 국가별 규제 문서를 자동으로 처리해
-기업의 제품별 영향도 분석과 대응 전략 도출 과정을 단축하는 것을 목표로 한다.
+## Overview
 
-**Pipeline:**
-규제 업로드 → 텍스트 추출/전처리 → 번역 → 임베딩 → 제품 매핑 → 영향도 분석 → 리포트 생성
+글로벌 규제를 다루는 기업은 국가·기관별로 상이한 규제 구조와 잦은 개정,
+그리고 미탐·오탐에 따른 높은 리스크를 동시에 관리해야 합니다.
 
----
+REMON은 규제 문서를 구조적으로 분해하고,
+제품 데이터와 연결하여 **판단 가능한 형태의 규제 정보**로 전환합니다.
 
-## 2. Features
+## Problem
 
-* 규제 PDF/HTML 파일 업로드
-* 텍스트 추출 및 언어 감지/번역
-* 문서 청킹 및 BGE-M3 임베딩 생성
-* 제품–규제 매핑 및 영향도 산출
-* 리포트 요약 및 전략 생성(GPT-4o mini 기반)
-* 임베딩 검색(Qdrant), Text 검색(OpenSearch 예정)
-* 리포트 다운로드
+* 국가·기관별로 상이한 규제 문서 형식 (PDF, HTML, 공지 등)
+* 규제 변경 여부 판단의 사람 의존성
+* 단순 키워드 기반 검토로 인한 미탐 / 오탐 발생
+* 제품·성분·패키지 단위 영향도 분석의 비효율
+* 규제 대응 판단 근거에 대한 추적 어려움
 
----
+## Solution
 
-## 3. System Architecture
+REMON은 다음 과정을 자동화합니다.
 
-<img src="./docs/ai.jpg" style="width:100px;">
-<img src="./docs/the-clean-architecture.png" style="width:100px;">
+* 규제 문서 수집 및 변경 감지
+* 규제 문서의 구조적 분해
+* 제품 데이터와의 정합적 매핑
+* AI 기반 영향도 분석 및 대응 전략 생성
+* Human-in-the-Loop를 통한 판단 통제
 
-**Backend(FastAPI)**
+이를 통해 규제 대응을 **빠르게**, 그리고 **통제 가능한 방식으로** 수행할 수 있습니다.
 
-* CollectService: 규제 파일 수집 및 메타데이터
-* RefineService: 추출/번역/임베딩
-* MappingService: 제품 매핑 및 영향도 계산
-* ReportService: 전략·요약 리포트 생성
-* AI Pipeline: LangGraph 기반 LLM workflow
+## Key Features
 
-**Storages**
+* **Regulation Change Detection**
+  이전 버전 대비 의미 기반 규제 변경 감지
 
-* PostgreSQL: 문서/제품/메타데이터
-* Qdrant: 벡터 임베딩
-* OpenSearch: Hybrid Retrieval (예정)
-* Redis: 캐시·상태·비동기 처리 옵션
+* **Structural Regulation Parsing**
+  국가별 상위 규제 체계에 기반한 문서 구조화
 
----
+* **Hybrid Search (Dense + Sparse)**
+  의미 검색과 키워드 정합을 결합한 규제 검색
 
-## 4. Tech Stack
+* **Product-Level Impact Mapping**
+  제품 성분·패키지·라벨 단위 영향도 분석
 
-**Backend**
+* **Human-in-the-Loop Validation**
+  AI 판단 결과에 대한 승인·수정·보류 통제
 
-* FastAPI · Python 3.11 · uv
-* SQLAlchemy · Pydantic
-* Springboot
+* **Automated Report Generation**
+  변경 요약, 영향 제품, 대응 전략 리포트 자동 생성
 
-**AI Pipeline**
+## System Architecture
 
-* GPT-4o mini, GPT-5 mini
-* BGE-M3 Embedding
-* LangGraph
+REMON은 규제 수집, 전처리, AI 분석, 리포트 생성으로 이어지는
+**End-to-End 파이프라인 구조**로 설계되었습니다.
 
-**Databases**
+* 상세 아키텍처 문서:
+  [`docs/architecture.md`](docs/architecture.md)
 
-* PostgreSQL
-* Qdrant
+## Tech Stack
 
-**Frontend**
-
-* Vue 3 · Vite
-* TailwindCSS
-
-**Infra**
-
-* Docker
-* Amazon EKS
-* S3
-
----
-
-## 5. Getting Started
-
-### 5.1 Prerequisites
+### Backend / AI
 
 * Python 3.11
-* uv
-* Docker(optional)
-* Node.js 20+(Frontend)
+* FastAPI
+* LangGraph (Multi-Agent Workflow)
+* LLM-based Analysis
 
----
+### Data
 
-### 5.2 Setup Environment
+* PostgreSQL (Metadata, JSONB)
+* Qdrant (Vector Database)
+* Dense + Sparse Hybrid Embedding
 
-```bash
-chmod +x init_env.sh
-./init_env.sh
+### Frontend
+
+* Vue 3
+* Tailwind CSS
+
+### Infra
+
+* Docker
+* Kubernetes
+* GitHub Actions
+
+## Project Structure
+
+```text
+.
+├─ backend/
+├─ frontend/
+├─ database/
+├─ infra/
+└─ docs/
 ```
 
-해당 스크립트는 다음을 자동 처리한다.
+## Workflow (High-Level)
 
-* uv 설치
-* Python 패키지 설치
-* .env 생성
-* VSCode 개발환경 설정
-
----
-
-### 5.3 Run Backend
-
-```bash
-uv run uvicorn app.main:app --reload
+```text
+1. Regulation Ingestion
+2. Preprocessing & Structuring
+3. Change Detection
+4. Product Mapping
+5. HITL Validation
+6. Report Generation
 ```
 
----
+## Documentation
 
-### 5.4 Run Frontend
+상세 설계와 내부 로직은 README에서 분리하여 관리합니다.
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+* Architecture Overview
+  [`docs/architecture.md`](docs/architecture.md)
 
----
+* AI Workflow & Agents
+  [`docs/ai-workflow.md`](docs/ai-workflow.md)
 
-## 6. Project Structure
+* Data Model & ERD
+  [`docs/data-model.md`](docs/data-model.md)
 
-```
-/app
-  ├── api/                 # API 라우팅
-  ├── services/            # Collect / Refine / Mapping / Report 서비스
-  ├── ai_pipeline/         # LangGraph 기반 LLM 파이프라인
-  ├── vectorstore/         # Qdrant 연동
-  ├── core/                # DB 설정, ORM, Repository
-  ├── config/              # 환경 설정
-  ├── main.py
+* HITL Design & Validation Flow
+  [`docs/hitl.md`](docs/hitl.md)
 
-/frontend
-  ├── pages/
-  ├── components/
-  ├── services/
-```
+## Roadmap
 
----
+* 국가별 규제 소스 확장
+* 규제 도메인 확장 (제약, 화장품, ESG 등)
+* 리포트 템플릿 고도화
+* 규제 대응 이력 기반 분석 기능 추가
 
-## 7. API Documentation
-
-* Swagger UI: **`http://localhost:8000/docs`**
-* ReDoc: **`http://localhost:8000/redoc`**
-
----
-
-## 8. Documents
-
-세부 설계 문서는 `/docs` 폴더에 정리됨.
-
-* `/docs/architecture/*` – 시스템 아키텍처
-* `/docs/database/ERD_REMON.png` – ERD
-* `/docs/pipeline/*` – 파이프라인 상세
-* `/docs/specs/*` – 모듈/데이터 구조 명세
-
----
-
-## 9. Team Members
+## Team Members
 
 <table>
   <tr>
     <td align="center">
-      <img src="https://avatars.githubusercontent.com/SunYoung710" width="120" style="border-radius: 50%;" alt="박선영"/><br/>
+      <img src="https://avatars.githubusercontent.com/SunYoung710" width="120" /><br/>
       <b>박선영</b><br/>
       <sub>Frontend Engineer</sub><br/>
-      <sub>UI/UX · Report Viewer · API 연동</sub><br/>
+      <sub>UI/UX · Report Viewer · API Integration</sub><br/>
       <a href="https://github.com/SunYoung710">@SunYoung710</a>
     </td>
     <td align="center">
-      <img src="https://avatars.githubusercontent.com/bofoto" width="120" style="border-radius: 50%;" alt="조영우"/><br/>
+      <img src="https://avatars.githubusercontent.com/bofoto" width="120" /><br/>
       <b>조영우</b><br/>
       <sub>Backend Lead</sub><br/>
       <sub>API Gateway · Transaction · Service Orchestration</sub><br/>
       <a href="https://github.com/bofoto">@bofoto</a>
     </td>
     <td align="center">
-      <img src="https://avatars.githubusercontent.com/Nam707" width="120" style="border-radius: 50%;" alt="남지수"/><br/>
+      <img src="https://avatars.githubusercontent.com/Nam707" width="120" /><br/>
       <b>남지수</b><br/>
       <sub>Database Engineer</sub><br/>
       <sub>PostgreSQL Schema · ORM · Repository Layer</sub><br/>
@@ -193,46 +169,44 @@ npm run dev
   </tr>
   <tr>
     <td align="center">
-      <img src="https://avatars.githubusercontent.com/bluepaled0t" width="120" style="border-radius: 50%;" alt="고서아"/><br/>
+      <img src="https://avatars.githubusercontent.com/bluepaled0t" width="120" /><br/>
       <b>고서아</b><br/>
       <sub>AI Pipeline Engineer</sub><br/>
-      <sub>LangGraph Workflow · Strategy/Report Generator</sub><br/>
+      <sub>LangGraph Workflow · Strategy / Report Generator</sub><br/>
       <a href="https://github.com/bluepaled0t">@bluepaled0t</a>
     </td>
     <td align="center">
-      <img src="https://avatars.githubusercontent.com/gksl5355" width="120" style="border-radius: 50%;" alt="조태환"/><br/>
+      <img src="https://avatars.githubusercontent.com/gksl5355" width="120" /><br/>
       <b>조태환</b><br/>
       <sub>RAG Engineer</sub><br/>
       <sub>Embedding · Qdrant · Retrieval Pipeline</sub><br/>
       <a href="https://github.com/gksl5355">@gksl5355</a>
     </td>
     <td align="center">
-      <img src="./docs/andong.jpg" width="120" style="border-radius: 50%;" alt="김민제"/><br/>
+      <img src="./docs/andong.jpg" width="120" /><br/>
       <b>김민제</b><br/>
-      <sub>Data/Collect Engineer</sub><br/>
-      <sub>Crawling · Preprocessing · Collect/Refine Pipelines</sub><br/>
+      <sub>Data / Collect Engineer</sub><br/>
+      <sub>Crawling · Preprocessing · Collect / Refine Pipelines</sub><br/>
       <a href="https://github.com/dreamFORcreative">@dreamFORcreative</a>
     </td>
   </tr>
 </table>
 
----
+## License & Third-Party Notices
 
-## 10. License
+This project is intended for **educational and portfolio purposes**.
+Commercial use requires separate permission.
 
+### Open-Source Licenses Used
 
+* **Apache License 2.0**
+  fastapi, uvicorn, torch, langchain, pandas
 
----
+* **MIT License**
+  aiohttp, loguru, python-dotenv
 
-## 11. Contact
+* **BSD License**
+  numpy
 
-
-
----
-
-
-
-
-
-
+Detailed license texts are available in each respective repository.
 

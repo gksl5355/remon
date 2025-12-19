@@ -197,13 +197,14 @@ class AppState(TypedDict, total=False):
     mapping: MappingResults
     mapping_debug: MappingDebugInfo
     mapping_filters: Dict[str, Any]  # 매핑 필터 (국가, 규제 ID 등)
-    strategies: List[str]
+    strategies: List[Dict[str, str]]  # CoT 구조: previous_requirement, current_requirement, impact_reasoning, recommended_strategy
     validation_strategy: bool
     mapping_context: MappingContext
     impact_scores: List[ImpactScoreItem]
     report: ReportDraft
     translation_id: Optional[int]  # 향후 사용 예정
     change_id: Optional[int]  # 향후 사용 예정
+    previous_regulation_summary: Optional[str]  # 이전 규제 요약 (CoT용)
 
     # Vision-Centric Preprocessing Pipeline 필드
     vision_extraction_result: List[Dict[str, Any]]  # 페이지별 Vision LLM 추출 결과

@@ -3,21 +3,38 @@
 import os
 import re
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
 
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
+from dotenv import load_dotenv
 
-from fastapi import APIRouter, UploadFile, Form, HTTPException, Query, Depends
+from fastapi import (
+    APIRouter,
+    UploadFile,
+    Form,
+    HTTPException,
+    Query,
+    Depends,
+    BackgroundTasks,
+)
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+import asyncio
+import tempfile
+from pathlib import Path
+from sqlalchemy import text
+from app.core.database import AsyncSessionLocal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.utils.db import get_async_db, fetch_regul_data_by_title
 from app.services.translation_service import TranslationService
 
+# .env 파일 로드
+ROOT_DIR = Path(__file__).resolve().parents[3]
+load_dotenv(ROOT_DIR / ".env")
 
 router = APIRouter()
 
@@ -25,14 +42,15 @@ router = APIRouter()
 # ENV
 # ==================================================
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_REGION = os.getenv("AWS_REGION")
 
+# Keep env var names consistent with Kubernetes secrets (prefixed with AWS_)
 ACCESS_POINT_NAME = os.getenv("AWS_ACCESS_POINT_NAME")
 AWS_ACCOUNT_ID = os.getenv("AWS_ACCOUNT_ID")
 
-S3_BASE_PREFIX = os.getenv("S3_BASE_PREFIX")    # skala2
-S3_APP_PREFIX = os.getenv("S3_APP_PREFIX")      # skala-2.4.17
+S3_BASE_PREFIX = os.getenv("S3_BASE_PREFIX")  # skala2
+S3_APP_PREFIX = os.getenv("S3_APP_PREFIX")  # skala-2.4.17
 
 if not all([AWS_REGION, AWS_ACCOUNT_ID, ACCESS_POINT_NAME]):
     raise RuntimeError("AWS S3 Access Point environment variables are not set")
@@ -51,6 +69,7 @@ s3_client = boto3.client(
     aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
     config=Config(signature_version="s3v4"),
 )
+
 
 # ==================================================
 # S3 HELPER FUNCTIONS
@@ -88,6 +107,139 @@ def generate_presigned_download_url(key: str, expires: int = 3600) -> str:
         ExpiresIn=expires,
     )
 
+
+# 파이프라인 상태를 DB에 기록하기 위한 설정
+_pipeline_table_initialized = False
+
+
+async def _ensure_pipeline_table(session) -> None:
+    """pipeline_jobs 테이블이 없으면 생성 (간단한 상태 저장용)."""
+    global _pipeline_table_initialized
+    if _pipeline_table_initialized:
+        return
+    await session.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS pipeline_jobs (
+                s3_key TEXT PRIMARY KEY,
+                status TEXT,
+                error TEXT,
+                updated_at TIMESTAMPTZ DEFAULT now()
+            );
+            """
+        )
+    )
+    _pipeline_table_initialized = True
+
+
+async def _set_job_status(s3_key: str, status: str, error: Optional[str] = None):
+    async with AsyncSessionLocal() as session:
+        await _ensure_pipeline_table(session)
+        await session.execute(
+            text(
+                """
+                INSERT INTO pipeline_jobs (s3_key, status, error, updated_at)
+                VALUES (:s3_key, :status, :error, now())
+                ON CONFLICT (s3_key) DO UPDATE
+                SET status = EXCLUDED.status,
+                    error = EXCLUDED.error,
+                    updated_at = now();
+                """
+            ),
+            {"s3_key": s3_key, "status": status, "error": error},
+        )
+        await session.commit()
+
+
+async def _get_job_status(s3_key: str) -> Dict[str, str]:
+    async with AsyncSessionLocal() as session:
+        await _ensure_pipeline_table(session)
+        res = await session.execute(
+            text(
+                "SELECT status, error, updated_at FROM pipeline_jobs WHERE s3_key = :s3_key"
+            ),
+            {"s3_key": s3_key},
+        )
+        row = res.fetchone()
+        if row:
+            return {
+                "status": row.status,
+                "error": row.error,
+                "updated_at": str(row.updated_at),
+            }
+        return {"status": "unknown"}
+
+
+# ==================================================
+# PIPELINE TRIGGER
+# ==================================================
+class RunPipelineRequest(BaseModel):
+    s3_key: str
+
+
+async def _download_s3_to_tmp(s3_key: str) -> Path:
+    """S3 객체를 임시 파일로 다운로드 후 경로 반환."""
+    tmp_dir = Path(tempfile.gettempdir())
+    local_path = tmp_dir / Path(s3_key).name
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(
+        None, s3_client.download_file, ACCESS_POINT_ARN, s3_key, str(local_path)
+    )
+    return local_path
+
+
+async def _run_pipeline_worker(s3_key: str):
+    """S3 키를 받아 파이프라인을 비동기로 실행."""
+    try:
+        from app.ai_pipeline.graph import build_graph
+
+        # 1) S3 → 로컬 임시 저장
+        local_pdf = await _download_s3_to_tmp(s3_key)
+
+        # 2) 파이프라인 초기 상태 구성
+        initial_state = {
+            "preprocess_request": {
+                "pdf_paths": [str(local_pdf)],
+                "use_vision_pipeline": True,
+                "enable_change_detection": True,
+            },
+            "change_context": {},
+            "mapping_filters": {},
+            "validation_retry_count": 0,
+        }
+
+        app = build_graph()
+        await app.ainvoke(initial_state, config={"configurable": {}})
+        logger.info("✅ pipeline completed for s3_key=%s", s3_key)
+        await _set_job_status(s3_key, "done")
+    except Exception as exc:
+        logger.error(
+            "❌ pipeline failed for s3_key=%s, error=%s", s3_key, exc, exc_info=True
+        )
+        await _set_job_status(s3_key, "failed", str(exc))
+
+
+@router.post("/run-pipeline")
+async def run_pipeline_from_s3(
+    req: RunPipelineRequest, background_tasks: BackgroundTasks
+):
+    """
+    S3 키로 업로드된 규제 PDF를 즉시 AI 파이프라인에 태우는 엔드포인트.
+    응답은 바로 반환되고, 백그라운드에서 처리됩니다.
+    """
+    await _set_job_status(req.s3_key, "running")
+    background_tasks.add_task(_run_pipeline_worker, req.s3_key)
+    return {"status": "accepted", "s3_key": req.s3_key}
+
+
+@router.get("/pipeline-status")
+async def pipeline_status_check(s3_key: str):
+    """
+    파이프라인 상태 확인 (DB 기반).
+    """
+    return await _get_job_status(s3_key)
+
+
 # ==================================================
 # UTIL
 # ==================================================
@@ -100,6 +252,7 @@ def normalize_title(title: str) -> str:
     title = re.sub(r"[^a-z0-9\s\-]", "", title)
     title = re.sub(r"\s+", "-", title)
     return title
+
 
 # ==================================================
 # FILE UPLOAD
@@ -130,6 +283,7 @@ async def upload_file(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 # ==================================================
 # FILE LIST
 # ==================================================
@@ -158,17 +312,20 @@ def list_files(
                 continue
 
             parts = key.split("/")
-            results.append({
-                "id": hash(key),
-                "name": parts[-1],
-                "country": parts[-2] if len(parts) > 2 else "",
-                "type": "reg" if "regulation" in key else "report",
-                "s3_key": key,
-                "size": obj["Size"],
-                "date": obj["LastModified"].strftime("%Y-%m-%d"),
-            })
+            results.append(
+                {
+                    "id": hash(key),
+                    "name": parts[-1],
+                    "country": parts[-2] if len(parts) > 2 else "",
+                    "type": "reg" if "regulation" in key else "report",
+                    "s3_key": key,
+                    "size": obj["Size"],
+                    "date": obj["LastModified"].strftime("%Y-%m-%d"),
+                }
+            )
 
     return {"status": "success", "files": results}
+
 
 # ==================================================
 # FILE DELETE
@@ -184,19 +341,29 @@ def delete_file(s3_key: str = Query(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 # ==================================================
 # PRESIGNED DOWNLOAD
 # ==================================================
 class DownloadURLRequest(BaseModel):
-    key: str
+    key: Optional[str] = None
+    s3_key: Optional[str] = None
 
 
 @router.post("/download-url")
-def generate_download_url(req: DownloadURLRequest):
+def generate_download_url(
+    req: DownloadURLRequest,
+    key: Optional[str] = Query(None),
+    s3_key: Optional[str] = Query(None),
+):
+    selected = key or s3_key or req.key or req.s3_key
+    if not selected:
+        raise HTTPException(status_code=422, detail="key (or s3_key) is required")
     return {
         "status": "success",
-        "url": generate_presigned_download_url(req.key),
+        "url": generate_presigned_download_url(selected),
     }
+
 
 # ==================================================
 # TRANSLATION
@@ -218,10 +385,7 @@ async def generate_translation_pdf(
     pdf_filename = f"{normalized}__{lang}.pdf"
 
     # 🔥 변경된 저장 위치
-    s3_key = (
-        f"{S3_BASE_PREFIX}/{S3_APP_PREFIX}/remon/"
-        f"translation/{pdf_filename}"
-    )
+    s3_key = f"{S3_BASE_PREFIX}/{S3_APP_PREFIX}/remon/" f"translation/{pdf_filename}"
 
     # 이미 존재
     if s3_object_exists(s3_key):
@@ -236,15 +400,16 @@ async def generate_translation_pdf(
         raise HTTPException(status_code=404, detail="Regulation not found")
 
     try:
-        markdown_text = (
-            regul_data["vision_extraction_result"][0]
-            ["structure"]["markdown_content"]
-        )
+        markdown_text = regul_data["vision_extraction_result"][0]["structure"][
+            "markdown_content"
+        ]
     except Exception:
         raise HTTPException(status_code=500, detail="Invalid regulation data structure")
 
     if not markdown_text.strip():
-        raise HTTPException(status_code=500, detail="Regulation markdown content is empty")
+        raise HTTPException(
+            status_code=500, detail="Regulation markdown content is empty"
+        )
 
     service = TranslationService()
     result = await service.translate_markdown_to_pdf(
@@ -260,6 +425,7 @@ async def generate_translation_pdf(
         "s3_key": s3_key,
         "download_url": generate_presigned_download_url(s3_key),
     }
+
 
 # ==================================================
 # REGULATION PREVIEW

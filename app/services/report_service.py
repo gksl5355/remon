@@ -193,29 +193,40 @@ class ReportService:
             return None
         # TODO: summary.updated_at 컬럼이 있다면 비교. 없으면 created_at 기준 사용
         summary_updated = getattr(summary, "created_at", None)
+        report_s3_key = getattr(report_obj, "s3_key", None)
+        report_pdf_updated_at = getattr(report_obj, "pdf_updated_at", None)
         cached_fresh = (
             report_obj
-            and report_obj.s3_key
-            and report_obj.pdf_updated_at
+            and report_s3_key
+            and report_pdf_updated_at
             and summary_updated
-            and report_obj.pdf_updated_at >= summary_updated
+            and report_pdf_updated_at >= summary_updated
         )
 
         if cached_fresh and self.s3_client:
             try:
-                presigned = self.s3_client.generate_presigned_url(report_obj.s3_key)
+                presigned = self.s3_client.generate_presigned_url(report_s3_key)
                 logger.info("Serving cached PDF from S3 for report_id=%s", report_id)
                 return await self._download_s3(presigned)
             except Exception:
                 logger.warning("Failed to fetch cached PDF; regenerating.", exc_info=True)
 
         # 렌더 후 S3 업로드
-        html = self._render_summary_html(report_id, summary.summary_text)
+        html = self._render_summary_html(
+            report_id=report_id,
+            summary_text=summary.summary_text,
+            last_updated=getattr(summary, "created_at", None),
+        )
         pdf_bytes = self._html_to_pdf(html)
         if self.s3_client and report_obj:
-            s3_key = self._upload_pdf(pdf_bytes, f"reports/{report_id}.pdf")
-            await self.report_repo.update_pdf_meta(db, report_id, s3_key)
-            await db.commit()
+            try:
+                s3_key = self._upload_pdf(pdf_bytes, f"reports/{report_id}.pdf")
+                updater = getattr(self.report_repo, "update_pdf_meta", None)
+                if callable(updater):
+                    await updater(db, report_id, s3_key)
+                    await db.commit()
+            except Exception:
+                logger.warning("Failed to upload or update PDF metadata; continuing without S3 cache.", exc_info=True)
         return pdf_bytes
 
     async def download_combined_report(
@@ -271,23 +282,132 @@ class ReportService:
             "s3_key": s3_key,
         }
 
-    def _render_summary_html(self, report_id: int, summary_text: Any) -> str:
+    def _render_summary_html(self, report_id: int, summary_text: Any, last_updated: Optional[datetime] = None) -> str:
         """
         summary_text를 Jinja 템플릿으로 HTML 렌더링.
         """
-        sections: List[Dict[str, Any]] = []
+        raw_sections: List[Dict[str, Any]] = []
         if isinstance(summary_text, dict):
             for _, section in summary_text.items():
                 if isinstance(section, dict):
-                    sections.append(section)
+                    raw_sections.append(section)
         elif isinstance(summary_text, list):
             for item in summary_text:
                 if isinstance(item, dict):
-                    sections.append(item)
+                    raw_sections.append(item)
+
+        def _find_section(keys: List[str]) -> Optional[Dict[str, Any]]:
+            for s in raw_sections:
+                title = s.get("title", "")
+                sec_id = s.get("id", "")
+                if any(k in title for k in keys) or sec_id in keys:
+                    return s
+            return None
+
+        def _normalize_content(section: Dict[str, Any], default: str = "데이터가 없습니다.") -> List[str]:
+            content = section.get("content")
+            if content is None:
+                return [default]
+            if isinstance(content, list):
+                return [str(c) for c in content if c is not None]
+            return [str(content)]
+
+        def _normalize_tables(section: Dict[str, Any]) -> List[Dict[str, Any]]:
+            tables = section.get("tables") or []
+            normalized = []
+            for tbl in tables:
+                headers = tbl.get("headers") or ["항목", "내용"]
+                rows = tbl.get("rows") or [["데이터 없음", "-"]]
+                normalized.append(
+                    {
+                        "product_name": tbl.get("product_name", ""),
+                        "headers": headers,
+                        "rows": rows,
+                    }
+                )
+            if not normalized:
+                normalized.append(
+                    {
+                        "product_name": "",
+                        "headers": ["항목", "내용"],
+                        "rows": [["데이터 없음", "-"]],
+                    }
+                )
+            return normalized
+
+        def _normalize_links(section: Dict[str, Any]) -> List[Dict[str, str]]:
+            links = section.get("content") or []
+            normalized = []
+            for link in links:
+                if isinstance(link, dict):
+                    normalized.append(
+                        {
+                            "url": link.get("url") or link.get("link") or "#",
+                            "text": link.get("text") or link.get("title") or link.get("url") or "링크",
+                        }
+                    )
+                else:
+                    normalized.append({"url": str(link), "text": str(link)})
+            return normalized
+
+        ordered_sections: List[Dict[str, Any]] = []
+        overall = _find_section(["overall", "종합 요약"])
+        if overall:
+            ordered_sections.append(
+                {"title": "0. 종합 요약", "type": "list", "content": _normalize_content(overall)}
+            )
+
+        change = _find_section(["규제 변경 요약", "change"])
+        if change:
+            ordered_sections.append(
+                {"title": "1. 규제 변경 요약", "type": "list", "content": _normalize_content(change)}
+            )
+
+        products = _find_section(["제품 분석", "products"])
+        if products:
+            ordered_sections.append(
+                {
+                    "title": "2. 영향받는 제품 목록",
+                    "type": "nested_tables",
+                    "tables": _normalize_tables(products),
+                }
+            )
+
+        analysis = _find_section(["변경 사항", "major", "changes"])
+        if analysis:
+            ordered_sections.append(
+                {"title": "3. 주요 변경 사항 해석", "type": "list", "content": _normalize_content(analysis)}
+            )
+
+        strategy = _find_section(["대응 전략", "strategy"])
+        if strategy:
+            ordered_sections.append(
+                {"title": "4. 대응 전략", "type": "list", "content": _normalize_content(strategy)}
+            )
+
+        impact = _find_section(["영향 평가", "impact"])
+        if impact:
+            ordered_sections.append(
+                {
+                    "title": "5. 영향 평가 근거",
+                    "type": "paragraph",
+                    "content": _normalize_content(impact),
+                }
+            )
+
+        references = _find_section(["참고", "references"])
+        if references:
+            ordered_sections.append(
+                {"title": "6. 참고 및 원문 링크", "type": "links", "content": _normalize_links(references)}
+            )
+
+        if not ordered_sections:
+            ordered_sections = raw_sections
+
         context = {
             "title": f"Report #{report_id}",
-            "last_updated": None,
-            "sections": sections,
+            "last_updated": last_updated,
+            "sections": ordered_sections,
         }
         template = self.jinja_env.get_template("report.html.j2")
         return template.render(**context)

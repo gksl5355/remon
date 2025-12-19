@@ -323,7 +323,7 @@
 
 <script setup>
 import api from "@/services/api";
-import { computed, ref, watch } from "vue";
+import { ref, watch } from "vue";
 
 /* AUTO SCROLL */
 const scrollArea = ref(null);
@@ -376,7 +376,8 @@ const isLoading = ref(false);
 
 /* REPORT INPUT */
 const props = defineProps({
-  fileId: Number
+  fileId: Number,
+  regulationId: Number
 });
 
 /* TYPEWRITER BASED ON CHARACTER */
@@ -480,57 +481,49 @@ watch(
 
 /* HUMAN VALIDATION */
 const runHV = async () => {
+  if (!hvInput.value.trim()) {
+    alert('피드백을 입력해주세요.');
+    return;
+  }
+
+  if (!props.regulationId) {
+    alert('규제 ID가 없습니다.');
+    return;
+  }
+
   showModal.value = false;
   isLoading.value = true;
 
   try {
-    // HITL 관련 코드 
-    // const res = await api.post(`/ai/hitl/feedback`, { 
-    //   regulation_id: 218,
-    //   user_message: hvInput.value
-    // });
+    // ✅ 백엔드 HITL API 호출
+    const res = await api.post('/ai/hitl/feedback', {
+      regulation_id: props.regulationId,
+      user_message: hvInput.value
+    });
 
-    // const data = res.data;
+    console.log('✅ HITL 응답:', res.data);
 
-    // if (data.intent === 'question') {
-    //   // 질문: 답변만 표시
-    //   isLoading.value = false;
-    //   alert(data.answer);
-    //   return;
-    // }
+    // Intent 분기 처리
+    if (res.data.intent === 'question') {
+      // 질문 답변만 표시 (재실행 없음)
+      alert(`답변: ${res.data.answer}`);
+      isLoading.value = false;
+      hvInput.value = '';
+      return;
+    }
 
-    // modification: 리포트 재로드
-    await new Promise(r => setTimeout(r, 600));
-    // const reportRes = await api.get(`/reports/${props.fileId}`);
-    // const reportData = reportRes.data;
-
-    // // regulation_id 업데이트
-    // regulationId.value = reportData.regulation_id;
-
-    // // 데이터 업데이트
-    // if (reportData.sections && Array.isArray(reportData.sections)) {
-    //   reportData.sections.forEach(section => {
-    //     if (section.title.includes('종합 요약')) {
-    //       baseOverall.value = section.content;
-    //     } else if (section.title.includes('규제 변경 요약')) {
-    //       baseSection1.value = section.content.join('\n');
-    //     } else if (section.title.includes('제품 분석')) {
-    //       baseProducts.value = section.tables;
-    //     } else if (section.title.includes('변경 사항')) {
-    //       baseAnalysis.value = section.content;
-    //     } else if (section.title.includes('대응 전략')) {
-    //       baseStrategy.value = section.content;
-    //     } else if (section.title.includes('영향 평가')) {
-    //       baseImpactReason.value = section.content.join('\n');
-    //     } else if (section.title.includes('참고 및 원문 링크')) {
-    //       baseUrl.value = section.content;
-    //     }
-    //   });
-    // }
-
+    // ✅ 현재 보고서를 스트리밍으로 표시 (HITL 완료 여부 무관)
     isLoading.value = false;
-    isStreaming.value = true;
-
+    
+    // 스트리밍 데이터 초기화
+    streamedOverrall.value = [];
+    streamedSection1.value = "";
+    streamedProducts.value = [];
+    streamedAnalysis.value = [];
+    streamedStrategy.value = [];
+    streamedImpactReason.value = "";
+    streamedReferences.value = [];
+    
     showSection0.value = false;
     showSection1.value = false;
     showSection2.value = false;
@@ -538,33 +531,169 @@ const runHV = async () => {
     showSection4.value = false;
     showSection5.value = false;
     showSection6.value = false;
+    
+    isStreaming.value = true;
 
     showSection0.value = true;
     await typeList(streamedOverrall, baseOverall.value, "Overrall");
+    await new Promise(r => setTimeout(r, 600));
 
     showSection1.value = true;
     await typeText(streamedSection1, baseSection1.value, "section1");
+    await new Promise(r => setTimeout(r, 600));
 
     showSection2.value = true;
     await typeProducts(streamedProducts, baseProducts.value, "products");
+    await new Promise(r => setTimeout(r, 600));
 
     showSection3.value = true;
     await typeList(streamedAnalysis, baseAnalysis.value, "analysis");
+    await new Promise(r => setTimeout(r, 600));
 
     showSection4.value = true;
     await typeList(streamedStrategy, baseStrategy.value, "strategy");
+    await new Promise(r => setTimeout(r, 600));
 
     showSection5.value = true;
     await typeText(streamedImpactReason, baseImpactReason.value, "impactReason");
+    await new Promise(r => setTimeout(r, 600));
 
     showSection6.value = true;
     await typeList(streamedReferences, baseUrl.value, "references");
 
     isStreaming.value = false;
+
+    // modification: 새 보고서 로드 (완료된 경우만)
+    if (res.data.report_id) {
+      const reportRes = await api.get(`/reports/${res.data.report_id}`);
+      const data = reportRes.data;
+
+      // ✅ 새 데이터로 업데이트
+      if (data.sections && Array.isArray(data.sections)) {
+        data.sections.forEach(section => {
+          if (section.title.includes('종합 요약')){
+            baseOverall.value = section.content;
+          } else if (section.title.includes('규제 변경 요약')) {
+            baseSection1.value = section.content.join('\n');
+          } else if (section.title.includes('제품 분석')) {
+            baseProducts.value = section.tables;
+          } else if (section.title.includes('변경 사항')) {
+            baseAnalysis.value = section.content;
+          } else if (section.title.includes('대응 전략')) {
+            baseStrategy.value = section.content;
+          } else if (section.title.includes('영향 평가')) {
+            baseImpactReason.value = section.content.join('\n');
+          } else if (section.title.includes('참고 및 원문 링크')) {
+            baseUrl.value = section.content;
+          }
+        });
+      }
+
+
+      // ✅ 새 데이터를 스트리밍으로 다시 표시
+      // 스트리밍 데이터 초기화
+      streamedOverrall.value = [];
+      streamedSection1.value = "";
+      streamedProducts.value = [];
+      streamedAnalysis.value = [];
+      streamedStrategy.value = [];
+      streamedImpactReason.value = "";
+      streamedReferences.value = [];
+      
+      showSection0.value = false;
+      showSection1.value = false;
+      showSection2.value = false;
+      showSection3.value = false;
+      showSection4.value = false;
+      showSection5.value = false;
+      showSection6.value = false;
+      
+      isStreaming.value = true;
+
+      showSection0.value = true;
+      await typeList(streamedOverrall, baseOverall.value, "Overrall");
+      await new Promise(r => setTimeout(r, 600));
+
+      showSection1.value = true;
+      await typeText(streamedSection1, baseSection1.value, "section1");
+      await new Promise(r => setTimeout(r, 600));
+
+      showSection2.value = true;
+      await typeProducts(streamedProducts, baseProducts.value, "products");
+      await new Promise(r => setTimeout(r, 600));
+
+      showSection3.value = true;
+      await typeList(streamedAnalysis, baseAnalysis.value, "analysis");
+      await new Promise(r => setTimeout(r, 600));
+
+      showSection4.value = true;
+      await typeList(streamedStrategy, baseStrategy.value, "strategy");
+      await new Promise(r => setTimeout(r, 600));
+
+      showSection5.value = true;
+      await typeText(streamedImpactReason, baseImpactReason.value, "impactReason");
+      await new Promise(r => setTimeout(r, 600));
+
+      showSection6.value = true;
+      await typeList(streamedReferences, baseUrl.value, "references");
+
+      isStreaming.value = false;
+    }
+
   } catch (err) {
-    console.error('HITL 피드백 실패:', err);
+    console.error('❌ HITL 실패:', err);
+    
+    // ✅ 에러 발생해도 현재 보고서를 스트리밍으로 표시
     isLoading.value = false;
-    alert('피드백 처리 중 오류가 발생했습니다.');
+    
+    streamedOverrall.value = [];
+    streamedSection1.value = "";
+    streamedProducts.value = [];
+    streamedAnalysis.value = [];
+    streamedStrategy.value = [];
+    streamedImpactReason.value = "";
+    streamedReferences.value = [];
+    
+    showSection0.value = false;
+    showSection1.value = false;
+    showSection2.value = false;
+    showSection3.value = false;
+    showSection4.value = false;
+    showSection5.value = false;
+    showSection6.value = false;
+    
+    isStreaming.value = true;
+
+    showSection0.value = true;
+    await typeList(streamedOverrall, baseOverall.value, "Overrall");
+    await new Promise(r => setTimeout(r, 600));
+
+    showSection1.value = true;
+    await typeText(streamedSection1, baseSection1.value, "section1");
+    await new Promise(r => setTimeout(r, 600));
+
+    showSection2.value = true;
+    await typeProducts(streamedProducts, baseProducts.value, "products");
+    await new Promise(r => setTimeout(r, 600));
+
+    showSection3.value = true;
+    await typeList(streamedAnalysis, baseAnalysis.value, "analysis");
+    await new Promise(r => setTimeout(r, 600));
+
+    showSection4.value = true;
+    await typeList(streamedStrategy, baseStrategy.value, "strategy");
+    await new Promise(r => setTimeout(r, 600));
+
+    showSection5.value = true;
+    await typeText(streamedImpactReason, baseImpactReason.value, "impactReason");
+    await new Promise(r => setTimeout(r, 600));
+
+    showSection6.value = true;
+    await typeList(streamedReferences, baseUrl.value, "references");
+
+    isStreaming.value = false;
+  } finally {
+    hvInput.value = '';
   }
 };
 
@@ -576,7 +705,8 @@ const downloadReport = async () => {
 
   try {
     const res = await api.get(`/reports/${props.fileId}/download`, {
-      responseType: "blob"
+      responseType: "blob",
+      timeout: 30000
     });
     const blob = new Blob([res.data], { type: "application/pdf" });
     const url = URL.createObjectURL(blob);
@@ -587,7 +717,14 @@ const downloadReport = async () => {
     URL.revokeObjectURL(url);
   } catch (err) {
     console.error('리포트 다운로드 실패:', err);
-    alert('리포트 다운로드 중 오류가 발생했습니다.');
+    const status = err?.response?.status;
+    if (status === 503) {
+      alert('서버가 잠시 응답하지 않습니다. 잠시 후 다시 시도해주세요.');
+    } else if (status === 504 || err.code === 'ECONNABORTED') {
+      alert('다운로드 시간이 초과되었습니다. 다시 시도하거나 잠시 기다려주세요.');
+    } else {
+      alert('리포트 다운로드 중 오류가 발생했습니다.');
+    }
   }
 };
 </script>
