@@ -125,15 +125,6 @@ REMON은 규제 수집, 전처리, AI 분석, 리포트 생성으로 이어지�
 * Architecture Overview
   [`docs/architecture.md`](docs/architecture.md)
 
-* AI Workflow & Agents
-  [`docs/ai-workflow.md`](docs/ai-workflow.md)
-
-* Data Model & ERD
-  [`docs/data-model.md`](docs/data-model.md)
-
-* HITL Design & Validation Flow
-  [`docs/hitl.md`](docs/hitl.md)
-
 ## Roadmap
 
 * 국가별 규제 소스 확장
@@ -209,5 +200,6 @@ Commercial use requires separate permission.
   numpy
 
 Detailed license texts are available in each respective repository.
+
 
 
