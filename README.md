@@ -178,7 +178,7 @@ REMON은 규제 수집, 전처리, AI 분석, 리포트 생성으로 이어지�
     <td align="center">
       <img src="https://avatars.githubusercontent.com/gksl5355" width="120" /><br/>
       <b>조태환</b><br/>
-      <sub>RAG Engineer</sub><br/>
+      <sub>PM/AI - RAG</sub><br/>
       <sub>Embedding · Qdrant · Retrieval Pipeline</sub><br/>
       <a href="https://github.com/gksl5355">@gksl5355</a>
     </td>
@@ -209,4 +209,5 @@ Commercial use requires separate permission.
   numpy
 
 Detailed license texts are available in each respective repository.
+
 
