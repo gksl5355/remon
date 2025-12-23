@@ -34,7 +34,7 @@ class ReportItem(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationship
-    report = relationship("Report", back_populates="items")
+    # report = relationship("Report", back_populates="items")
 
 
 class ReportSummary(Base):
